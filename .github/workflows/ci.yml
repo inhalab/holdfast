@@ -10,25 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Gradle 프로젝트 여부 확인
-        id: check
+      - name: 빌드 및 테스트
         run: |
           if [ -f gradlew ]; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
+            ./gradlew build
           else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
             echo "스캐폴딩 전입니다. 빌드를 건너뜁니다."
           fi
-
-      - name: Java 설정
-        if: steps.check.outputs.exists == 'true'
-        uses: actions/setup-java@v5
-        with:
-          java-version: '21'
-          distribution: temurin
-          cache: gradle
-
-      - name: 빌드 및 테스트
-        if: steps.check.outputs.exists == 'true'
-        run: ./gradlew build
