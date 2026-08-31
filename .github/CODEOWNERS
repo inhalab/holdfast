@@ -1,6 +1,9 @@
-# 해당 경로가 바뀌면 자동으로 리뷰어가 붙습니다 (승인 강제는 아님)
-/api/         @Asirante
-/load-test/   @Asirante
-/infra/       @F3ZLoV
-/.github/     @F3ZLoV
-/docs/        @Asirante @F3ZLoV
+# 아래 규칙이 우선합니다
+/api/                 @F3ZLoV
+/api/reservation/     @Asirante
+/api/seat/            @Asirante
+/web/                 @F3ZLoV
+/infra/               @F3ZLoV
+/load-test/           @Asirante
+/.github/             @F3ZLoV
+/docs/                @Asirante @F3ZLoV
