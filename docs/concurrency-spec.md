@@ -2,20 +2,38 @@
 
 **holdfast** — 좌석 단위 점유 제어 · 락 전략 비교
 
-이 문서는 `docs/design-spec.md` 3.4절이 지정한 별도 문서다. 임계 구역이 어디인지, 각 전략을 어떻게 구현하는지, 무엇을 어떤 조건에서 측정하는지를 착수 전에 고정한다.
+`docs/design-spec.md` 3.4절이 지정한 별도 문서다. 임계 구역이 어디인지, 각 전략을 어떻게 구현하는지, 무엇을 어떤 조건에서 측정하는지를 착수 전에 고정한다.
 
 ---
 
-## 0. 전제
+## 0. 스택
 
-| 항목 | 값 |
-|---|---|
-| 백엔드 | Spring Boot 3 / Java 21 |
-| DB | PostgreSQL 16 |
-| 캐시·락 | Redis 7 + Redisson |
-| 부하 도구 | k6 |
-| 인스턴스 | 앱 2대 (ALB 또는 nginx 뒤) |
-| 격리 수준 | READ COMMITTED (전 전략 고정) |
+| 항목 | 값 | 상태 |
+|---|---|---|
+| 백엔드 | Spring Boot 4.1 / Java 25 | 확정 |
+| DB | PostgreSQL 18 | 잠정 |
+| 캐시·락 | Redis 또는 Valkey + Redisson 4.7 | 잠정 |
+| 부하 도구 | k6 | 확정 |
+| 배포 | ECS + ALB, 앱 2대 | 잠정 |
+| 로컬 | Docker Compose (앱 2대 + nginx) | 확정 |
+| 격리 수준 | READ COMMITTED (전 전략 고정) | 확정 |
+
+### 0.1 버전 근거
+
+Spring Boot 4.0은 2025-11-20, 4.1은 2026-06-10에 공개됐다. 3.x는 3.5.16(2026-06-25)을 끝으로 오픈소스 지원이 종료됐고 현재 지원 대상은 4.0·4.1뿐이다. 4개월 프로젝트를 지원 종료된 라인에서 시작할 이유가 없다.
+
+Redisson 4.7.0은 Spring Boot 1.3.x–4.1.x를 지원하므로 호환성 문제는 없다. Valkey도 같은 클라이언트로 붙는다.
+
+**Spring Boot 4 전환 비용은 인지하고 들어간다.** Jakarta EE 11 기반, Spring Framework 7 필수, Gradle 9 이상, Jackson 3 기본, JSpecify 기반 null 애노테이션. 3.x에서 deprecated였던 API는 제거됐다. 인터넷 예제 대부분이 3.x 기준이라 설정·의존성 쪽에서 그대로 붙지 않는 경우가 생긴다. 다만 이 문서가 다루는 `@Lock`, `@Transactional`, `TransactionSynchronizationManager`, Redisson `RLock`은 4.x에서 변경이 없다.
+
+### 0.2 미결정
+
+| 항목 | 결정자 | 기한 |
+|---|---|---|
+| RDS Postgres 마이너 버전 | 박태준 | M1 |
+| ElastiCache Redis vs Valkey | 박태준 | M1 |
+| ECS Fargate vs EC2 | 박태준 | M1 |
+| 커넥션 풀·스레드 풀 수치 | 최건 | M2 (첫 측정 전) |
 
 좌석재고는 `(회차ID, 좌석ID)` 행으로 **사전 생성**한다. 예약 시점 생성이 아니다. 이 결정이 없으면 행 단위 락과 유니크 제약을 둘 다 쓸 수 없다.
 
@@ -96,6 +114,14 @@ public interface SeatHoldStrategy {
     HoldResult hold(long sessionId, List<Long> seatIds, String holdId);
 }
 ```
+
+| 프로퍼티 값 | 전략 |
+|---|---|
+| `none` | 베이스라인 (락 없음) |
+| `pessimistic` | 비관적 락 |
+| `optimistic` | 낙관적 락 |
+| `unique` | DB 유니크 제약 |
+| `redis` | Redis 분산락 |
 
 ### 4.1 베이스라인 (`none`)
 
@@ -190,6 +216,7 @@ Outbox 워커는 `SELECT ... FOR UPDATE SKIP LOCKED`로 집는다. 2대가 같�
 |---|---|---|
 | 초과 예약 건수 | 0 | RFP SFR-001 |
 | p95 응답시간 | 3초 이내 | RFP PER-002 |
+| p99 응답시간 | 참고 | GC 꼬리 확인 |
 | 처리량 (TPS) | 비교값 | |
 | 정상 거절률 (409) | 참고 | **실패 아님** |
 | 오류율 (5xx·타임아웃) | 0에 가깝게 | |
@@ -217,6 +244,7 @@ Outbox 워커는 `SELECT ... FOR UPDATE SKIP LOCKED`로 집는다. 2대가 같�
 |---|---|
 | HikariCP `maximum-pool-size` | 명시적 고정 (기본 10 금지) |
 | Tomcat `max-threads` | 명시적 고정 |
+| 가상 스레드 | 비활성화 (측정 단순화) |
 | 격리 수준 | READ COMMITTED |
 | 앱 인스턴스 | 2대 |
 | 홀드 TTL | 10초 |
@@ -225,6 +253,8 @@ Outbox 워커는 `SELECT ... FOR UPDATE SKIP LOCKED`로 집는다. 2대가 같�
 | k6 실행 위치 | 앱과 분리된 호스트 |
 
 **커넥션 풀 크기가 이 표에서 가장 위험하다.** 기본값 10에 VU 500을 때리면 비관적 락 대기가 아니라 커넥션 대기를 측정하게 된다. 전 전략 동일 값을 쓰고 보고서에 그 값을 명시한다.
+
+Java 25에서 가상 스레드를 켜면 스레드 풀 상한이 사라지고 커넥션 풀이 유일한 병목이 되어 성능 특성이 달라진다. 본 측정에서는 끄고, 4개월차에 여유가 있으면 별도 실험으로 다룬다.
 
 ### 7.4 측정 프로토콜
 
@@ -246,15 +276,17 @@ Outbox 워커는 `SELECT ... FOR UPDATE SKIP LOCKED`로 집는다. 2대가 같�
 
 ### 7.6 기록 양식
 
-| 전략 | 경합도 | 초과 예약 | p95 | p99 | TPS | 409율 | 오류율 | 재시도 | 제약위반 |
-|---|---|---|---|---|---|---|---|---|---|
-| none | 고경합 | | | | | | | — | |
-| pessimistic | 고경합 | | | | | | — | | |
-| optimistic | 고경합 | | | | | | | | |
-| unique | 고경합 | | | | | | — | | |
-| redis | 고경합 | | | | | | — | | |
+경합도별로 한 벌씩, 총 3벌 작성한다.
 
-저경합·극단 시나리오도 같은 양식으로 3벌 작성한다.
+| 전략 | 초과 예약 | p95 | p99 | TPS | 409율 | 오류율 | 재시도 | 제약위반 |
+|---|---|---|---|---|---|---|---|---|
+| none | | | | | | | — | |
+| pessimistic | | | | | | — | | |
+| optimistic | | | | | | | | |
+| unique | | | | | | — | | |
+| redis | | | | | | — | | |
+
+README의 측정 결과 표는 고경합 시나리오를 요약본으로 싣고, 전체는 이 문서에 둔다.
 
 ---
 
