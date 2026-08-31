@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: gradle
+      - name: Build & test
+        run: |
+          if [ -f gradlew ]; then
+            ./gradlew build
+          else
+            echo "빌드 설정 전. 스캐폴딩 후 이 분기를 지우세요."
+          fi

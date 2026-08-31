@@ -1,0 +1,31 @@
+# --- Java / Gradle ---
+build/
+.gradle/
+*.class
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# --- Node ---
+node_modules/
+dist/
+
+# --- Terraform (이거 빠지면 AWS 리소스 정보가 통째로 공개됩니다) ---
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+!example.tfvars
+crash.log
+
+# --- 환경변수 / 자격증명 ---
+.env
+.env.*
+*.pem
+*.key
+
+# --- IDE / OS ---
+.idea/
+.vscode/
+*.iml
+.DS_Store
