@@ -20,7 +20,7 @@
 | 백엔드 | Spring Boot 4.1 / Java 25 |
 | DB | PostgreSQL 18 |
 | 캐시·분산락 | Redis (또는 Valkey) + Redisson 4.7 |
-| 프론트엔드 | React + Vite + TypeScript |
+| 프론트엔드 | Thymeleaf + htmx (서버 렌더링) |
 | 부하 테스트 | k6 |
 | 인프라 | AWS ECS + ALB (앱 2대), Terraform |
 | 로컬 | Docker Compose (앱 2대 + nginx) |
@@ -49,8 +49,7 @@
 ## 구조
 
 ```
-api/         애플리케이션
-web/         프론트엔드
+api/         애플리케이션 (Thymeleaf 템플릿 포함)
 infra/       Terraform, 배포
 load-test/   k6 시나리오
 docs/        설계 명세, ERD, 측정 결과
