@@ -39,3 +39,5 @@ docs/        설계 명세, ERD, 측정 결과
 - [역할 분담](docs/roles.md)
 
 - [협업 규칙](docs/workflow.md)
+
+- [동시성 설계서](docs/concurrency-spec.md)

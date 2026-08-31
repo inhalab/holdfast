@@ -1,0 +1,271 @@
+# 동시성 설계서
+
+**holdfast** — 좌석 단위 점유 제어 · 락 전략 비교
+
+이 문서는 `docs/design-spec.md` 3.4절이 지정한 별도 문서다. 임계 구역이 어디인지, 각 전략을 어떻게 구현하는지, 무엇을 어떤 조건에서 측정하는지를 착수 전에 고정한다.
+
+---
+
+## 0. 전제
+
+| 항목 | 값 |
+|---|---|
+| 백엔드 | Spring Boot 3 / Java 21 |
+| DB | PostgreSQL 16 |
+| 캐시·락 | Redis 7 + Redisson |
+| 부하 도구 | k6 |
+| 인스턴스 | 앱 2대 (ALB 또는 nginx 뒤) |
+| 격리 수준 | READ COMMITTED (전 전략 고정) |
+
+좌석재고는 `(회차ID, 좌석ID)` 행으로 **사전 생성**한다. 예약 시점 생성이 아니다. 이 결정이 없으면 행 단위 락과 유니크 제약을 둘 다 쓸 수 없다.
+
+---
+
+## 1. 임계 구역
+
+| # | 구역 | 경합 대상 | 위험 |
+|---|---|---|---|
+| CS-1 | 좌석 홀드 획득 | `seat_inventory` 행 | 초과 점유 |
+| CS-2 | 예약 확정 | 홀드된 행 | 만료된 홀드의 확정 |
+| CS-3 | 홀드 TTL 만료 | 홀드된 행 | 확정과 동시 발생 |
+| CS-4 | 취소 시 좌석 반환 | 판매된 행 | 이중 반환 |
+| CS-5 | 회차 잔여 수량 | `event_session.remaining` | 카운터 경합 |
+
+**CS-2와 CS-3의 경합이 이 프로젝트에서 가장 자주 터진다.** 홀드가 만료되는 순간과 결제 완료 콜백이 도착하는 순간이 겹치면, 만료된 좌석이 확정되거나 결제는 됐는데 좌석이 없는 상태가 된다.
+
+CS-5는 가급적 만들지 않는다. 잔여 수량을 별도 카운터 컬럼으로 두면 회차 단위 핫 로우가 생겨 좌석 단위 락의 의미가 사라진다. 잔여 수량은 `COUNT(*) WHERE status='AVAILABLE'`로 유도하고, 조회 성능이 문제되면 그때 캐시를 얹는다.
+
+---
+
+## 2. 좌석재고 상태 전이
+
+```
+AVAILABLE ──hold──> HELD ──confirm──> SOLD
+    ^                 │                 │
+    └────expire───────┘                 │
+    └────────────cancel─────────────────┘
+```
+
+`seat_inventory` 컬럼:
+
+| 컬럼 | 용도 |
+|---|---|
+| `session_id`, `seat_id` | 복합 유니크 |
+| `status` | AVAILABLE / HELD / SOLD |
+| `hold_id` | 현재 홀드 식별자 (nullable) |
+| `held_until` | 홀드 만료 시각 (nullable) |
+| `version` | 낙관적 락용 |
+
+---
+
+## 3. 홀드 정책
+
+**TTL 5분.** 결제 화면 체류 시간을 고려한 값이며, 부하 테스트에서는 경합을 빨리 관찰하기 위해 10초로 낮춰 쓴다. 프로퍼티로 뺀다.
+
+만료 처리 방식은 세 가지가 있다.
+
+| 방식 | 내용 | 채택 |
+|---|---|---|
+| 스케줄러 배치 | 주기적으로 만료 행을 AVAILABLE로 | 보조 |
+| 지연 큐 | Redis TTL + keyspace notification | 미채택 |
+| **lazy 검증** | 조회·확정 시점에 `held_until` 비교 | **주** |
+
+**lazy 검증을 주로 삼는다.** 확정 쿼리 자체에 만료 조건을 넣으면 CS-2와 CS-3의 경합이 단일 SQL 문 안에서 원자적으로 해소된다.
+
+```sql
+UPDATE seat_inventory
+   SET status = 'SOLD', hold_id = NULL, held_until = NULL, version = version + 1
+ WHERE session_id = ? AND seat_id = ?
+   AND status = 'HELD'
+   AND hold_id = ?
+   AND held_until > now();
+```
+
+`rowsAffected = 0`이면 홀드가 만료됐거나 남의 홀드다. 별도의 사전 조회가 없으므로 "조회 후 확정" 사이의 틈이 존재하지 않는다. 스케줄러는 만료 행을 실제로 AVAILABLE로 되돌려 조회 성능을 유지하는 청소 용도로만 둔다. 스케줄러가 죽어도 정합성은 깨지지 않는다.
+
+**시각 기준은 DB의 `now()`로 통일한다.** 앱 서버 2대의 시계가 어긋나면 만료 판정이 인스턴스마다 달라진다.
+
+---
+
+## 4. 락 전략
+
+전략은 `SeatHoldStrategy` 인터페이스의 구현체 5개로 두고, `@ConditionalOnProperty(name="holdfast.strategy")`로 스위칭한다. k6 시나리오는 고정하고 프로퍼티만 바꿔 측정한다.
+
+```java
+public interface SeatHoldStrategy {
+    HoldResult hold(long sessionId, List<Long> seatIds, String holdId);
+}
+```
+
+### 4.1 베이스라인 (`none`)
+
+조회 후 UPDATE. 락 없음. **전략이 아니라 실패 증거다.** 2개월차 산출물이며, 여기서 초과 예약 M건이 나와야 나머지 4개가 무엇을 고쳤는지 말할 수 있다.
+
+### 4.2 비관적 락 (`pessimistic`)
+
+`@Lock(LockModeType.PESSIMISTIC_WRITE)` 또는 native `SELECT ... FOR UPDATE`. 트랜잭션 종료까지 행을 점유한다. 대기 중 DB 커넥션을 계속 쥐고 있다는 점이 성능 특성을 지배한다.
+
+`FOR UPDATE NOWAIT` / `SKIP LOCKED` 변형은 측정하지 않는다. 범위가 늘어난다.
+
+### 4.3 낙관적 락 (`optimistic`)
+
+JPA `@Version`은 쓰지 않는다. 버전 증가가 flush 시점에 묶이고 `OptimisticLockException`이 트랜잭션 커밋 시점, 즉 `@Transactional` 메서드 바깥에서 터져 같은 트랜잭션 안에서 재시도할 수 없다.
+
+명시적 조건부 UPDATE로 한다.
+
+```sql
+UPDATE seat_inventory
+   SET status = 'HELD', hold_id = ?, held_until = now() + interval '5 minutes',
+       version = version + 1
+ WHERE id = ? AND version = ? AND status = 'AVAILABLE';
+```
+
+`rowsAffected = 0`이면 충돌. **재시도 상한 3회, 지수 백오프 + 지터.** 재시도 횟수를 메트릭으로 노출한다 — 고경합 구간에서 이 값이 폭발하는 것이 이 전략의 특성이다.
+
+### 4.4 DB 유니크 제약 (`unique`)
+
+앱 레벨 락 없이 `seat_hold` 테이블에 INSERT하고 `(session_id, seat_id)` 유니크 제약 위반을 잡는다. `DataIntegrityViolationException` → 409.
+
+### 4.5 Redis 분산락 (`redis`)
+
+Redisson `RLock`. 키는 `lock:seat:{sessionId}:{seatId}`.
+
+```
+waitTime  = 3초
+leaseTime = 10초 (명시 — 워치독 비활성화)
+```
+
+**`leaseTime`을 반드시 명시한다.** 생략하면 워치독이 30초 리스를 10초마다 자동 연장하는데, 락을 오래 쥐는 버그가 측정에서 가려지고 실행마다 결과가 달라진다.
+
+---
+
+## 5. 두 가지 규칙
+
+### 5.1 데드락 회피 — 좌석 ID 정렬
+
+여러 좌석을 한 번에 예약할 때 두 요청이 반대 순서로 락을 잡으면 데드락이 난다. **모든 전략에서 좌석 ID를 오름차순 정렬한 뒤 획득한다.** 애플리케이션 레벨에서 정렬하고, 쿼리에도 `ORDER BY id`를 넣는다.
+
+```java
+List<Long> ordered = seatIds.stream().sorted().toList();
+```
+
+Postgres는 `FOR UPDATE`에서 정렬 전 스캔 순서로 락을 잡을 수 있어 `ORDER BY`만으로 완전히 안전하지는 않다. 부하 테스트에서 데드락이 계속 관측되면 정렬된 ID를 한 건씩 개별 락으로 전환한다.
+
+### 5.2 분산락 해제는 커밋 이후
+
+커밋 전에 풀면 락을 걸지 않은 것과 같다. 다른 요청이 커밋되지 않은 상태를 읽는다. **흔한 실수이며 단위 테스트로는 잡히지 않고 부하 테스트에서만 드러난다.**
+
+```java
+TransactionSynchronizationManager.registerSynchronization(
+    new TransactionSynchronization() {
+        @Override public void afterCompletion(int status) {
+            if (lock.isHeldByCurrentThread()) lock.unlock();
+        }
+    });
+```
+
+`afterCommit`이 아니라 `afterCompletion`을 쓴다. 롤백 시에도 해제되어야 한다.
+
+---
+
+## 6. 멱등성
+
+| 대상 | 키 | 저장 |
+|---|---|---|
+| 예약 요청 | `Idempotency-Key` 헤더 (클라이언트 UUID) | `idempotency_record` 유니크 |
+| 결제 콜백 | PG 거래 ID | `payment.pg_tx_id` 유니크 |
+| 알림 발송 | `(예약ID, 알림종류)` | `outbox` 유니크 |
+
+`idempotency_record`에 요청 해시와 응답 본문을 함께 저장한다. 같은 키로 다른 본문이 오면 409를 반환한다 — 키 재사용 버그를 조용히 통과시키지 않는다.
+
+Outbox 워커는 `SELECT ... FOR UPDATE SKIP LOCKED`로 집는다. 2대가 같은 행을 잡지 않으면서 한쪽이 죽어도 다른 쪽이 이어받는다.
+
+---
+
+## 7. 측정 설계
+
+### 7.1 지표
+
+| 지표 | 목표 | 비고 |
+|---|---|---|
+| 초과 예약 건수 | 0 | RFP SFR-001 |
+| p95 응답시간 | 3초 이내 | RFP PER-002 |
+| 처리량 (TPS) | 비교값 | |
+| 정상 거절률 (409) | 참고 | **실패 아님** |
+| 오류율 (5xx·타임아웃) | 0에 가깝게 | |
+| 낙관적 재시도 횟수 | 참고 | `optimistic` 전용 |
+| 제약 위반 발생 횟수 | 0 기대 | 최후 방어선 작동 여부 |
+| 커넥션 풀 대기 시간 | 참고 | 해석의 핵심 |
+
+**정상 거절과 오류를 반드시 분리한다.** 좌석이 이미 팔려 409를 반환한 것은 시스템이 제대로 동작한 것이다. 뭉뚱그리면 "실패율 40%" 같은 무의미한 숫자가 나온다. k6에서 상태 코드별 태그로 집계한다.
+
+**유니크 제약은 5개 전략 전부에 항상 걸어둔다.** 차이는 앱 레벨에서 무엇을 하느냐다. `unique` 전략은 앱 락 없이 제약만으로 막는 경우이고, 나머지는 앱 락이 있고 제약은 최후 방어선이다. 따라서 `redis` 행의 제약 위반 횟수가 0이 아니면 **그 분산락이 새고 있다는 증거**다. 이 열을 표에 남긴다.
+
+### 7.2 경합도 3단계
+
+| 시나리오 | 좌석 수 | VU | 관찰 목적 |
+|---|---|---|---|
+| 저경합 | 1000석 | 100 | 오버헤드 비교 |
+| 고경합 | 10석 | 500 | 전략 차이 |
+| 극단 | 1석 | 200 | 정합성 한계 |
+
+한 조건으로만 재면 순위가 고정되어 비교가 심심해진다. 낙관적 락은 저경합에서 가장 빠르고 고경합에서 재시도가 폭발하며, 비관적 락은 반대다. **이 교차점을 숫자로 잡으면 "상황에 따라 다르다"가 아니라 "경합도 N 이상에서 뒤집힌다"고 말할 수 있다.**
+
+### 7.3 고정 변수
+
+| 변수 | 조치 |
+|---|---|
+| HikariCP `maximum-pool-size` | 명시적 고정 (기본 10 금지) |
+| Tomcat `max-threads` | 명시적 고정 |
+| 격리 수준 | READ COMMITTED |
+| 앱 인스턴스 | 2대 |
+| 홀드 TTL | 10초 |
+| 시드 데이터 | 매 런 초기화 |
+| JVM | 동일 힙·GC 옵션 |
+| k6 실행 위치 | 앱과 분리된 호스트 |
+
+**커넥션 풀 크기가 이 표에서 가장 위험하다.** 기본값 10에 VU 500을 때리면 비관적 락 대기가 아니라 커넥션 대기를 측정하게 된다. 전 전략 동일 값을 쓰고 보고서에 그 값을 명시한다.
+
+### 7.4 측정 프로토콜
+
+1. 시드 초기화
+2. 워밍업 30초 — **집계에서 제외**
+3. 본 측정
+4. 전략당 3회 반복, **중앙값** 채택
+5. 원본 결과 JSON을 `docs/results/`에 커밋
+
+**JVM 워밍업은 자바 특유의 함정이다.** JIT 컴파일 전 첫 수천 요청은 눈에 띄게 느려서, 워밍업을 버리지 않으면 첫 번째로 측정한 전략이 무조건 손해를 본다. GC 일시정지는 p95보다 p99 꼬리를 흔들기 때문에 대표값으로 p95를 쓰되 p99도 함께 기록한다.
+
+### 7.5 사전 가설
+
+측정 전에 적어두고 나중에 대조한다.
+
+> Redis 분산락이 p95에서 비관적 락을 앞설 것이다. Redis가 빨라서가 아니라, 락 획득을 트랜잭션 시작 **전에** 수행하면 대기 중 DB 커넥션을 점유하지 않기 때문이다. 비관적 락은 커넥션을 쥔 채 대기한다.
+
+이 가설을 검증하려면 커넥션 풀 대기 시간을 함께 측정해야 한다. 그래야 결론이 "Redis 승"이 아니라 "자원 점유 구간의 차이"가 된다.
+
+### 7.6 기록 양식
+
+| 전략 | 경합도 | 초과 예약 | p95 | p99 | TPS | 409율 | 오류율 | 재시도 | 제약위반 |
+|---|---|---|---|---|---|---|---|---|---|
+| none | 고경합 | | | | | | | — | |
+| pessimistic | 고경합 | | | | | | — | | |
+| optimistic | 고경합 | | | | | | | | |
+| unique | 고경합 | | | | | | — | | |
+| redis | 고경합 | | | | | | — | | |
+
+저경합·극단 시나리오도 같은 양식으로 3벌 작성한다.
+
+---
+
+## 8. 검증 방법
+
+| 종류 | 도구 | 대상 |
+|---|---|---|
+| 단위 경합 테스트 | JUnit5 + `ExecutorService` + `CountDownLatch` | 전략별 N스레드 동시 홀드 |
+| 통합 테스트 | **Testcontainers** (Postgres + Redis) | 전 전략 |
+| 부하 테스트 | k6, 앱 2대 | 측정 |
+
+**H2를 쓰지 않는다.** `FOR UPDATE` 의미론이 Postgres와 달라 동시성 테스트가 통과해도 아무것도 보장하지 않는다. Testcontainers로 실제 Postgres·Redis를 띄우며 CI에서도 그대로 돈다.
+
+**단일 인스턴스로 측정하지 않는다.** 앱 1대에서는 분산락이 왜 필요한지 증명할 수 없고, 프로젝트의 논지 절반이 사라진다.
