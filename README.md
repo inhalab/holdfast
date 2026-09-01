@@ -60,6 +60,8 @@ docs/        설계 명세, ERD, 측정 결과
 - [설계 명세 및 구현 범위](docs/design-spec.md)
 - [동시성 설계서](docs/concurrency-spec.md)
 - [ERD — 도메인 모델](docs/erd.md)
+- [예약 API 계약 — 요약과 설계 근거](docs/api-spec.md)
+- [OpenAPI 3.1 정의](docs/openapi.yaml)
 - [역할 분담](docs/roles.md)
 - [협업 규칙](docs/workflow.md)
 
