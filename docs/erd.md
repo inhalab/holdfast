@@ -125,10 +125,10 @@ erDiagram
         bigint id PK
         bigint reservation_id FK
         varchar pg_tx_id "PG 거래 ID - 콜백 멱등키"
-        varchar status "REQUESTED/PAID/FAILED/CANCELLED"
+        varchar status "REQUESTED/APPROVED/DECLINED/TIMEOUT/FAILED"
         bigint amount
         timestamptz created_at
-        timestamptz paid_at
+        timestamptz approved_at
     }
 
     ticket {
@@ -299,6 +299,21 @@ INSERT가 유니크 위반으로 거절된다. `concurrency-spec.md` 3절의 스
 
 **결제는 예약당 N건이다.** Mock PG의 실패·타임아웃 재시도가 이력으로 남아야 하므로
 `reservation : payment`를 1:N으로 두고, 멱등성은 `pg_tx_id` 유니크(U-8)가 담당한다.
+
+**`payment.status`는 `REQUESTED/APPROVED/DECLINED/TIMEOUT/FAILED`다.** 이전
+`REQUESTED/PAID/FAILED/CANCELLED`는 Mock PG가 범위 밖이던 시점의 자리표시자였다.
+`TIMEOUT`을 `FAILED`와 분리한 이유는 `TIMEOUT`이 "승인 여부를 모르는 상태"이기
+때문이다 — 응답을 못 받았을 뿐 PG 쪽에서는 실제로 승인됐을 수 있어, 이를 실패로
+간주하고 좌석을 풀어주면 뒤늦은 승인 콜백과 충돌하는 정합성 깨짐이 생긴다
+(`state-transitions.md` 5.1절). `paid_at` 컬럼도 `approved_at`으로 함께 바꿨다.
+
+**`CANCELLED`는 되살리지 않는다.** 결제 취소를 표현할 상태가 필요 없다고 판단했다.
+`design-spec.md` 4.3절에 따라 실제 환불·정산 처리는 범위 밖이므로 취소 시 되돌릴
+금액 로직 자체가 없고, 예약이 취소됐다는 사실은 이미 `reservation.status`
+(`CONFIRMED→CANCELLED`)가 담당한다 — 같은 사실을 두 곳에서 지키지 않는다는 3.1절의
+원칙과 같다. `payment` 행은 승인·거절·실패로 한 번 종결되면 그 자체로는 바뀌지
+않는 이력이고, 예약이 나중에 취소돼도 "그 결제 시도가 승인됐었다"는 사실은 변하지
+않는다.
 
 ### 4.1 만료 홀드 정리 절차
 

@@ -173,10 +173,8 @@ stateDiagram-v2
 ## 5. `payment` — Mock PG 기준
 
 **확정.** `roles.md`가 최건에게 배정한 결정이다 — "Mock PG는 박태준이 만들되,
-인터페이스는 최건이 정한다." 아래가 그 인터페이스다. `erd.md`의
-`payment.status` 열거형(`REQUESTED/PAID/FAILED/CANCELLED`)은 Mock PG가 범위 밖이던
-시점에 놓아둔 자리표시자였고, 이 확정으로 대체된다. **`erd.md`의 해당 스키마 블록은
-별도로 갱신이 필요하다** — 이 문서만으로는 `erd.md`를 고치지 않는다(5.3절 참조).
+인터페이스는 최건이 정한다." 아래가 그 인터페이스이며, `erd.md`의 `payment.status`
+열거형도 이 값으로 갱신했다(`erd.md` 4절).
 
 ```mermaid
 stateDiagram-v2
@@ -252,19 +250,9 @@ Mock PG의 동작은 요청 시점에 아래 프로퍼티로 제어한다. `Seat
 오염된다. `callback-delay-ms`를 키운 시나리오는 락 전략 비교와 **별도로** 돌리고,
 그 시나리오임을 보고서에 명시한다.
 
-### 5.3 `erd.md`와의 불일치 — 별도 갱신 필요
-
-이번에 확정한 상태값(`APPROVED/DECLINED/TIMEOUT/FAILED`)은 `erd.md`가 스키마에
-적어둔 `payment.status` 열거형(`REQUESTED/PAID/FAILED/CANCELLED`)과 다르다. `PAID`가
-`APPROVED`로 바뀌고, `DECLINED`·`TIMEOUT`이 새로 생기고, `CANCELLED`는 이 절의
-상태 기계에서 빠졌다(취소는 `reservation.status`가 담당하고 `payment` 행 자체는
-승인·거절·실패로 종결된 뒤 바뀌지 않는다 — `erd.md` 4절 "결제는 예약당 N건이다"와
-일관된다).
-
-**이 문서의 범위는 상태 전이 다이어그램이라 `erd.md`의 스키마 블록은 직접 고치지
-않았다.** `erd.md`가 이 문서보다 먼저 병합된 확정 문서이므로, 스키마 자체를 여기서
-같이 바꾸면 그 문서의 소유 범위를 침범하게 된다. `erd.md`의 `payment` 스키마 블록과
-2절 REQ 매핑은 별도 PR로 갱신이 필요하다.
+**`CANCELLED`는 이 상태 기계에 없다.** `payment` 행은 `APPROVED`/`DECLINED`/`FAILED`로
+한 번 종결되면 그 자체로는 바뀌지 않는 이력이다. 예약이 나중에 취소돼도 결제 취소
+전용 상태가 필요하지 않은 이유와 판단 근거는 `erd.md` 4절에 있다.
 
 ---
 
