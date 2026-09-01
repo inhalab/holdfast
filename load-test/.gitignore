@@ -1,0 +1,3 @@
+# k6 실행 결과물 — 확정 측정본만 최건이 선별 커밋한다. 자동 생성물은 무시.
+results/*.json
+!results/.gitkeep
