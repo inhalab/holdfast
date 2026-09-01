@@ -205,7 +205,7 @@ erDiagram
 | # | 대상 | 컬럼 | 종류 | 목적 | 적용 |
 |---|---|---|---|---|---|
 | U-1 | `seat_inventory` | `(session_id, seat_id)` | 유니크 인덱스 | 재고 행 중복 생성 방지 | **5개 전략 전부** |
-| U-2 | `seat_hold` | `(session_id, seat_id)` `WHERE status <> 'RELEASED'` | 부분 유니크 인덱스 | 초과 홀드 차단 — 최후 방어선 | **`none` 제외 4개** |
+| U-2 | `seat_hold` | `(session_id, seat_id)` `WHERE status = 'HELD'` | 부분 유니크 인덱스 | 활성 홀드 중복 차단 — 최후 방어선 | **`none` 제외 4개** |
 | U-3 | `zone` | `(seat_layout_id, name)` | 유니크 인덱스 | 배치도 내 구역명 중복 방지 | 전부 |
 | U-4 | `seat` | `(zone_id, seat_no)` | 유니크 인덱스 | 구역 내 좌석번호 중복 방지 | 전부 |
 | U-5 | `user_session_quota` | `(session_id, user_id)` | 유니크 인덱스 | 집계 행 중복 생성 방지 | 전부 |
@@ -252,9 +252,19 @@ U-1은 재고 행의 유일성이지 점유의 유일성이 아니므로 5개 �
 **U-2와 U-11은 부분 유니크 인덱스다.** `seat_hold`는 `status`에 `RELEASED`를 두어
 홀드의 **이력**을 남기므로(`concurrency-spec.md` 2.2), 전체 행에 유니크를 걸면 홀드가
 한 번 해제된 좌석을 다시 홀드할 수 없게 되어 `design-spec.md` 4.1의 "취소 시 좌석
-반환"이 성립하지 않는다. 활성 홀드(`HELD`·`CONFIRMED`)에만 걸어야 유일성과 이력이
-동시에 성립한다. `ticket_scan`도 같은 이유로 실패 스캔 이력을 남기되 성공 입장
-(`ADMITTED`)만 티켓당 1건으로 제한한다.
+반환"이 성립하지 않는다. 유일성과 이력이 동시에 성립하려면 부분 인덱스여야 한다.
+`ticket_scan`도 같은 이유로 실패 스캔 이력을 남기되 성공 입장(`ADMITTED`)만 티켓당
+1건으로 제한한다.
+
+**U-2의 조건은 `status = 'HELD'`다. `CONFIRMED`를 포함하지 않는다.** `CONFIRMED`가
+인덱스에 남으면 "판매된 좌석의 재홀드 차단"까지 이 제약이 떠맡게 되는데, 그 책임은
+`seat_inventory.status`의 조건부 UPDATE에 있다(`concurrency-spec.md` 3절의 확정
+쿼리). **같은 사실을 두 곳에서 지키면 어긋난다.**
+
+측정 해석에서도 이 편이 낫다. 제약 위반 카운터가 **"앱 락이 샜다"만 세도록** 유지해야
+`concurrency-spec.md` 7.1의 "정상 거절과 오류를 분리한다"가 지켜진다. 조건에
+`CONFIRMED`를 넣으면 이미 팔린 좌석에 대한 정상 거절까지 같은 카운터에 섞여, 7.6
+기록 양식의 제약위반 열이 무엇을 뜻하는지 흐려진다.
 
 **`event_session`이 `seat_layout`을 참조한다.** `seat_inventory`를 회차 × 좌석 행으로
 사전 생성하려면 그 회차에 어떤 좌석이 속하는지 알아야 하고, 그 출처가 배치도다.
@@ -265,6 +275,28 @@ U-1은 재고 행의 유일성이지 점유의 유일성이 아니므로 5개 �
 **예약은 홀드 시점에 생성된다.** `design-spec.md` 3.3의 예약 상태 전이가
 `선점 → 결제대기 → 확정 → 취소`로 `선점` 상태를 포함하므로, `reservation`은 확정
 시점이 아니라 홀드 시점에 만들어지고 `hold_id`로 `seat_hold` 그룹과 연결된다.
+
+**홀드가 만료돼도 `reservation` 행은 지우지 않는다.** `status`를 `EXPIRED`로 전이시키고
+행을 남긴다(`design-spec.md` 3.3의 `선점 → 만료`). 만료 판정의 정본은 `held_until`과
+DB `now()`의 비교이며(`concurrency-spec.md` 3절), `status` 컬럼은 그 판정의 결과를
+반영한 것이지 판정 근거가 아니다. 한 번의 만료로 네 곳이 함께 바뀐다.
+
+| 대상 | 전이 |
+|---|---|
+| `reservation.status` | `HELD` → `EXPIRED` |
+| `seat_hold.status` | `HELD` → `RELEASED` |
+| `seat_inventory` | `status`를 `HELD` → `AVAILABLE`, `hold_id`·`held_until`을 `NULL` |
+| `user_session_quota.held_count` | 홀드했던 좌석 수만큼 감소 |
+
+이 전이도 `concurrency-spec.md` 5.1의 전역 락 순서(사용자 할당량 행 → 좌석 행)를 따른다.
+만료된 예약에는 결제가 붙지 않으므로 `payment` 행도 생기지 않는다.
+
+**정리되지 않은 만료 홀드는 재홀드를 막는다.** U-2가 `status = 'HELD'`에만 걸리므로,
+만료됐지만 아직 `RELEASED`로 전이되지 않은 행이 남아 있으면 같은 좌석에 대한 새 홀드
+INSERT가 유니크 위반으로 거절된다. 따라서 **홀드 획득 경로에서 만료된 홀드를 발견하면
+그 자리에서 `RELEASED`로 전이시킨 뒤 INSERT한다.** `concurrency-spec.md` 3절의 스케줄러는
+여기서도 보조이며, 스케줄러가 죽어도 정합성은 깨지지 않는다. 다만 좌석이 다시 팔릴 수
+있는지는 이 정리에 의존하므로, 정리를 스케줄러에만 맡기지 않고 홀드 경로에 둔다.
 
 **결제는 예약당 N건이다.** Mock PG의 실패·타임아웃 재시도가 이력으로 남아야 하므로
 `reservation : payment`를 1:N으로 두고, 멱등성은 `pg_tx_id` 유니크(U-8)가 담당한다.
