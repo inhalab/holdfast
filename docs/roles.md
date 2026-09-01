@@ -19,13 +19,13 @@
 
 | 경로 | 내용 | 담당 |
 |---|---|---|
-| `api/reservation/` | 좌석 선점, 예약 확정, 취소, 만료 | 최건 |
-| `api/seat/` | 좌석·회차 조회 | 최건 |
-| `api/payment/` | Mock PG | 박태준 |
-| `api/ticket/` | QR 발급, 검표 | 박태준 |
-| `api/notification/` | Outbox | 박태준 |
-| `api/admin/` | 관리자 기능 | 박태준 |
-| `web/` | 전체 화면 | 박태준 |
+| `.../holdfast/reservation/` | 좌석 선점, 예약 확정, 취소, 만료 | 최건 |
+| `.../holdfast/seat/` | 좌석·회차 조회 | 최건 |
+| `.../holdfast/payment/` | Mock PG | 박태준 |
+| `.../holdfast/ticket/` | QR 발급, 검표 | 박태준 |
+| `.../holdfast/notification/` | Outbox | 박태준 |
+| `.../holdfast/admin/` | 관리자 기능 | 박태준 |
+| `api/src/main/resources/templates/` | Thymeleaf 화면 | 박태준 |
 | `infra/` | Terraform, 배포 | 박태준 |
 | `load-test/` | k6 시나리오 | 최건 |
 

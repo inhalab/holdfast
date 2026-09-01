@@ -1,9 +1,10 @@
-# 아래 규칙이 우선합니다
-/api/                 @F3ZLoV
-/api/reservation/     @Asirante
-/api/seat/            @Asirante
-/web/                 @F3ZLoV
-/infra/               @F3ZLoV
-/load-test/           @Asirante
-/.github/             @F3ZLoV
-/docs/                @Asirante @F3ZLoV
+# 아래 규칙이 우선합니다.
+# 접근 권한이 아니라 리뷰 책임의 구분입니다.
+
+/api/                                                  @F3ZLoV
+/api/src/main/java/com/inhalab/holdfast/reservation/   @Asirante
+/api/src/main/java/com/inhalab/holdfast/seat/          @Asirante
+/infra/                                                @F3ZLoV
+/load-test/                                            @Asirante
+/.github/                                              @F3ZLoV
+/docs/                                                 @Asirante @F3ZLoV
