@@ -1,0 +1,35 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  application:
+    name: holdfast
+  datasource:
+    # 로컬: db 컨테이너. AWS: RDS 엔드포인트로 DB_HOST만 교체.
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:holdfast}
+    username: ${DB_USER:holdfast}
+    password: ${DB_PASSWORD:holdfast}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      # 스캐폴딩 단계 전용. 엔티티 확정 후 validate + 마이그레이션(Flyway)으로 전환.
+      ddl-auto: ${JPA_DDL_AUTO:none}
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    open-in-view: false
+  data:
+    redis:
+      # 로컬: redis 컨테이너. AWS: ElastiCache 엔드포인트로 REDIS_HOST만 교체.
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+# 인스턴스 식별자 — 로드밸런싱 확인용
+holdfast:
+  instance-id: ${INSTANCE_ID:local}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

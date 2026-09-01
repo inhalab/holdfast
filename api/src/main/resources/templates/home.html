@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>holdfast</title>
+    <!-- htmx: 서버렌더 화면의 부분 갱신용. webjar로 제공됨. -->
+    <script src="/webjars/htmx.org/dist/htmx.min.js"></script>
+</head>
+<body>
+    <h1>holdfast</h1>
+    <p>좌석 단위 점유 제어 예약·발권 시스템</p>
+    <p>이 응답을 처리한 인스턴스: <strong th:text="${instanceId}">unknown</strong></p>
+
+    <!-- htmx 동작 확인용: 버튼을 누르면 /api/status를 불러 아래 영역만 갱신 -->
+    <button hx-get="/api/status" hx-target="#status" hx-swap="innerHTML">
+        상태 조회 (htmx)
+    </button>
+    <pre id="status">여기에 응답이 표시됩니다.</pre>
+
+    <p>여러 번 새로고침하면 app1 / app2 가 번갈아 나오는지 확인하세요.</p>
+</body>
+</html>

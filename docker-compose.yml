@@ -1,0 +1,88 @@
+# 로컬 다중 인스턴스 환경 (Spring Boot 4.1 / PostgreSQL 18 / Redis).
+# 설계 명세 5.2: "단일 인스턴스로만 부하 테스트하면 분산락의 의미가 없다" → 앱 2대.
+#
+#   nginx(로드밸런서, :8080)
+#     ├─ app1 ┐
+#     └─ app2 ┴─ 같은 postgres·redis 공유
+#
+# 실행:  docker compose up --build
+# 확인:  curl.exe http://localhost:8080/api/status   (instance가 app1/app2 번갈아)
+#        curl.exe http://localhost:8080/api/health   (db/redis up)
+
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: holdfast
+      POSTGRES_USER: holdfast
+      POSTGRES_PASSWORD: holdfast
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U holdfast -d holdfast"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app1:
+    build: ./api
+    environment:
+      PORT: 8080
+      INSTANCE_ID: app1
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: holdfast
+      DB_PASSWORD: holdfast
+      DB_NAME: holdfast
+      JPA_DDL_AUTO: update    # 스캐폴딩 단계에서만. 엔티티 확정 후 validate + Flyway.
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  app2:
+    build: ./api
+    environment:
+      PORT: 8080
+      INSTANCE_ID: app2
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: holdfast
+      DB_PASSWORD: holdfast
+      DB_NAME: holdfast
+      JPA_DDL_AUTO: update
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app1
+      - app2
+
+volumes:
+  db-data:
