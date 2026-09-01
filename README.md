@@ -81,6 +81,7 @@ node load-test/scripts/summarize.mjs --scenario high   # 7.6 기록 양식 표
 - [OpenAPI 3.1 정의](docs/openapi.yaml)
 - [역할 분담](docs/roles.md)
 - [협업 규칙](docs/workflow.md)
+- [배포 환경 결정](docs/infra-decision.md)
 
 ## 라이선스
 
