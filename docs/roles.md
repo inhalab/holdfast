@@ -19,17 +19,27 @@
 
 | 경로 | 내용 | 담당 |
 |---|---|---|
-| `.../holdfast/reservation/` | 좌석 선점, 예약 확정, 취소, 만료 | 최건 |
-| `.../holdfast/seat/` | 좌석·회차 조회 | 최건 |
+| `.../holdfast/reservation/` | 좌석 선점, 예약 확정, 취소, 만료. **경합하는 테이블의 엔티티가 여기 있다** | 최건 |
+| `.../holdfast/seat/` | 좌석·회차 조회. 조회 전용 참조 데이터 엔티티 | 최건 |
 | `.../holdfast/payment/` | Mock PG | 박태준 |
 | `.../holdfast/ticket/` | QR 발급, 검표 | 박태준 |
 | `.../holdfast/notification/` | Outbox | 박태준 |
-| `.../holdfast/admin/` | 관리자 기능 | 박태준 |
+| `.../holdfast/admin/` | 관리자 기능 — **아직 없음**(4개월차 착수 시 생성) | 박태준 |
+| `api/src/main/resources/db/migration/` | Flyway 마이그레이션 (스키마 정본) | 최건 |
 | `api/src/main/resources/templates/` | Thymeleaf 화면 | 박태준 |
 | `infra/` | Terraform, 배포 | 박태준 |
 | `load-test/` | k6 시나리오 | 최건 |
 
-접근 권한이 아니라 리뷰 책임의 구분이다. 상대 영역도 필요하면 손대되, PR에서 담당자가 리뷰어로 붙는다. 실제 패키지 구조가 확정되면 `.github/CODEOWNERS`와 함께 갱신한다.
+접근 권한이 아니라 리뷰 책임의 구분이다. 상대 영역도 필요하면 손대되, PR에서 담당자가 리뷰어로 붙는다.
+
+**패키지 구조는 확정됐고 `.github/CODEOWNERS`가 이 표를 그대로 반영한다.**
+`admin/`만 아직 만들어지지 않았는데, 생성 전까지는 `/api/` 기본 규칙이 박태준에게
+걸리므로 CODEOWNERS에 따로 줄을 두지 않았다.
+
+**`seat_inventory`·`seat_hold`·`user_session_quota`가 `seat/`가 아니라
+`reservation/`에 있는 이유**는 `docs/erd.md` 4절에 있다 — 이 셋은 CS-1·CS-6의 쓰기
+경로이며 락 전략이 직접 건드리는 대상이라, 경합하는 테이블을 만지는 변경이 동시성
+담당자에게 리뷰가 가도록 패키지 경계를 리뷰 경계와 맞춘 것이다.
 
 ## 순서상 중요한 것
 
