@@ -38,7 +38,17 @@ SCENARIO="${1:-high}"
 STRATEGY="${2:?전략을 지정한다: none|pessimistic|optimistic|unique|redis}"
 REPEATS="${REPEATS:-3}"   # 7.4: 전략당 3회 반복
 WARMUP_SEC="${WARMUP_SEC:-30}"
-DURATION_SEC="${DURATION_SEC:-120}"
+# 7.4: 개발 확인용 30초(기본값) / 최종 측정용 120초.
+# 45회(5전략 × 3회 × 3시나리오)를 120초로 돌리면 두 시간을 넘는다.
+DURATION_SEC="${DURATION_SEC:-30}"
+FINAL_DURATION_SEC=120
+
+if [ "$DURATION_SEC" -lt "$FINAL_DURATION_SEC" ]; then
+  echo "[run] 개발 확인용 실행이다(본 측정 ${DURATION_SEC}초 < ${FINAL_DURATION_SEC}초)."
+  echo "[run] 이 실행의 숫자는 7.6 기록 양식에 싣지 않는다."
+  echo "[run] 최종 측정: DURATION_SEC=${FINAL_DURATION_SEC} $0 $SCENARIO $STRATEGY"
+  echo
+fi
 
 for run in $(seq 1 "$REPEATS"); do
   echo

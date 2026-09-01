@@ -1,3 +1,7 @@
-# k6 실행 결과물 — 확정 측정본만 최건이 선별 커밋한다. 자동 생성물은 무시.
+# k6 실행 결과물. 루트 .gitignore에도 같은 규칙이 있고, 여기 것은 load-test/만
+# 따로 떼어 봐도 규칙이 유효하도록 남겨 둔다.
+#
+# 원본 JSON은 results/에 남기고, 채택한 확정 측정본만 docs/results/로 옮겨
+# 커밋한다 (concurrency-spec 7.4-5).
 results/*.json
 !results/.gitkeep

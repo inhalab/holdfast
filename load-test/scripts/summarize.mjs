@@ -79,6 +79,7 @@ function buildRow(strategy, runs) {
     strategy,
     runs: runs.length,
     unclassified,
+    devRuns: runs.filter((r) => r.row.isFinalRun !== true).length,
     cells: {
       oversell: '?',                                          // ← DB 검증 쿼리(7.1)
       p95: fmtMs(median(runs.map((r) => r.row.p95))),
@@ -137,6 +138,11 @@ function render(scenario, rows) {
   for (const r of rows) {
     if (r.runs !== 3) {
       L.push(`> ⚠ ${r.strategy}: 실행 ${r.runs}회. 7.4는 전략당 3회 반복 후 중앙값을 요구한다.`);
+    }
+    if (r.devRuns > 0) {
+      L.push(`> ⚠ ${r.strategy}: 개발 확인용 실행 ${r.devRuns}건 포함(본 측정 120초 미만). ` +
+             `**7.6 기록 양식은 최종 측정용 실행으로만 채운다**(7.4). ` +
+             `\`DURATION_SEC=120 load-test/scripts/run.sh ...\`로 다시 돌린다.`);
     }
     if (r.unclassified > 0) {
       L.push(`> ⚠ ${r.strategy}: 미분류 ${r.unclassified}건. **이 실행의 숫자는 쓰지 않는다** — ` +

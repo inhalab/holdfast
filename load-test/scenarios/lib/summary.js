@@ -29,6 +29,7 @@ export function extractRow(data, cfg) {
     seats: cfg.seats,
     warmupSec: cfg.warmupSec,
     durationSec: cfg.durationSec,
+    isFinalRun: cfg.isFinalRun === true,
 
     // k6가 정본인 값들(7.1)
     p95: metricValue(data, 'measured_req_duration', 'p(95)'),
@@ -62,7 +63,8 @@ export function renderText(row) {
   L.push('');
   L.push('─'.repeat(62));
   L.push(` 전략 ${row.strategy} · 시나리오 ${row.scenario} (좌석 ${row.seats} / VU ${row.vus}) · ${row.run}회차`);
-  L.push(` 워밍업 ${row.warmupSec}s 제외, 본 측정 ${row.durationSec}s`);
+  L.push(` 워밍업 ${row.warmupSec}s 제외, 본 측정 ${row.durationSec}s` +
+         (row.isFinalRun ? ' (최종 측정용)' : ' ← 개발 확인용. 7.6 기록 양식에 싣지 않는다'));
   L.push('─'.repeat(62));
   L.push(` p95            ${fmt(row.p95)} ms`);
   L.push(` p99            ${fmt(row.p99)} ms`);

@@ -15,6 +15,9 @@ function intEnv(name, fallback) {
   return n;
 }
 
+/** 7.4 최종 측정용 본 측정 길이. 이 값 미만이면 개발 확인용 실행으로 본다. */
+export const FINAL_DURATION_SEC = 120;
+
 export function loadConfig() {
   const name = __ENV.SCENARIO || 'high';
   const profile = PROFILES[name];
@@ -31,9 +34,15 @@ export function loadConfig() {
   // 7.4: 워밍업 30초는 집계에서 제외.
   const warmupSec = intEnv('WARMUP_SEC', 30);
 
-  // 본 측정 길이. **7절에 명시가 없어 기본값을 둔 값이다**(설계값 아님).
-  // 4.3의 재시도 상한처럼 관측 후 조정하고, 조정 전후를 함께 기록한다.
-  const durationSec = intEnv('DURATION_SEC', 120);
+  // 본 측정 길이. 7.4가 용도별로 두 값을 구분해 둔다.
+  //   개발 확인용 30초(기본값) — 시나리오·집계를 고치며 반복 실행할 때
+  //   최종 측정용 120초        — 보고서에 실을 숫자를 뽑을 때
+  //
+  // 기본값이 30초인 이유는 전체 실행 시간이다. 5전략 × 3회 × 3시나리오 = 45회에
+  // 회차마다 워밍업 30초가 붙어, 120초로 전부 돌리면 두 시간을 넘는다.
+  // **개발 확인용 실행의 숫자는 7.6 기록 양식에 싣지 않는다.**
+  const durationSec = intEnv('DURATION_SEC', 30);
+  const isFinalRun = durationSec >= FINAL_DURATION_SEC;
 
   // VU를 한 번에 올리면 그 자체가 스파이크가 되어 워밍업 구간이 왜곡된다.
   // 램프업을 워밍업 안에서 끝내, 본 측정은 목표 VU 고정 상태로만 돌게 한다.
@@ -61,6 +70,7 @@ export function loadConfig() {
     warmupSec,
     warmupMs: warmupSec * 1000,
     durationSec,
+    isFinalRun,
     rampSec,
     sessionId,
     seatIdBase,

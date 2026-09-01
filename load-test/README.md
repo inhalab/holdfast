@@ -16,6 +16,7 @@ scenarios/
   smoke.js          지금 돌릴 수 있는 유일한 시나리오. /api/status·/api/health를
                     reservation.js와 같은 집계 경로에 통과시킨다
   reservation.js    본 측정 시나리오. 계약(openapi.yaml)에 맞춰 미리 써 둔 것
+  deadlock.js       데드락 회피 검증 (7.2.1). 3석을 뒤섞어 보낸다
   lib/
     classify.js     **응답 → 집계 버킷 분류. 측정 해석의 핵심**
     metrics.js      7.1 지표 중 k6가 정본인 것들의 커스텀 메트릭
@@ -29,6 +30,7 @@ sql/
   verify.sql        **초과 예약 검증 — 출처가 k6가 아니라 DB다**
 scripts/
   run.sh            측정 프로토콜 실행기 (시드 → 워밍업·측정 → 검증, 3회 반복)
+  run-deadlock.sh   데드락 회피 검증 실행기 (판정: 데드락 0건)
   seed.sh           시드 초기화
   verify.sh         DB 검증 쿼리 실행
   summarize.mjs     7.6 기록 양식 표 출력 (3회 중앙값)
@@ -49,7 +51,31 @@ load-test/scripts/run.sh high pessimistic
 
 # 4) 7.6 기록 양식 표로 요약
 node load-test/scripts/summarize.mjs --scenario high
+
+# 5) 데드락 회피 검증 (성능 측정이 아니다. 판정은 데드락 0건)
+load-test/scripts/run-deadlock.sh pessimistic high
 ```
+
+### 개발 확인용과 최종 측정용을 구분한다 (7.4)
+
+| 용도 | `DURATION_SEC` | 쓰는 때 |
+|---|---|---|
+| 개발 확인용 | **30초** (기본값) | 시나리오·집계를 고치며 반복 실행할 때 |
+| 최종 측정용 | **120초** | 보고서에 실을 숫자를 뽑을 때 |
+
+```bash
+load-test/scripts/run.sh high pessimistic                    # 30초 (개발 확인용)
+DURATION_SEC=120 load-test/scripts/run.sh high pessimistic   # 120초 (최종 측정용)
+```
+
+**120초는 JIT가 안정화된 뒤에도 충분한 표본을 쌓기 위한 길이다.** p95·p99는 꼬리
+분포라 표본이 적으면 실행마다 크게 흔들린다.
+
+**기본값이 30초인 이유는 전체 실행 시간이다.** 5전략 × 3회 × 3시나리오 = 45회에
+회차마다 워밍업 30초가 붙어, 120초로 전부 돌리면 두 시간을 넘는다. 30초면 45분이다.
+
+**개발 확인용 실행의 숫자는 7.6 기록 양식에 싣지 않는다.** `run.sh`가 실행 시작 때
+알려주고, `summarize.mjs`도 개발 확인용 실행이 섞이면 경고한다.
 
 ### Windows / Git Bash 주의
 
@@ -71,6 +97,45 @@ MSYS_NO_PATHCONV=1 docker compose -f docker-compose.yml -f docker-compose.k6.yml
 | `low` | 1000 | 100 | 오버헤드 비교 |
 | `high` | 10 | 500 | 전략 차이 |
 | `extreme` | 1 | 200 | 정합성 한계 |
+
+## 데드락 회피 검증 (7.2.1)
+
+경합도 3단계는 **요청당 1석을 유지한다.** 여러 좌석을 한 번에 잡으면 거절 사유가
+좌석별로 섞여 경합도 해석이 흐려지기 때문이다.
+
+그런데 그러면 **`erd.md` 4.1의 좌석 ID 오름차순 획득과 `concurrency-spec` 5.1의
+전역 락 순서가 부하 테스트에서 한 번도 실행되지 않는다.** 1석만 잡으면 정렬할
+것이 없고, 여러 좌석을 잡는 코드 경로가 통째로 미검증으로 남는다. 데드락은 바로
+그 경로에서만 난다.
+
+그래서 별도 시나리오로 3석을 잡는다.
+
+```bash
+load-test/scripts/run-deadlock.sh pessimistic high
+```
+
+| 항목 | 값 |
+|---|---|
+| 요청당 좌석 수 | 3석 |
+| 좌석 ID 전송 순서 | **무작위(뒤섞어 보낸다)** |
+| 판정 기준 | **데드락 발생 0건** — 처리량·p95가 아니다 |
+| 결과 기록 | 7.6 기록 양식에 넣지 않는다 |
+
+**좌석 ID를 뒤섞어 보내는 것이 핵심이다.** 5.1이 정렬을 요구하는 주체는
+애플리케이션이다. 클라이언트가 이미 정렬해 보내면 서버가 정렬을 빠뜨려도 데드락이
+나지 않아, 서버의 정렬 로직이 실제로 도는지 확인할 수 없다. `reservation.js`는
+정렬해 보내고(잘 동작하는 클라이언트), `deadlock.js`에서만 뒤섞는다.
+
+**판정은 응답이 아니라 DB에서 읽는다.** 앱은 데드락을 잡아 409 `LOCK_TIMEOUT`으로
+변환하므로(`api-spec` 3.3) k6가 받는 응답만으로는 데드락이었는지 단순 락 대기였는지
+구분할 수 없다. 초과 예약과 같은 이유다.
+
+```sql
+SELECT deadlocks FROM pg_stat_database WHERE datname = current_database();
+```
+
+`run-deadlock.sh`가 실행 전후로 이 값을 찍어 차이를 내고, Postgres 로그의
+`deadlock detected` 항목으로 교차 확인한 뒤 통과/실패를 판정한다.
 
 ## 측정 프로토콜 (7.4)
 
@@ -136,9 +201,20 @@ VU 램프업은 워밍업 **안에서** 끝낸다. 본 측정은 목표 VU가 �
 
 ## 결과 파일
 
-원본 JSON은 `results/`에 남고 gitignore 대상이다. 7.4-5가 말하는 "원본 결과 JSON을
-`docs/results/`에 커밋"은 **확정 측정본**을 뜻하므로, 채택한 실행만 `docs/results/`로
-옮겨 커밋한다. 자동 생성물 전부를 커밋하지는 않는다.
+**원본 JSON은 `load-test/results/`에 남기고 커밋하지 않는다.** 루트 `.gitignore`와
+`load-test/.gitignore` 양쪽에 규칙이 있다 — 루트만 봐도, `load-test/`만 떼어 봐도
+규칙이 유효하도록 둘 다 둔다.
+
+**채택한 확정 측정본만 `docs/results/`로 옮겨 커밋한다.** 7.4-5가 말하는 "원본 결과
+JSON을 `docs/results/`에 커밋"이 이것이다. 자동 생성물 전부를 커밋하지는 않는다.
+
+```
+load-test/results/*.json    실행할 때마다 쌓이는 원본. gitignore 대상
+docs/results/*.json         채택한 확정 측정본. 커밋한다
+```
+
+옮기는 것은 **최종 측정용(120초) 실행만**이다. 개발 확인용 30초 실행은 표본이
+부족해 7.6 기록 양식을 채우는 데 쓰지 않는다.
 
 ## 담당 경계
 
