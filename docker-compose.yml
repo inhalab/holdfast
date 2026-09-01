@@ -48,7 +48,7 @@ services:
       DB_USER: holdfast
       DB_PASSWORD: holdfast
       DB_NAME: holdfast
-      JPA_DDL_AUTO: update    # 스캐폴딩 단계에서만. 엔티티 확정 후 validate + Flyway.
+      JPA_DDL_AUTO: validate  # Flyway가 스키마를 만들고, JPA는 엔티티와 일치하는지만 검증한다.
       REDIS_HOST: redis
       REDIS_PORT: 6379
     depends_on:
@@ -67,7 +67,7 @@ services:
       DB_USER: holdfast
       DB_PASSWORD: holdfast
       DB_NAME: holdfast
-      JPA_DDL_AUTO: update
+      JPA_DDL_AUTO: validate
       REDIS_HOST: redis
       REDIS_PORT: 6379
     depends_on:

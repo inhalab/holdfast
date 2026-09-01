@@ -67,10 +67,13 @@ docker compose down -v    # DB 데이터(볼륨)까지 삭제
 
 ## 주의
 
-- `JPA_DDL_AUTO=update`는 **스캐폴딩 단계 전용**. 엔티티 확정 후 `validate` +
-  Flyway 마이그레이션으로 전환.
-- `(회차ID, 좌석ID)` 유니크 제약은 엔티티 정의 시 반드시 건다. 설계 명세 5.1 —
-  초과 예약을 0건으로 만드는 최후 방어선.
+- `JPA_DDL_AUTO=validate`(기본값)로 전환 완료. 스키마는 Flyway 마이그레이션
+  (`api/src/main/resources/db/migration/`)이 정본이고, JPA는 엔티티와 스키마가
+  일치하는지만 검증한다. 스캐폴딩 단계의 `update`는 더 이상 쓰지 않는다.
+- `(회차ID, 좌석ID)` 유니크 제약(U-1)은 `V1__init_schema.sql`이 이미 걸어
+  두었다. 설계 명세 5.1 — 초과 예약을 0건으로 만드는 최후 방어선. `seat_hold`의
+  활성 홀드 유니크(U-2)는 `none` 전략에서만 빠지며, 그 제거는 마이그레이션이
+  아니라 `load-test/scripts/seed.sh`가 담당한다(`docs/erd.md` 3.1절).
 - 분산락(Redisson) 해제는 **트랜잭션 커밋 이후**에. 설계 명세 5.1의 흔한 함정.
 
 ## 버전 참고
@@ -87,12 +90,13 @@ docker compose down -v    # DB 데이터(볼륨)까지 삭제
 같은 예약 확정 코드에 전략만 갈아끼우며 측정한다. 이 프로젝트의 핵심 산출물.
 
 - 비관적 락: `@Lock(LockModeType.PESSIMISTIC_WRITE)` → `SELECT ... FOR UPDATE`
-- 낙관적 락: 엔티티에 `@Version`
+- 낙관적 락: `seat_inventory.version` 비교를 포함한 명시적 조건부 UPDATE.
+  JPA `@Version`(자동 낙관적 락)이 아니다 — `concurrency-spec.md` 4.3 참조
 - DB 유니크 제약: `(회차ID, 좌석ID)` unique index
 - Redis 분산락: Redisson `RLock`
 
 ## 다음 단계
 
-1. 좌석재고·예약 엔티티 정의 → `JPA_DDL_AUTO=validate` + Flyway 전환
+1. ~~좌석재고·예약 엔티티 정의 → `JPA_DDL_AUTO=validate` + Flyway 전환~~ 완료
 2. 락 전략 4종 구현
 3. k6 부하 테스트로 베이스라인 실패 재현 → 전략별 비교 측정
