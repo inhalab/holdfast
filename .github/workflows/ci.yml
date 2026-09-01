@@ -10,10 +10,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: 빌드 및 테스트
+
+      # 애플리케이션이 없으면(스캐폴딩 전) 빌드를 건너뛴다.
+      # gradlew는 api/ 디렉토리에 있다.
+      - name: 애플리케이션 존재 여부 확인
+        id: check
         run: |
-          if [ -f gradlew ]; then
-            ./gradlew build
+          if [ -f api/gradlew ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
           else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
             echo "스캐폴딩 전입니다. 빌드를 건너뜁니다."
           fi
+
+      # 프로젝트가 요구하는 JDK 25 세팅. gradle 캐시도 함께.
+      - name: JDK 25 설정
+        if: steps.check.outputs.exists == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+
+      - name: 빌드 및 테스트
+        if: steps.check.outputs.exists == 'true'
+        working-directory: api
+        run: |
+          chmod +x gradlew
+          ./gradlew build
