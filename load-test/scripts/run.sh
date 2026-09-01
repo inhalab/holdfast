@@ -104,6 +104,16 @@ for run in $(seq 1 "$REPEATS"); do
 
   # 7.1 초과 예약은 k6가 아니라 DB 검증 쿼리로 센다.
   "$ROOT/load-test/scripts/verify.sh" || true
+
+  # 7.1 커넥션 풀 대기는 Actuator 스냅샷으로 본다(이슈 #44). 인스턴스 기동
+  # 시점부터 누적이므로 전략 비교에는 마지막 회차 직후 값을 쓴다.
+  #
+  # node는 MSYS 경로 변환이 필요한 네이티브 exe다(위 docker용 /scenarios/...
+  # 보호와 반대 상황). MSYS_NO_PATHCONV는 "값이 있으면 비활성화"라 =0으로는
+  # 안 풀린다 — env -u로 아예 지워야 실제 호스트 경로로 정상 변환된다.
+  # 켠 채로 두면 node가 /e/holdfast/... 를 "E:\e\holdfast\..."로 잘못 풀어
+  # 경로를 못 찾는다.
+  env -u MSYS_NO_PATHCONV node "$ROOT/load-test/scripts/pool-metrics.mjs" "$STRATEGY/$SCENARIO run${run}/${REPEATS}" || true
 done
 
 echo
