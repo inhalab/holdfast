@@ -1,5 +1,6 @@
 package com.inhalab.holdfast.reservation;
 
+import com.inhalab.holdfast.api.ApiException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -142,7 +143,7 @@ class NoneSeatHoldStrategyConcurrencyTest {
                     startGate.await();
                     seatHoldService.hold(SESSION_ID, userId, List.of(SEAT_ID), UUID.randomUUID().toString());
                     succeeded.incrementAndGet();
-                } catch (SeatHoldRejectedException e) {
+                } catch (ApiException e) {
                     // 조회 시점에 이미 HELD를 본 스레드. 정상 거절이다.
                     rejected.incrementAndGet();
                 } catch (Exception e) {

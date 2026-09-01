@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -47,4 +48,61 @@ public interface SeatHoldRepository extends JpaRepository<SeatHold, Long> {
      */
     @Query("SELECT MIN(sh.heldUntil) FROM SeatHold sh WHERE sh.holdId = :holdId")
     Optional<Instant> findHeldUntilByHoldId(@Param("holdId") String holdId);
+
+    /** 홀드 그룹의 행 전체. 확정·해제가 대상 좌석을 찾는 데 쓴다. */
+    List<SeatHold> findByHoldIdOrderBySeatIdAsc(String holdId);
+
+    /**
+     * 홀드 그룹을 확정으로 전이시킨다. {@code HELD}인 행만 바꾼다.
+     */
+    @Modifying
+    @Query(value = """
+            UPDATE seat_hold SET status = 'CONFIRMED'
+             WHERE hold_id = :holdId AND status = 'HELD'
+            """, nativeQuery = true)
+    int confirmHeld(@Param("holdId") String holdId);
+
+    /**
+     * 홀드 그룹을 해제로 전이시킨다.
+     *
+     * <p>{@code RELEASED}는 "활성 홀드가 아니게 된 모든 경우"를 가리키는 값
+     * 하나이며, 만료였는지 자진 해제였는지 취소였는지는
+     * {@code reservation.status}가 구분한다(state-transitions.md 3절).
+     * 그래서 확정된 홀드의 취소도 같은 전이를 쓴다.
+     */
+    @Modifying
+    @Query(value = """
+            UPDATE seat_hold SET status = 'RELEASED'
+             WHERE hold_id = :holdId AND status IN ('HELD', 'CONFIRMED')
+            """, nativeQuery = true)
+    int releaseByHoldId(@Param("holdId") String holdId);
+
+    /**
+     * <b>만료 홀드 정리.</b> erd.md 4.1절이 정한 조건부 UPDATE 그대로이며,
+     * {@code rowsAffected}가 판정의 근거다.
+     *
+     * <pre>
+     * 1 → 내가 만료 행을 정리했다      → INSERT 진행
+     * 0 → 다른 요청이 이미 정리했다    → 재조회하거나 409로 거절
+     * </pre>
+     *
+     * <p>정리와 INSERT를 두 단계로 나누면 두 요청이 같은 만료 행을 동시에
+     * 발견했을 때 둘 다 INSERT를 시도하고, U-2가 막은 쪽이 제약 위반 카운터를
+     * 올려 "앱 락이 샜다"는 신호와 섞인다. 판정을 단일 SQL 문 안에서 끝내
+     * 그 틈을 없앤다.
+     *
+     * <p><b>{@code none} 전략은 이 메서드를 호출하지 않는다.</b> erd.md 4.1의
+     * 전략별 표가 명시한 대로다 — {@code rowsAffected} 게이트는 앱 레벨 방어라
+     * 베이스라인에 넣으면 실패 증거가 흐려지고, U-2가 없어 만료 행이 INSERT를
+     * 막지도 않는다. 나머지 4개 전략이 홀드 획득 경로에서 쓴다.
+     */
+    @Modifying
+    @Query(value = """
+            UPDATE seat_hold SET status = 'RELEASED'
+             WHERE session_id = :sessionId
+               AND seat_id = :seatId
+               AND status = 'HELD'
+               AND held_until <= now()
+            """, nativeQuery = true)
+    int releaseExpired(@Param("sessionId") long sessionId, @Param("seatId") long seatId);
 }

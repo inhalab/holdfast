@@ -75,6 +75,64 @@ public interface SeatInventoryRepository extends JpaRepository<SeatInventory, Lo
      * <p>{@code held_until}은 DB {@code now()}로 계산한다 — 앱 서버 2대의 시계가
      * 어긋나면 만료 판정이 인스턴스마다 달라진다(concurrency-spec.md 3절).
      */
+    /**
+     * <b>lazy 검증 확정 쿼리.</b> concurrency-spec.md 3절이 정한 형태 그대로다.
+     *
+     * <p>만료 판정을 확정과 <b>같은 SQL 문 안에</b> 넣는 것이 핵심이다. 별도로
+     * 조회해 만료를 확인한 뒤 확정하면 그 사이에 만료가 일어날 수 있는데, 그것이
+     * CS-2(예약 확정)와 CS-3(홀드 TTL 만료)의 경합이며 이 프로젝트에서 가장 자주
+     * 터지는 지점이다. 조건을 문장 안으로 넣으면 그 틈이 존재하지 않는다.
+     *
+     * <p>{@code rowsAffected = 0}이면 홀드가 만료됐거나 남의 홀드다. 여기서는
+     * 그 판정이 <b>필요하므로</b> {@code int}를 돌려준다 — 베이스라인의 홀드
+     * 획득 경로에서 {@code rowsAffected} 판정을 금지한 것과는 다른 얘기다.
+     * 확정은 5개 전략에서 동일하게 처리되며 비교 대상이 아니다.
+     */
+    @Modifying
+    @Query(value = """
+            UPDATE seat_inventory
+               SET status = 'SOLD', hold_id = NULL, held_until = NULL, version = version + 1
+             WHERE session_id = :sessionId
+               AND seat_id = :seatId
+               AND status = 'HELD'
+               AND hold_id = :holdId
+               AND held_until > now()
+            """, nativeQuery = true)
+    int confirmIfStillHeld(@Param("sessionId") long sessionId,
+                           @Param("seatId") long seatId,
+                           @Param("holdId") String holdId);
+
+    /**
+     * 홀드를 풀어 좌석을 되돌린다. 자진 해제(DELETE /api/holds/{holdId})와
+     * 만료 정리가 함께 쓴다. {@code hold_id}를 조건에 넣어 남의 홀드를 풀지
+     * 않는다.
+     */
+    @Modifying
+    @Query(value = """
+            UPDATE seat_inventory
+               SET status = 'AVAILABLE', hold_id = NULL, held_until = NULL, version = version + 1
+             WHERE session_id = :sessionId
+               AND seat_id = :seatId
+               AND hold_id = :holdId
+            """, nativeQuery = true)
+    int releaseHeld(@Param("sessionId") long sessionId,
+                    @Param("seatId") long seatId,
+                    @Param("holdId") String holdId);
+
+    /**
+     * 판매된 좌석을 되돌린다(취소). {@code SOLD}인 행만 바꾼다 — 확정 시
+     * {@code hold_id}가 {@code NULL}이 되므로 홀드로는 식별할 수 없고,
+     * 어떤 좌석이 이 예약의 것인지는 {@code reservation_seat}가 안다.
+     */
+    @Modifying
+    @Query(value = """
+            UPDATE seat_inventory
+               SET status = 'AVAILABLE', hold_id = NULL, held_until = NULL, version = version + 1
+             WHERE id = :seatInventoryId
+               AND status = 'SOLD'
+            """, nativeQuery = true)
+    int releaseSold(@Param("seatInventoryId") long seatInventoryId);
+
     @Modifying
     @Query(value = """
             UPDATE seat_inventory

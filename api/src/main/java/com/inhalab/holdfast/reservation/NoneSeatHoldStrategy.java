@@ -1,5 +1,7 @@
 package com.inhalab.holdfast.reservation;
 
+import com.inhalab.holdfast.api.ErrorCode;
+import com.inhalab.holdfast.api.SeatConflict;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -79,7 +81,7 @@ public class NoneSeatHoldStrategy implements SeatHoldStrategy {
                     seatInventoryRepository.findBySessionIdAndSeatId(command.sessionId(), seatId);
 
             if (found.isEmpty()) {
-                conflicts.add(new SeatConflict(seatId, "SEAT_NOT_IN_SESSION"));
+                conflicts.add(new SeatConflict(seatId, ErrorCode.SEAT_NOT_IN_SESSION));
                 continue;
             }
 
@@ -113,12 +115,12 @@ public class NoneSeatHoldStrategy implements SeatHoldStrategy {
         return HoldResult.success(heldUntil);
     }
 
-    private String conflictCodeFor(String seatStatus) {
+    private ErrorCode conflictCodeFor(String seatStatus) {
         if (STATUS_SOLD.equals(seatStatus)) {
-            return "SEAT_ALREADY_SOLD";
+            return ErrorCode.SEAT_ALREADY_SOLD;
         }
         if (STATUS_HELD.equals(seatStatus)) {
-            return "SEAT_HELD_BY_OTHER";
+            return ErrorCode.SEAT_HELD_BY_OTHER;
         }
         // 상태값이 셋 중 어느 것도 아니면 데이터가 깨진 것이다. 조용히 넘기지 않는다.
         throw new IllegalStateException("알 수 없는 seat_inventory.status: " + seatStatus);
@@ -128,7 +130,7 @@ public class NoneSeatHoldStrategy implements SeatHoldStrategy {
      * 최상위 {@code code}에 담을 대표 사유. 화면이 좌석별 처리를 할 때는 이 값이
      * 아니라 {@code conflicts}를 봐야 한다(api-spec.md 4.2절).
      */
-    private String representativeCode(List<SeatConflict> conflicts) {
+    private ErrorCode representativeCode(List<SeatConflict> conflicts) {
         return conflicts.getFirst().code();
     }
 }
