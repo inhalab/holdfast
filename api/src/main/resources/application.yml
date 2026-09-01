@@ -28,10 +28,20 @@ spring:
       # 로컬: redis 컨테이너. AWS: ElastiCache 엔드포인트로 REDIS_HOST만 교체.
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+  mvc:
+    problemdetails:
+      # api-spec.md: "Spring Boot 4가 처리하지 못한 예외에도 같은 형식을
+      # 내보내므로" — 프레임워크가 만드는 오류 응답(타입 불일치 등)도
+      # RFC 9457 ProblemDetail 형태로 나가게 한다.
+      enabled: true
 
 # 인스턴스 식별자 — 로드밸런싱 확인용
 holdfast:
   instance-id: ${INSTANCE_ID:local}
+  # 선점 유지 시간(초). concurrency-spec.md 3절: 운영 5분, 부하 측정 시 10초로
+  # 낮춰 쓴다. SeatMap 응답(holdTtlSeconds)에 그대로 노출해 클라이언트가
+  # 하드코딩하지 않게 한다.
+  hold-ttl-seconds: ${HOLD_TTL_SECONDS:300}
 
 management:
   endpoints:
