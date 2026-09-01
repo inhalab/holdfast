@@ -13,7 +13,8 @@
 //   초과 예약   → sql/verify.sql (DB 검증 쿼리)
 //   재시도 횟수 → Actuator 앱 커스텀 메트릭
 //   제약 위반   → Actuator 앱 커스텀 메트릭
-//   풀 대기     → hikaricp.connections.pending / .acquire
+//   풀 대기     → hikaricp.connections.pending / .acquire (run.sh가 회차마다
+//               scripts/pool-metrics.mjs로 콘솔에 찍는다. 마지막 회차 값을 옮겨 적는다)
 //
 // 이 칸들은 `?`로 남는다. **0으로 채우지 않는다** — "쟀는데 0"과 "안 쟀음"이
 // 구분되지 않으면 비교표를 믿을 수 없게 된다.

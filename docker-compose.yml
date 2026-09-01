@@ -44,6 +44,11 @@ services:
 
   app1:
     build: ./api
+    # nginx(:8080)는 두 인스턴스를 라운드로빈하므로 그 경유로는 "이 인스턴스의
+    # 풀 대기"를 확정할 수 없다. 인스턴스별 관측(concurrency-spec 7.1, 이슈 #44)을
+    # 위해 컨테이너를 직접 찌를 수 있게 호스트 포트를 연다.
+    ports:
+      - "18081:8080"
     environment:
       PORT: 8080
       INSTANCE_ID: app1
@@ -71,6 +76,8 @@ services:
 
   app2:
     build: ./api
+    ports:
+      - "18082:8080"
     environment:
       PORT: 8080
       INSTANCE_ID: app2
