@@ -84,6 +84,20 @@ docker compose down -v    # DB 데이터(볼륨)까지 삭제
 - Redisson 4.7의 `redisson-spring-boot-starter`는 Boot 4.1 기준으로 빌드돼
   있어 **스타터만 넣으면 된다**(spring-data 모듈 exclude 불필요).
 - Gradle wrapper는 9.1.0. Java 25 실행을 위해 8.x가 아닌 9.x가 필요하다.
+- **Boot 4.x는 자동설정을 기능별 모듈로 쪼갰다.** 3.x에서 모든 통합의
+  자동설정을 담고 있던 `spring-boot-autoconfigure` 단일체가
+  `spring-boot-jdbc`·`spring-boot-hibernate`·`spring-boot-jpa`처럼 나뉘었다.
+  그래서 **라이브러리 의존성만 넣으면 자동설정이 붙지 않는 경우가 있다.**
+
+  진단 신호는 이것이다 — **로그에 그 기능의 초기화 메시지가 아예 없으면**
+  (실패 메시지가 아니라 *아무것도* 없으면) `spring-boot-{기능}` 모듈이
+  빠졌는지 확인한다. 자동설정 클래스 자체가 클래스패스에 없으면 조건 평가에도
+  걸리지 않아 조용히 통째로 빠진다.
+
+  Flyway가 이 경우였다. `flyway-core`와 `flyway-database-postgresql`만
+  넣었더니 마이그레이션이 실행되지 않고 Flyway 로그도 한 줄 남지 않아,
+  JPA `validate`가 빈 스키마에 대고 실패했다.
+  `org.springframework.boot:spring-boot-flyway`를 추가해 해결했다.
 
 ## 락 전략 4종 (JPA 기준 — 최건 담당)
 
