@@ -12,12 +12,17 @@ spring:
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      # 스캐폴딩 단계 전용. 엔티티 확정 후 validate + 마이그레이션(Flyway)으로 전환.
-      ddl-auto: ${JPA_DDL_AUTO:none}
+      # validate — 엔티티와 스키마가 정확히 일치하는지만 확인하고 DDL을
+      # 만들지 않는다. 스키마는 Flyway 마이그레이션(db/migration/)이 정본이다.
+      # setup.md의 "스캐폴딩 단계 전용" 주의사항은 이 전환으로 해소됐다.
+      ddl-auto: ${JPA_DDL_AUTO:validate}
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
     open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
   data:
     redis:
       # 로컬: redis 컨테이너. AWS: ElastiCache 엔드포인트로 REDIS_HOST만 교체.

@@ -26,6 +26,15 @@ dependencies {
     // JPA — 락 전략의 핵심. 비관적 락 @Lock, 낙관적 락 @Version 을 어노테이션으로.
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 
+    // Flyway — 스키마 마이그레이션. JPA_DDL_AUTO=validate와 짝을 이룬다.
+    // Flyway 10+부터 DB별 지원이 별도 모듈로 분리되어 postgresql 모듈을 함께 넣는다.
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-database-postgresql'
+    // Boot 4는 spring-boot-autoconfigure 단일체를 기능별 모듈로 쪼갰다
+    // (spring-boot-jdbc, spring-boot-hibernate처럼). Flyway 자동설정
+    // (FlywayAutoConfiguration)도 이 모듈에 있어 flyway-core만으로는 동작하지 않는다.
+    implementation 'org.springframework.boot:spring-boot-flyway'
+
     // Redis — 분산락(Redisson). Boot 4.1.x는 스타터만으로 충분(내부 spring-data-41 번들).
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.redisson:redisson-spring-boot-starter:4.7.0'
