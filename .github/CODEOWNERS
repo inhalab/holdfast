@@ -7,7 +7,7 @@
 /api/src/main/java/com/inhalab/holdfast/payment/       @F3ZLoV
 /api/src/main/java/com/inhalab/holdfast/ticket/        @F3ZLoV
 /api/src/main/java/com/inhalab/holdfast/notification/  @F3ZLoV
-/api/src/main/resources/db/migration/                  @Asirante
+/api/src/main/resources/db/migration/                  @Asirante @F3ZLoV
 /infra/                                                @F3ZLoV
 /load-test/                                            @Asirante
 /.github/                                              @F3ZLoV
