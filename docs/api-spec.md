@@ -103,7 +103,8 @@ POST /api/reservations/{id}/cancel         취소 → 좌석 반환
 | `HOLD_EXPIRED` | 409 | **정상 거절** | 홀드가 만료됨 (CS-2·CS-3 경합) |
 | `QUOTA_EXCEEDED` | 409 | **정상 거절** | 1인 최대 매수 초과 (CS-6) |
 | `RESERVATION_NOT_OPEN` | 409 | **정상 거절** | 예약 오픈 전 |
-| `LOCK_TIMEOUT` | 409 | **락 포기율** | 락 대기 시간 초과 (`concurrency-spec` 7.6.1) |
+| `LOCK_TIMEOUT` | 409 | **락 포기율** | 락 대기 시간 초과 — `pessimistic`·`redis` (`concurrency-spec` 7.6.1) |
+| `RETRY_EXHAUSTED` | 409 | **락 포기율** | 재시도 상한 소진 — `optimistic` (`concurrency-spec` 7.6.1) |
 | `HOLD_RELEASED` | 409 | 상태 거절 | 이미 해제된 홀드로 확정 시도 |
 | `HOLD_ALREADY_CONFIRMED` | 409 | 상태 거절 | 이미 확정된 홀드 |
 | `RESERVATION_ALREADY_CANCELLED` | 409 | 상태 거절 | (취소 API는 멱등이라 실제로는 200) |
@@ -124,12 +125,18 @@ POST /api/reservations/{id}/cancel         취소 → 좌석 반환
 | 열 | 집계 대상 |
 |---|---|
 | 정상 거절률(409) | 위 표에서 **정상 거절**로 분류된 5개 코드만 |
-| 락 포기율 | `LOCK_TIMEOUT` 하나만 |
+| 락 포기율 | `LOCK_TIMEOUT`과 `RETRY_EXHAUSTED` 두 개만 |
 | 오류율(5xx·타임아웃) | 5xx 응답과 네트워크 타임아웃만 |
 
-**`LOCK_TIMEOUT`은 409로 응답하지만 409율에 넣지 않는다.** 좌석이 팔려서 거절한 것이
-아니라 좌석이 남아 있었을 수도 있는데 기다리다 포기한 것이므로, 정상 거절도 오류도
-아니다. `concurrency-spec.md` 7.6.1이 이 열의 정의와 해석 주의를 담고 있다.
+**`LOCK_TIMEOUT`과 `RETRY_EXHAUSTED`는 409로 응답하지만 409율에 넣지 않는다.** 좌석이
+팔려서 거절한 것이 아니라 좌석이 남아 있었을 수도 있는데 포기한 것이므로, 정상 거절도
+오류도 아니다. `concurrency-spec.md` 7.6.1이 이 열의 정의와 해석 주의를 담고 있다.
+
+**두 코드를 나눈 이유는 포기 사유가 전략마다 다르기 때문이다.** `LOCK_TIMEOUT`은 락
+대기 시간(1초)을 넘긴 것이고(`pessimistic`·`redis`), `RETRY_EXHAUSTED`는 재시도 상한
+3회를 소진한 것이다(`optimistic`). 하나의 코드로 합치면 시간 기반 포기와 횟수 기반
+포기가 같은 이름으로 섞여, 보고서에서 어느 쪽인지 전략 열로 추론해야 한다. 두 코드는
+같은 열(락 포기율)에 집계되지만 원인은 코드로 구분된다.
 
 **상태 거절과 클라이언트 오류는 어느 쪽에도 넣지 않는다.** 부하 테스트에서 이 코드들이
 나온다면 시나리오 자체가 잘못 짜인 것이므로, 별도 태그로 세어 두고 시나리오를 고치는
@@ -139,8 +146,10 @@ POST /api/reservations/{id}/cancel         취소 → 좌석 반환
 
 **경합으로 인한 거절은 어떤 경우에도 5xx로 나가지 않는다.** 구현 시 아래를 지킨다.
 
-- 낙관적 락 재시도 소진 → `SEAT_HELD_BY_OTHER` (409). `OptimisticLockException`을
-  그대로 전파해 500이 되게 두지 않는다.
+- 낙관적 락 재시도 소진 → `RETRY_EXHAUSTED` (409). `OptimisticLockException`을 그대로
+  전파해 500이 되게 두지 않는다. **`SEAT_HELD_BY_OTHER`로 반환하지 않는다** — 재시도를
+  소진한 시점에 좌석이 실제로 남아 있었을 수도 있으므로 정상 거절로 세면 409율이
+  오염된다(`concurrency-spec.md` 7.6.1).
 - 유니크 제약 위반 → `SEAT_ALREADY_SOLD` 또는 `SEAT_HELD_BY_OTHER` (409).
   `DataIntegrityViolationException`이 500으로 새지 않게 명시적으로 잡는다
   (`concurrency-spec.md` 4.4).
