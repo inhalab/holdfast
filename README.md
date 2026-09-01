@@ -55,6 +55,21 @@ load-test/   k6 시나리오
 docs/        설계 명세, ERD, 측정 결과
 ```
 
+## 부하 테스트
+
+측정 실행 환경과 집계 로직은 [`load-test/`](load-test/)에 있다. 자세한 내용은
+[부하 테스트 README](load-test/README.md).
+
+```bash
+docker compose up -d                    # 앱 2대 + DB + Redis + nginx
+load-test/scripts/run.sh smoke          # k6 실행 환경·집계 파이프라인 확인
+load-test/scripts/run.sh high pessimistic   # 본 측정 (예약 API 구현 후)
+node load-test/scripts/summarize.mjs --scenario high   # 7.6 기록 양식 표
+```
+
+**예약 API는 아직 구현되지 않았다.** 지금 돌릴 수 있는 것은 스모크 테스트뿐이고,
+나머지는 API가 생겼을 때 그대로 돌도록 계약에 맞춰 미리 써 둔 것이다.
+
 ## 문서
 
 - [설계 명세 및 구현 범위](docs/design-spec.md)
