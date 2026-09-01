@@ -19,6 +19,8 @@ services:
     ports:
       - "5432:5432"
     volumes:
+      # postgres:18 이미지는 PGDATA가 /var/lib/postgresql/18/docker (버전별 하위 디렉터리)라 옛 관례인
+      # .../data가 아닌 부모 경로를 마운트해야 메이저 버전이 바뀌어도 볼륨이 실제 데이터 위치를 계속 포함한다.
       - db-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U holdfast -d holdfast"]
