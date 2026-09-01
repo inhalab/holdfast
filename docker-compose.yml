@@ -12,6 +12,10 @@
 services:
   db:
     image: postgres:18-alpine
+    # concurrency-spec 7.3 고정 변수: deadlock_timeout 200ms.
+    # 데드락 검증 시나리오(7.2.1)가 pg_stat_database.deadlocks를 읽어 판정하는데,
+    # 기본값 1초로 두면 검출이 느려 짧은 실행에서 놓친다.
+    command: ["postgres", "-c", "deadlock_timeout=200ms"]
     environment:
       POSTGRES_DB: holdfast
       POSTGRES_USER: holdfast
@@ -43,6 +47,10 @@ services:
     environment:
       PORT: 8080
       INSTANCE_ID: app1
+      # 7.3 고정 변수. 이 세 값은 앱 2대가 반드시 같아야 한다.
+      HOLD_TTL_SECONDS: ${HOLD_TTL_SECONDS:-10}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-30}
+      TOMCAT_MAX_THREADS: ${TOMCAT_MAX_THREADS:-200}
       DB_HOST: db
       DB_PORT: 5432
       DB_USER: holdfast
@@ -66,6 +74,11 @@ services:
     environment:
       PORT: 8080
       INSTANCE_ID: app2
+      # app1과 동일해야 한다(7.3). 한쪽만 바꾸면 두 인스턴스가 다른 조건으로 돌아
+      # 측정이 오염된다.
+      HOLD_TTL_SECONDS: ${HOLD_TTL_SECONDS:-10}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-30}
+      TOMCAT_MAX_THREADS: ${TOMCAT_MAX_THREADS:-200}
       DB_HOST: db
       DB_PORT: 5432
       DB_USER: holdfast

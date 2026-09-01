@@ -1,5 +1,11 @@
 server:
   port: ${PORT:8080}
+  tomcat:
+    threads:
+      # concurrency-spec 7.3 고정 변수: "Tomcat max-threads — 명시적 고정".
+      # 값 자체는 Boot 기본값과 같지만, 기본값에 기대면 Boot 버전이 올라갈 때
+      # 측정 조건이 조용히 바뀐다. 전 전략 동일 값을 쓰고 보고서에 명시한다.
+      max: ${TOMCAT_MAX_THREADS:200}
 
 spring:
   application:
@@ -10,6 +16,17 @@ spring:
     username: ${DB_USER:holdfast}
     password: ${DB_PASSWORD:holdfast}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      # 7.3 고정 변수 중 **가장 위험한 값**이다. "기본 10 금지" — VU 500을
+      # 기본 풀 10에 때리면 락 대기가 아니라 커넥션 대기를 측정하게 된다.
+      #
+      # 30인 근거: 앱 2대 × 30 = 60으로 Postgres 기본 max_connections 100 안에
+      # 들어가고, 시드·검증용 psql 접속 여유가 남는다. 풀을 스레드 수(200)까지
+      # 키우면 DB 접속 상한을 넘는다.
+      #
+      # 풀 대기(hikaricp.connections.pending)는 없애야 할 값이 아니라
+      # "해석의 핵심"이므로(7.1) 지우지 않고 잰다.
+      maximum-pool-size: ${DB_POOL_SIZE:30}
   jpa:
     hibernate:
       # validate — 엔티티와 스키마가 정확히 일치하는지만 확인하고 DDL을
@@ -57,4 +74,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        # metrics — 7.1이 커넥션 풀 대기의 출처로 못박은
+        # hikaricp.connections.pending / .acquire 를 읽기 위해 연다.
+        # 응답시간의 정본은 k6이므로(7.1) HTTP 히스토그램은 켜지 않는다.
+        include: health,info,metrics
