@@ -62,7 +62,7 @@ stateDiagram-v2
 | `HELD → CONFIRMED` | API 호출 + lazy 검증 — `POST /api/reservations` | `seat_inventory`(`HELD→SOLD`), `seat_hold`(`HELD→CONFIRMED`) | 단일 조건부 UPDATE, `held_until > now()` 검사 포함(`concurrency-spec.md` 3절 확정 쿼리) |
 | `HELD → EXPIRED` | lazy 검증(홀드 재획득 경로) 또는 스케줄러(보조) | `seat_hold`(`HELD→RELEASED`), `seat_inventory`(`HELD→AVAILABLE`), `user_session_quota`(감소) — 4곳(`erd.md` 4절) | 조건부 UPDATE + `rowsAffected` 판정(`erd.md` 4.1) |
 | `HELD → CANCELLED` | API 호출 — `DELETE /api/holds/{holdId}` | `seat_inventory`(`HELD→AVAILABLE`), `seat_hold`(`HELD→RELEASED`), `user_session_quota`(감소) | 조건부 UPDATE, `reservation.status='HELD'` 확인 후 전이 |
-| `CONFIRMED → CANCELLED` | API 호출 — `POST /api/reservations/{id}/cancel` | `seat_inventory`(`SOLD→AVAILABLE`), `seat_hold`(`CONFIRMED→RELEASED`, 아래 확인 필요) | 조건부 UPDATE, `reservation.status='CONFIRMED'` 확인 후 전이. 재호출 시 200과 기존 결과(`api-spec.md` 6.1절 멱등) |
+| `CONFIRMED → CANCELLED` | API 호출 — `POST /api/reservations/{id}/cancel` | `seat_inventory`(`SOLD→AVAILABLE`), `seat_hold`(`CONFIRMED→RELEASED`) | 조건부 UPDATE, `reservation.status='CONFIRMED'` 확인 후 전이. 재호출 시 200과 기존 결과(`api-spec.md` 6.1절 멱등) |
 
 **`PENDING_PAYMENT`는 이 다이어그램에 없다.** `erd.md` 스키마의 `reservation.status`
 열거형에는 존재하지만(`HELD/PENDING_PAYMENT/CONFIRMED/CANCELLED/EXPIRED`), Mock PG
@@ -70,14 +70,15 @@ stateDiagram-v2
 `HELD → CONFIRMED` 직행이다(`api-spec.md` 1.2절). Mock PG 인터페이스가 확정되면
 `HELD → PENDING_PAYMENT → CONFIRMED`로 이 다이어그램을 갱신한다.
 
-**확인이 필요한 지점 — `CONFIRMED → CANCELLED` 시 `seat_hold`의 전이.**
-`erd.md` 4절은 만료 시 `seat_hold`가 `RELEASED`로 전이한다고 명시하지만, 취소 시에도
-같은 전이가 일어나야 하는지는 어느 문서에도 명시돼 있지 않다. 위 표는 만료 처리와
-대칭이 되도록(활성 홀드가 아니게 된 행은 `RELEASED`로 남긴다) 추정해 채웠다. U-2의
-조건(`status = 'HELD'`, `erd.md` 3.1절)이 `CONFIRMED` 행을 애초에 보호 대상에서 빼두었기
-때문에 이 전이가 없어도 재홀드가 막히지는 않지만, `seat_hold.status`가 "이력"의 정본인
-이상(0절) `CONFIRMED`로 영구히 남기는 것과 `RELEASED`로 닫는 것은 실제 값이 다르다.
-이 판단은 확인이 필요하다.
+**확정 — `CONFIRMED → CANCELLED` 시 `seat_hold`도 `RELEASED`로 전이한다.**
+만료 처리와 동일하다. `seat_hold`는 홀드 레코드의 **생명주기만** 표현하는 테이블이고,
+그 레코드가 왜 끝났는지(만료됐는지 취소됐는지)는 `seat_hold`가 구분할 일이 아니다 —
+해제 사유는 `reservation.status`(`EXPIRED` 또는 `CANCELLED`)가 담당한다. `seat_hold`
+쪽에 취소 전용 상태값을 따로 두면 U-2의 부분 인덱스 조건(`WHERE status = 'HELD'`,
+`erd.md` 3.1절)이 그 값까지 제외 대상에 넣어야 해서 조건만 복잡해지고, 좌석이 다시
+팔릴 수 있으려면 애초에 `HELD`가 아니기만 하면 충분하므로 얻는 것도 없다. `RELEASED`
+하나로 "활성 홀드가 아니게 된 모든 경우"를 표현하고, 그 경우들 사이의 구분은
+`reservation.status`에 맡긴다.
 
 ---
 
@@ -118,7 +119,7 @@ stateDiagram-v2
     HELD --> CONFIRMED : POST /api/reservations
     HELD --> RELEASED : 만료 (lazy 검증 / 스케줄러)
     HELD --> RELEASED : DELETE /api/holds/{holdId}
-    CONFIRMED --> RELEASED : POST /api/reservations/{id}/cancel (확인 필요, 1절 참조)
+    CONFIRMED --> RELEASED : POST /api/reservations/{id}/cancel
     CONFIRMED --> [*]
     RELEASED --> [*]
 ```
@@ -129,13 +130,14 @@ stateDiagram-v2
 | `HELD → CONFIRMED` | API 호출 + lazy 검증 — `POST /api/reservations` | `seat_inventory`(`HELD→SOLD`), `reservation`(`HELD→CONFIRMED`) | 단일 조건부 UPDATE(`concurrency-spec.md` 3절) |
 | `HELD → RELEASED` (만료) | lazy 검증(홀드 재획득 경로에서 발견 시) 또는 스케줄러(보조) | `seat_inventory`(`AVAILABLE`), `reservation`(`EXPIRED`), `user_session_quota`(감소) | 조건부 UPDATE + `rowsAffected`(`erd.md` 4.1) — 이 판정이 U-2가 만료 홀드에 걸려 재홀드가 막히는 것을 푸는 지점이다 |
 | `HELD → RELEASED` (자진 해제) | API 호출 — `DELETE /api/holds/{holdId}` | `seat_inventory`(`AVAILABLE`), `reservation`(`CANCELLED`), `user_session_quota`(감소) | 조건부 UPDATE, `seat_hold.status='HELD'` 확인 후 전이 |
-| `CONFIRMED → RELEASED` | API 호출 — `POST /api/reservations/{id}/cancel` | `seat_inventory`(`AVAILABLE`), `reservation`(`CANCELLED`) | **확인 필요** — 1절의 같은 항목 참조 |
+| `CONFIRMED → RELEASED` | API 호출 — `POST /api/reservations/{id}/cancel` | `seat_inventory`(`SOLD→AVAILABLE`), `reservation`(`CONFIRMED→CANCELLED`) | 조건부 UPDATE, `seat_hold.status='CONFIRMED'` 확인 후 전이 |
 
 **U-2는 `status = 'HELD'`인 행만 본다.** `CONFIRMED`나 `RELEASED`로 전이한 행은 이미
-제약의 보호 범위 밖이다(`erd.md` 3.1절). 그래서 `CONFIRMED → RELEASED` 전이가
-일어나든 안 일어나든 재홀드 차단에는 영향이 없다 — 이 전이가 확인이 필요한 이유는
-정합성 판정(U-2)이 아니라 **이력**(0절에서 `seat_hold`가 정본이라고 한 바로 그 역할)이
-정확한 최종 상태를 반영하는지의 문제다.
+제약의 보호 범위 밖이다(`erd.md` 3.1절). 그래서 `CONFIRMED → RELEASED` 전이 자체는
+재홀드 차단과는 무관하다 — 이 전이가 존재하는 이유는 정합성 판정(U-2)이 아니라
+**이력**(0절에서 `seat_hold`가 정본이라고 한 바로 그 역할)을 정확하게 유지하기
+위해서다. `RELEASED`는 "활성 홀드가 아니게 된 모든 경우"를 가리키는 하나의 값이고,
+그 경우가 만료였는지 자진 해제였는지 취소였는지는 `reservation.status`가 구분한다.
 
 ---
 
@@ -170,35 +172,99 @@ stateDiagram-v2
 
 ## 5. `payment` — Mock PG 기준
 
-**전체가 잠정.** Mock PG 인터페이스는 아직 정해지지 않았다(`roles.md`: "Mock PG는
-박태준이 만들되, 인터페이스는 최건이 정한다" — 아직 정하지 않은 상태). 아래는
-`erd.md`의 `payment.status` 열거형(`REQUESTED/PAID/FAILED/CANCELLED`)과
-`design-spec.md` 4.1절의 Mock PG 요구("성공 / 실패 / 타임아웃 / 지연 주입 가능")에서
-끌어낸 최소 추정이다. **Mock PG 인터페이스 확정 시 이 절 전체를 다시 쓴다.**
+**확정.** `roles.md`가 최건에게 배정한 결정이다 — "Mock PG는 박태준이 만들되,
+인터페이스는 최건이 정한다." 아래가 그 인터페이스다. `erd.md`의
+`payment.status` 열거형(`REQUESTED/PAID/FAILED/CANCELLED`)은 Mock PG가 범위 밖이던
+시점에 놓아둔 자리표시자였고, 이 확정으로 대체된다. **`erd.md`의 해당 스키마 블록은
+별도로 갱신이 필요하다** — 이 문서만으로는 `erd.md`를 고치지 않는다(5.3절 참조).
 
 ```mermaid
 stateDiagram-v2
-    [*] --> REQUESTED : 결제 요청 (Mock PG 인터페이스 확정 전 잠정)
-    REQUESTED --> PAID : 승인
-    REQUESTED --> FAILED : 실패 / 타임아웃
-    PAID --> CANCELLED : 예약 취소
-    PAID --> [*]
+    [*] --> REQUESTED : Mock PG 호출
+    REQUESTED --> APPROVED : 동기 응답 — 승인
+    REQUESTED --> DECLINED : 동기 응답 — 거절
+    REQUESTED --> FAILED : 호출 자체 실패 (네트워크 오류 등)
+    REQUESTED --> TIMEOUT : callback-delay-ms 초과, 응답 없음
+    TIMEOUT --> APPROVED : 지연된 콜백 도착 — 승인
+    TIMEOUT --> DECLINED : 지연된 콜백 도착 — 거절
+    TIMEOUT --> [*] : outcome=timeout — 콜백이 끝내 오지 않음
+    APPROVED --> [*]
+    DECLINED --> [*]
     FAILED --> [*]
-    CANCELLED --> [*]
 ```
 
 | 전이 | 행위 | 함께 바뀌는 테이블 | 원자성 보장 방식 |
 |---|---|---|---|
-| `[*] → REQUESTED` | (**잠정**) 결제 시도. `reservation`당 N건이므로(`erd.md` 4절) 재시도마다 새 행이 생긴다 — 기존 행이 `REQUESTED`로 되돌아가지 않는다 | 없음(신규 행) | 미확정 |
-| `REQUESTED → PAID` | (**잠정**) PG 콜백 승인 | `reservation`(`HELD→PENDING_PAYMENT→CONFIRMED`, 현재 계약에서는 미사용 — 1절 참조) | U-8(`pg_tx_id` 유니크)이 콜백 멱등성을 보장(`concurrency-spec.md` 6절) |
-| `REQUESTED → FAILED` | (**잠정**) PG 콜백 실패 또는 타임아웃 | 없음 | 미확정 — 재시도는 새 `payment` 행 생성으로 처리하는 것으로 추정 |
-| `PAID → CANCELLED` | (**잠정**) 예약 취소에 연동 | `reservation`(`CONFIRMED→CANCELLED`) | 미확정. `design-spec.md` 4.3절에 따라 실제 환불 처리(수수료 계산 등)는 범위 밖이므로 상태 표시 이상의 로직은 없을 것으로 추정 |
+| `[*] → REQUESTED` | Mock PG 호출. `reservation`당 N건이므로(`erd.md` 4절) 재시도마다 새 행이 생긴다 — 기존 행이 `REQUESTED`로 되돌아가지 않는다 | 없음(신규 행) | 없음 — 단순 INSERT |
+| `REQUESTED → APPROVED` | Mock PG의 동기 응답(승인) | `reservation`(`HELD→PENDING_PAYMENT→CONFIRMED`, 현재 계약에서는 미사용 — 1절 참조) | 없음 — 단일 요청·단일 응답으로 종결 |
+| `REQUESTED → DECLINED` | Mock PG의 동기 응답(거절) | 없음 | 없음 |
+| `REQUESTED → FAILED` | 호출 자체의 실패(네트워크 오류·5xx 등). **승인이 없었음이 확실하다** | 없음 | 없음 |
+| `REQUESTED → TIMEOUT` | `callback-delay-ms` 초과까지 응답이 오지 않음. **승인 여부를 모르는 상태** | `seat_hold`·`seat_inventory`·`reservation`을 만료 경로로 되돌릴 수 있다(1~3절의 만료 전이) | 없음 — 이 시점부터가 문제 구간의 시작이다 |
+| `TIMEOUT → APPROVED` / `TIMEOUT → DECLINED` | 지연된 비동기 콜백이 뒤늦게 도착 | 콜백이 `APPROVED`로 도착했는데 좌석이 이미 만료 처리됐다면 **정합성 깨짐** — 아래 참조 | U-8(`pg_tx_id` 유니크)이 콜백 멱등성을 보장(`concurrency-spec.md` 6절) |
+| `TIMEOUT → [*]` | `outcome=timeout`으로 주입한 경우 — 콜백이 끝내 오지 않는다 | 없음 | 없음. 영구 미해결 건의 정기 대조는 `design-spec.md` 4.2절 "여유가 되면"의 정합성 대조 배치 영역이며 현재 범위 밖이다 |
 
-**이 절은 다른 네 다이어그램과 신뢰 수준이 다르다.** 1~4절은 확정 문서에서 직접
-끌어온 것이거나(1·2·3절), 확정된 열거형에서 논리적으로 따라 나오는 최소 추정(4절)인
-반면, 이 절은 Mock PG 인터페이스가 아예 존재하지 않는 상태에서 스키마 열거형 하나만
-보고 그린 것이다. **Mock PG 작업(박태준 담당, 인터페이스는 최건이 정함)이 시작되면
-가장 먼저 다시 그려야 할 다이어그램이다.**
+### 5.1 `TIMEOUT`을 `FAILED`와 분리하는 이유
+
+**`TIMEOUT`은 승인 여부를 모르는 상태이고, `FAILED`는 승인이 없었음이 확실한
+상태다.** 이 구분이 이 상태 기계의 핵심이다.
+
+`FAILED`는 호출 자체가 실패한 경우다 — 요청이 PG에 도달하지 못했거나 PG가 즉시
+오류를 반환했으므로, 결제가 일어나지 않았다는 것을 우리 쪽에서 확신할 수 있다.
+안전하게 좌석을 풀어주고 끝내면 된다.
+
+`TIMEOUT`은 다르다. 요청은 보냈지만 **응답을 받지 못했을 뿐**이므로, PG 쪽에서는
+실제로 승인이 처리됐을 수도 있다. 이 상태에서 시스템이 "실패로 간주하고 좌석을
+풀어준 뒤" 나중에 승인 콜백이 도착하면, **좌석은 이미 해제됐는데 결제는 승인된**
+정합성 깨짐이 발생한다 — `design-spec.md` 5.1이 경고하는 "만료와 확정의 경합"과
+같은 계열의 문제이며, `concurrency-spec.md`의 CS-2(예약 확정)·CS-3(홀드 TTL 만료)를
+결제 축에서 재현한 것이다.
+
+`concurrency-spec.md` 6절의 결제 콜백 멱등성이 이 경로를 다룬다. `payment.pg_tx_id`
+유니크 제약(U-8)이 늦게 도착한 콜백을 정확히 그 결제 시도와 연결하므로, `TIMEOUT`
+행이 나중에 `APPROVED`로 풀려도 중복 승인 처리가 되지 않는다. 다만 **좌석이 이미
+다른 사람에게 팔렸을 수 있다는 문제 자체는 멱등성으로 해결되지 않는다** — 멱등성은
+"같은 콜백을 두 번 처리하지 않는다"를 보장할 뿐, "결제는 됐는데 좌석이 없다"는
+상태를 해소하는 보상 로직은 별도다. 그 보상 로직(환불 처리 등)은
+`design-spec.md` 4.3절에 따라 이 프로젝트의 범위 밖이며, 현재 계약은 이 상태가
+**발생할 수 있다는 것을 재현하는 데까지**를 다룬다.
+
+### 5.2 주입 파라미터
+
+Mock PG의 동작은 요청 시점에 아래 프로퍼티로 제어한다. `SeatHoldStrategy`가
+`holdfast.strategy`로 스위칭되는 것과 같은 방식이다.
+
+| 파라미터 | 값 | 용도 |
+|---|---|---|
+| `holdfast.mock-pg.outcome` | `approve` / `decline` / `timeout` / `fail` / `random` | 이번 결제 시도가 도달할 결과 |
+| `holdfast.mock-pg.outcome-weights` | 각 결과의 비율(`outcome=random`일 때만 사용) | 무작위 분포 조정 |
+| `holdfast.mock-pg.delay-ms`, `holdfast.mock-pg.delay-jitter-ms` | 밀리초 | 동기 호출 자체의 응답 지연과 지터 주입 |
+| `holdfast.mock-pg.callback-delay-ms` | 밀리초 | 비동기 콜백의 지연 — `REQUESTED → TIMEOUT` 전이를 일으키는 값 |
+
+**`callback-delay-ms`가 이 파라미터들 중 유일하게 존재 이유가 측정과 직결된다.**
+이 값을 홀드 TTL(`concurrency-spec.md` 3절)보다 길게 설정하면, 홀드가 먼저 만료돼
+좌석이 풀리고 그 뒤에 결제 승인 콜백이 도착하는 순서를 **의도적으로** 재현할 수
+있다. `design-spec.md` 5.1이 "발표에서 가장 좋은 소재"라고 부른 만료-확정 경합을
+우연히 마주치길 기다리는 대신, 이 파라미터로 원할 때 재현하는 것이 존재 이유다.
+
+**기본값은 `outcome=approve`, 지연 0이다.** 이 값은 `concurrency-spec.md` 7.3
+고정 변수 표에 있다. 락 전략 비교가 목적인 시나리오에서 Mock PG 지연까지 섞이면
+어느 지연이 락 대기이고 어느 지연이 결제 지연인지 구분할 수 없게 되어 측정이
+오염된다. `callback-delay-ms`를 키운 시나리오는 락 전략 비교와 **별도로** 돌리고,
+그 시나리오임을 보고서에 명시한다.
+
+### 5.3 `erd.md`와의 불일치 — 별도 갱신 필요
+
+이번에 확정한 상태값(`APPROVED/DECLINED/TIMEOUT/FAILED`)은 `erd.md`가 스키마에
+적어둔 `payment.status` 열거형(`REQUESTED/PAID/FAILED/CANCELLED`)과 다르다. `PAID`가
+`APPROVED`로 바뀌고, `DECLINED`·`TIMEOUT`이 새로 생기고, `CANCELLED`는 이 절의
+상태 기계에서 빠졌다(취소는 `reservation.status`가 담당하고 `payment` 행 자체는
+승인·거절·실패로 종결된 뒤 바뀌지 않는다 — `erd.md` 4절 "결제는 예약당 N건이다"와
+일관된다).
+
+**이 문서의 범위는 상태 전이 다이어그램이라 `erd.md`의 스키마 블록은 직접 고치지
+않았다.** `erd.md`가 이 문서보다 먼저 병합된 확정 문서이므로, 스키마 자체를 여기서
+같이 바꾸면 그 문서의 소유 범위를 침범하게 된다. `erd.md`의 `payment` 스키마 블록과
+2절 REQ 매핑은 별도 PR로 갱신이 필요하다.
 
 ---
 
