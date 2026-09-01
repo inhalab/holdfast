@@ -72,6 +72,9 @@ class NoneSeatHoldStrategyConcurrencyTest {
     private SeatHoldService seatHoldService;
 
     @Autowired
+    private ReservationService reservationService;
+
+    @Autowired
     private SeatHoldStrategy strategy;
 
     @Autowired
@@ -119,6 +122,90 @@ class NoneSeatHoldStrategyConcurrencyTest {
             jdbc.update("INSERT INTO user_session_quota (session_id, user_id, held_count) VALUES (?, ?, 0)",
                     SESSION_ID, (long) i);
         }
+    }
+
+    @Test
+    @DisplayName("확정까지 가면 같은 좌석이 여러 예약에 확정된다 — 초과 확정(V-1)")
+    void concurrentConfirmsOnSingleSeatProduceExcessConfirmations() throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(THREADS);
+        CountDownLatch startGate = new CountDownLatch(1);
+        CountDownLatch finished = new CountDownLatch(THREADS);
+        AtomicInteger heldOk = new AtomicInteger();
+        AtomicInteger confirmedOk = new AtomicInteger();
+        AtomicInteger phantom = new AtomicInteger();
+        AtomicInteger failed = new AtomicInteger();
+
+        for (int i = 1; i <= THREADS; i++) {
+            long userId = i;
+            pool.submit(() -> {
+                String holdId = UUID.randomUUID().toString();
+                try {
+                    startGate.await();
+                    seatHoldService.hold(SESSION_ID, userId, List.of(SEAT_ID), holdId);
+                    heldOk.incrementAndGet();
+                } catch (ApiException e) {
+                    finished.countDown();
+                    return; // 홀드 단계에서 거절됨. 팬텀 홀드의 분모에 들어가지 않는다.
+                } catch (Exception e) {
+                    failed.incrementAndGet();
+                    finished.countDown();
+                    return;
+                }
+
+                // 홀드에 성공한 요청만 확정을 시도한다 — 팬텀 홀드율(7.6.3)의 분모다.
+                try {
+                    reservationService.confirm(holdId, userId);
+                    confirmedOk.incrementAndGet();
+                } catch (ApiException e) {
+                    // "좌석을 잡았다"는 응답을 받고도 확정에서 잃었다 = 팬텀 홀드.
+                    phantom.incrementAndGet();
+                } catch (Exception e) {
+                    failed.incrementAndGet();
+                } finally {
+                    finished.countDown();
+                }
+            });
+        }
+
+        startGate.countDown();
+        assertThat(finished.await(60, TimeUnit.SECONDS)).isTrue();
+        pool.shutdown();
+
+        // V-1: 같은 재고 행이 두 건 이상의 확정된 예약에 팔렸는가.
+        // load-test/sql/verify.sql의 V-1과 같은 쿼리다.
+        Integer oversoldSeats = jdbc.queryForObject("""
+                SELECT count(*) FROM (
+                    SELECT rs.seat_inventory_id
+                      FROM reservation_seat rs
+                      JOIN reservation r ON r.id = rs.reservation_id
+                     WHERE r.status = 'CONFIRMED'
+                     GROUP BY rs.seat_inventory_id
+                    HAVING count(*) > 1
+                ) t
+                """, Integer.class);
+
+        Integer confirmedReservations = jdbc.queryForObject(
+                "SELECT count(*) FROM reservation WHERE status = 'CONFIRMED'", Integer.class);
+
+        System.out.printf(
+                "[none 확정] 홀드성공 %d · 확정성공 %d · 팬텀홀드 %d · 예외 %d "
+                        + "→ 확정된 예약 %d건, 초과 확정(V-1) %d건%n",
+                heldOk.get(), confirmedOk.get(), phantom.get(), failed.get(),
+                confirmedReservations, oversoldSeats);
+
+        assertThat(failed.get())
+                .as("예기치 못한 예외는 없어야 한다. 있으면 실패 증거가 아니라 결함이다")
+                .isZero();
+
+        // 이 테스트의 핵심. 좌석은 하나인데 확정된 예약이 둘 이상이면 초과 확정이다.
+        assertThat(oversoldSeats)
+                .as("""
+                        초과 확정(V-1)이 발생해야 한다. 0이라면 확정 경로에 방어가 남아 있다는                         뜻이다 — none이 원자적 조건부 UPDATE(confirmIfStillHeld)를 쓰고 있거나,                         재고의 hold_id를 대조하고 있는지 확인한다                        (state-transitions.md 2.1, NoneSeatHoldStrategy#confirmSeat)""")
+                .isPositive();
+
+        assertThat(confirmedOk.get())
+                .as("두 명 이상이 같은 좌석을 확정하는 데 성공해야 한다")
+                .isGreaterThan(1);
     }
 
     @Test

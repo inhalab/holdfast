@@ -81,7 +81,9 @@ function buildRow(strategy, runs) {
     unclassified,
     devRuns: runs.filter((r) => r.row.isFinalRun !== true).length,
     cells: {
-      oversell: '?',                                          // ← DB 검증 쿼리(7.1)
+      oversellConfirmed: '?',                                 // ← verify.sql V-1 (7.6.2)
+      oversellHeld: '?',                                      // ← verify.sql V-2 (7.6.2)
+      phantomHold: fmtPct(median(runs.map((r) => r.row.phantomHoldRate))),
       p95: fmtMs(median(runs.map((r) => r.row.p95))),
       p99: fmtMs(median(runs.map((r) => r.row.p99))),
       tps: fmtNum(median(runs.map((r) => r.row.tps))),
@@ -103,17 +105,18 @@ function render(scenario, rows) {
   const L = [];
   L.push(`## 7.6 기록 양식 — ${scenario || '전체'} 시나리오`);
   L.push('');
-  L.push('| 전략 | 초과 예약 | p95 | p99 | TPS | 409율 | 락 포기율 | 오류율 | 재시도 | 제약위반 | 풀 대기 |');
-  L.push('|---|---|---|---|---|---|---|---|---|---|---|');
+  L.push('| 전략 | 초과 확정 | 초과 홀드 | 팬텀 홀드율 | p95 | p99 | TPS | 409율 | 락 포기율 | 오류율 | 재시도 | 제약위반 | 풀 대기 |');
+  L.push('|---|---|---|---|---|---|---|---|---|---|---|---|---|');
   for (const r of rows) {
     const c = r.cells;
-    L.push(`| ${r.strategy} | ${c.oversell} | ${c.p95} | ${c.p99} | ${c.tps} | ` +
+    L.push(`| ${r.strategy} | ${c.oversellConfirmed} | ${c.oversellHeld} | ${c.phantomHold} | ` +
+           `${c.p95} | ${c.p99} | ${c.tps} | ` +
            `${c.rejection409} | ${c.lockGiveup} | ${c.errorRate} | ${c.retries} | ` +
            `${c.violations} | ${c.poolWait} |`);
   }
   L.push('');
   L.push('`?` = 이 스크립트가 만들지 않는 값. 출처가 k6가 아니다(7.1).');
-  L.push('  초과 예약 → `load-test/scripts/verify.sh`');
+  L.push('  초과 확정(V-1)·초과 홀드(V-2) → `load-test/scripts/verify.sh`');
   L.push('  재시도·제약위반·풀 대기 → Actuator 앱 커스텀 메트릭');
   L.push('`—` = 그 전략에서 성립하지 않는 지표. **0이 아니라 해당 없음이다.**');
   L.push('');

@@ -11,25 +11,35 @@ import java.util.List;
 /**
  * 예약 확정·조회·취소. state-transitions.md 1~3절.
  *
- * <p>이 세 경로는 <b>락 전략과 무관하다.</b> "전략 인터페이스가 감싸는 것은
- * {@code hold()} 메서드 하나뿐"이고(concurrency-spec.md 4절), 나머지 전이는 5개
- * 전략에서 동일하게 처리된다(state-transitions.md 2절). 그래서 여기에는 전략
- * 주입도, 전략별 분기도 없다.
+ * <p>확정의 <b>좌석 단위 전이만</b> 전략에 위임한다
+ * ({@link SeatHoldStrategy#confirmSeat}). 홀드 소유·상태 검사, 좌석 오름차순
+ * 순회, {@code seat_hold}·{@code reservation} 전이는 전부 여기 있고 5개 전략에서
+ * 동일하다 — 전략별 {@code if} 분기는 두지 않는다.
+ *
+ * <p>4개 전략은 그 좌석 단위 전이를 원자적 조건부 UPDATE로 똑같이 구현하고,
+ * {@code none}만 순진한 SELECT-후-UPDATE를 쓴다. 이유는
+ * {@link SeatHoldStrategy#confirmSeat}에 있다 — 베이스라인이 검수 기준을
+ * 위반할 수 있어야 재현한 결점과 측정 기준이 같은 것을 가리킨다.
+ *
+ * <p>조회·취소는 전략과 무관하다.
  */
 @Service
 public class ReservationService {
 
+    private final SeatHoldStrategy strategy;
     private final ReservationRepository reservationRepository;
     private final ReservationSeatRepository reservationSeatRepository;
     private final SeatHoldRepository seatHoldRepository;
     private final SeatInventoryRepository seatInventoryRepository;
     private final UserSessionQuotaRepository userSessionQuotaRepository;
 
-    public ReservationService(ReservationRepository reservationRepository,
+    public ReservationService(SeatHoldStrategy strategy,
+                              ReservationRepository reservationRepository,
                               ReservationSeatRepository reservationSeatRepository,
                               SeatHoldRepository seatHoldRepository,
                               SeatInventoryRepository seatInventoryRepository,
                               UserSessionQuotaRepository userSessionQuotaRepository) {
+        this.strategy = strategy;
         this.reservationRepository = reservationRepository;
         this.reservationSeatRepository = reservationSeatRepository;
         this.seatHoldRepository = seatHoldRepository;
@@ -65,9 +75,10 @@ public class ReservationService {
         long sessionId = reservation.getSessionId();
 
         // 좌석 오름차순으로 확정한다 — 전역 락 순서(5.1)는 확정 경로에서도 같다.
+        // 좌석 단위 전이만 전략에 위임한다. 4개 전략은 원자적 조건부 UPDATE를,
+        // none은 순진한 SELECT-후-UPDATE를 쓴다.
         for (SeatHold hold : holds) {
-            int confirmed = seatInventoryRepository.confirmIfStillHeld(sessionId, hold.getSeatId(), holdId);
-            if (confirmed == 0) {
+            if (!strategy.confirmSeat(sessionId, hold.getSeatId(), holdId)) {
                 // 홀드가 만료됐거나 남의 홀드다. 전부 아니면 전무이므로
                 // 예외를 던져 앞서 확정한 좌석까지 함께 되돌린다.
                 throw new ApiException(ErrorCode.HOLD_EXPIRED);

@@ -49,6 +49,12 @@ public interface SeatHoldRepository extends JpaRepository<SeatHold, Long> {
     @Query("SELECT MIN(sh.heldUntil) FROM SeatHold sh WHERE sh.holdId = :holdId")
     Optional<Instant> findHeldUntilByHoldId(@Param("holdId") String holdId);
 
+    /**
+     * 홀드 그룹 안의 좌석 한 건. {@code none}의 순진한 확정이 자기 홀드 행을
+     * 확인하는 데 쓴다.
+     */
+    Optional<SeatHold> findByHoldIdAndSeatId(String holdId, long seatId);
+
     /** 홀드 그룹의 행 전체. 확정·해제가 대상 좌석을 찾는 데 쓴다. */
     List<SeatHold> findByHoldIdOrderBySeatIdAsc(String holdId);
 

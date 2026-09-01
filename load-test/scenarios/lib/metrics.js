@@ -52,6 +52,34 @@ export const unclassifiedTotal = new Counter('bucket_unclassified_total');
 export const lockTimeoutTotal = new Counter('giveup_lock_timeout_total');
 export const retryExhaustedTotal = new Counter('giveup_retry_exhausted_total');
 
+// --- 팬텀 홀드 (7.6.3) -------------------------------------------------------
+
+/**
+ * 홀드에 201을 받았으나 확정에 실패한 요청의 비율.
+ *
+ * **none의 사용자 대면 결함이다.** "좌석을 잡았습니다"라는 응답을 받은 뒤
+ * 결제 화면에서 좌석을 잃는다. 초과 홀드(V-2)가 DB 상태로 드러나는 실패라면
+ * 이 값은 그 실패가 사용자에게 어떻게 보이는가를 잰다.
+ *
+ * 분모는 "홀드에 성공한 요청"이다 — 홀드 자체가 거절된 요청은 애초에 약속을
+ * 받지 않았으므로 여기 들어가지 않는다. 홀드 성공 건마다 add(true/false)를
+ * 정확히 한 번 호출한다.
+ */
+export const phantomHoldRate = new Rate('phantom_hold_rate');
+export const phantomHoldTotal = new Counter('phantom_hold_total');
+
+/**
+ * 홀드에 성공한 요청 하나의 결말을 기록한다.
+ *
+ * @param confirmed 확정까지 성공했으면 true
+ */
+export function recordHoldOutcome(confirmed, tags = {}) {
+  phantomHoldRate.add(!confirmed, tags);
+  if (!confirmed) {
+    phantomHoldTotal.add(1, tags);
+  }
+}
+
 // --- 워밍업 경계 -------------------------------------------------------------
 
 /**
