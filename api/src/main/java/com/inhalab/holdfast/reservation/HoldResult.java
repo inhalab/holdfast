@@ -1,5 +1,8 @@
 package com.inhalab.holdfast.reservation;
 
+import com.inhalab.holdfast.api.ErrorCode;
+import com.inhalab.holdfast.api.SeatConflict;
+
 import java.time.Instant;
 import java.util.List;
 
@@ -13,13 +16,13 @@ import java.util.List;
  * @param heldUntil 성공 시 홀드 만료 시각. DB {@code now()} 기준이다
  *                  (concurrency-spec.md 3절 — 앱 서버 2대의 시계가 어긋나면
  *                  만료 판정이 인스턴스마다 달라진다). 실패면 {@code null}.
- * @param code      실패 시 대표 코드(openapi.yaml {@code ErrorCode}). 성공이면 {@code null}.
+ * @param code      실패 시 대표 코드. 성공이면 {@code null}.
  * @param conflicts 좌석별 사유. 성공이면 빈 리스트.
  */
 public record HoldResult(
         boolean success,
         Instant heldUntil,
-        String code,
+        ErrorCode code,
         List<SeatConflict> conflicts
 ) {
 
@@ -27,7 +30,7 @@ public record HoldResult(
         return new HoldResult(true, heldUntil, null, List.of());
     }
 
-    public static HoldResult conflict(String code, List<SeatConflict> conflicts) {
+    public static HoldResult conflict(ErrorCode code, List<SeatConflict> conflicts) {
         return new HoldResult(false, null, code, List.copyOf(conflicts));
     }
 }

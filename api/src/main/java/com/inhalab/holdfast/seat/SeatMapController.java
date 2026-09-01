@@ -1,10 +1,7 @@
 package com.inhalab.holdfast.seat;
 
 import org.springframework.http.CacheControl;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.http.ProblemDetail;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -15,7 +12,6 @@ import org.thymeleaf.ITemplateEngine;
 import org.thymeleaf.context.Context;
 
 import jakarta.servlet.http.HttpServletResponse;
-import java.time.Instant;
 import java.util.Set;
 
 /**
@@ -25,10 +21,10 @@ import java.util.Set;
  * 메서드도 {@code HttpSession}을 참조하지 않는다. 앱 2대 구성에서 세션 공유는
  * 측정 오염 요인이다.
  *
- * <p>오류 처리는 지금은 이 컨트롤러 안에 국한한다. 예약·홀드 API가 붙으면
- * {@code ErrorCode} 전체를 다루는 공통 처리로 옮길 여지가 있지만, 지금은 이
- * 두 엔드포인트가 실제로 내는 404·500만 다룬다(openapi.yaml에 이 두 엔드포인트의
- * 응답으로 명시된 것은 200/304/404/500뿐이다).
+ * <p><b>오류 응답은 이 컨트롤러가 만들지 않는다.</b>
+ * {@link com.inhalab.holdfast.api.ApiExceptionHandler}가 전부 처리한다 —
+ * 컨트롤러마다 오류 모양이 다르면 k6가 {@code code}로 태깅해 집계하는 것이
+ * 깨지고, concurrency-spec.md 7.1의 "정상 거절과 오류를 분리한다"가 무너진다.
  */
 @RestController
 @RequestMapping("/api/sessions/{sessionId}")
@@ -83,24 +79,5 @@ public class SeatMapController {
         // Set<String> 인자로 넘긴다 — 전체 페이지가 아니라 htmx가 교체할 조각
         // 하나만 반환한다.
         return templateEngine.process("fragments/seat-status", Set.of("seatStatus"), context);
-    }
-
-    @ExceptionHandler(SessionNotFoundException.class)
-    public ProblemDetail handleSessionNotFound(SessionNotFoundException ex) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
-        problem.setTitle("Not Found");
-        problem.setProperty("code", "SESSION_NOT_FOUND");
-        problem.setProperty("serverTime", Instant.now().toString());
-        return problem;
-    }
-
-    @ExceptionHandler(Exception.class)
-    public ProblemDetail handleUnexpected(Exception ex) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-                HttpStatus.INTERNAL_SERVER_ERROR, "예기치 못한 오류가 발생했습니다.");
-        problem.setTitle("Internal Server Error");
-        problem.setProperty("code", "INTERNAL_ERROR");
-        problem.setProperty("serverTime", Instant.now().toString());
-        return problem;
     }
 }

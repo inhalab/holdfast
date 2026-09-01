@@ -40,6 +40,7 @@ export function extractRow(data, cfg) {
     normalRejectionRate: metricValue(data, 'normal_rejection_rate', 'rate'),
     lockGiveupRate: metricValue(data, 'lock_giveup_rate', 'rate'),
     errorRate: metricValue(data, 'error_rate', 'rate'),
+    phantomHoldRate: metricValue(data, 'phantom_hold_rate', 'rate'),
 
     counts: {
       success: metricValue(data, 'bucket_success_total', 'count') || 0,
@@ -51,10 +52,11 @@ export function extractRow(data, cfg) {
       unclassified: metricValue(data, 'bucket_unclassified_total', 'count') || 0,
       lockTimeout: metricValue(data, 'giveup_lock_timeout_total', 'count') || 0,
       retryExhausted: metricValue(data, 'giveup_retry_exhausted_total', 'count') || 0,
+      phantomHold: metricValue(data, 'phantom_hold_total', 'count') || 0,
     },
 
     // k6가 재지 않는 값들. summarize.mjs가 DB·Actuator에서 채운다(7.1).
-    notMeasuredByK6: ['초과 예약', '재시도 횟수', '제약 위반', '풀 대기'],
+    notMeasuredByK6: ['초과 확정', '초과 홀드', '재시도 횟수', '제약 위반', '풀 대기'],
   };
 }
 
@@ -74,6 +76,8 @@ export function renderText(row) {
   L.push(` 락 포기율       ${fmt(pct(row.lockGiveupRate))} %   ${row.counts.lockGiveup}건` +
          `  (LOCK_TIMEOUT ${row.counts.lockTimeout} / RETRY_EXHAUSTED ${row.counts.retryExhausted})`);
   L.push(` 오류율(5xx)     ${fmt(pct(row.errorRate))} %   ${row.counts.serverError}건`);
+  L.push(` 팬텀 홀드율     ${fmt(pct(row.phantomHoldRate))} %   ${row.counts.phantomHold}건` +
+         '  (홀드 201 → 확정 실패, 7.6.3)');
   L.push('');
   L.push(` 성공            ${row.counts.success}건`);
   L.push(` 상태 거절       ${row.counts.stateRejection}건  (어느 열에도 넣지 않음)`);

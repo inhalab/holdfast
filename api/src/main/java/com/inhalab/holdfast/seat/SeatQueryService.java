@@ -1,5 +1,7 @@
 package com.inhalab.holdfast.seat;
 
+import com.inhalab.holdfast.api.ApiException;
+import com.inhalab.holdfast.api.ErrorCode;
 import com.inhalab.holdfast.reservation.SeatInventoryRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -46,7 +48,7 @@ public class SeatQueryService {
     @Transactional(readOnly = true)
     public SeatMapResponse getSeatMap(Long sessionId) {
         EventSession session = eventSessionRepository.findById(sessionId)
-                .orElseThrow(() -> new SessionNotFoundException(sessionId));
+                .orElseThrow(() -> new ApiException(ErrorCode.SESSION_NOT_FOUND));
 
         List<SeatMapRow> rows = seatInventoryRepository.findSeatMapRows(sessionId);
         List<SeatMapZoneResponse> zones = groupByZone(rows);
@@ -87,7 +89,7 @@ public class SeatQueryService {
     @Transactional(readOnly = true)
     public SeatStatusSnapshotResult getSeatStatusSnapshot(Long sessionId) {
         if (!eventSessionRepository.existsById(sessionId)) {
-            throw new SessionNotFoundException(sessionId);
+            throw new ApiException(ErrorCode.SESSION_NOT_FOUND);
         }
 
         List<SeatStatusRow> rows = seatInventoryRepository.findStatusRows(sessionId);

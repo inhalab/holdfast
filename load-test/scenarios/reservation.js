@@ -12,7 +12,7 @@
 import { sleep } from 'k6';
 import exec from 'k6/execution';
 import { loadConfig, stagesFor, resultPath, SUMMARY_TREND_STATS } from './lib/config.js';
-import { record, inWarmup } from './lib/metrics.js';
+import { record, inWarmup, recordHoldOutcome } from './lib/metrics.js';
 import { createHold, confirmReservation } from './lib/api.js';
 import { extractRow, renderText } from './lib/summary.js';
 
@@ -64,6 +64,12 @@ export default function () {
     if (holdId) {
       const confirmRes = confirmReservation(cfg.baseUrl, userId, holdId);
       record(confirmRes, cfg.warmupMs);
+
+      // 팬텀 홀드(7.6.3): 홀드에 201을 받고도 확정에 실패한 경우.
+      // 워밍업 구간은 다른 지표와 같은 기준으로 제외한다(7.4).
+      if (!inWarmup(cfg.warmupMs)) {
+        recordHoldOutcome(confirmRes.status === 201);
+      }
     }
   }
 
