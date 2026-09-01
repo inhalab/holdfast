@@ -42,6 +42,16 @@ holdfast:
   # 낮춰 쓴다. SeatMap 응답(holdTtlSeconds)에 그대로 노출해 클라이언트가
   # 하드코딩하지 않게 한다.
   hold-ttl-seconds: ${HOLD_TTL_SECONDS:300}
+  # 락 전략 스위치(concurrency-spec.md 4절). none/pessimistic/optimistic/unique/redis.
+  # k6 시나리오는 고정하고 이 값만 바꿔 측정한다.
+  #
+  # 현재 구현된 것은 none뿐이다. 다른 값을 넣으면 SeatHoldStrategy 빈이 없어
+  # 기동에 실패한다 — 측정 도중 "구현되지 않은 전략을 쟀다"가 되는 것보다
+  # 기동 시점에 드러나는 편이 낫다.
+  #
+  # 기본값이 none인 것은 M2가 베이스라인(실패 재현) 단계이기 때문이다.
+  # none은 초과 예약을 막지 않는다 — 그것이 이 전략의 목적이다(4.1).
+  strategy: ${HOLDFAST_STRATEGY:none}
 
 management:
   endpoints:

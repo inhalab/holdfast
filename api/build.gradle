@@ -18,6 +18,14 @@ repositories {
     mavenCentral()
 }
 
+dependencyManagement {
+    imports {
+        // Boot 4.1의 BOM은 testcontainers 모듈 버전을 관리하지 않는다.
+        // spring-boot-testcontainers가 끌어오는 코어와 같은 줄로 맞춘다.
+        mavenBom 'org.testcontainers:testcontainers-bom:2.0.5'
+    }
+}
+
 dependencies {
     // 웹 + 서버렌더(Thymeleaf)
     implementation 'org.springframework.boot:spring-boot-starter-web'
@@ -49,6 +57,18 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+    // 단위 경합 테스트는 실제 Postgres에서 돌린다. concurrency-spec 8절:
+    // "H2를 쓰지 않는다. FOR UPDATE 의미론이 Postgres와 달라 동시성 테스트가
+    // 통과해도 아무것도 보장하지 않는다."
+    //
+    // Testcontainers 2.x에서 모듈 아티팩트 이름이 바뀌었다.
+    // 1.x의 org.testcontainers:junit-jupiter / :postgresql은 2.x에 없고
+    // :testcontainers-junit-jupiter / :testcontainers-postgresql이다.
+    // 버전은 Boot가 관리하지 않으므로 testcontainers-bom을 import해 맞춘다.
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+    testImplementation 'org.testcontainers:testcontainers-postgresql'
 }
 
 tasks.named('test') {

@@ -3,10 +3,12 @@ package com.inhalab.holdfast.reservation;
 import com.inhalab.holdfast.seat.SeatMapRow;
 import com.inhalab.holdfast.seat.SeatStatusRow;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * {@code SeatInventory} 저장소. 엔티티가 있는 이 패키지({@code reservation/})에
@@ -48,4 +50,41 @@ public interface SeatInventoryRepository extends JpaRepository<SeatInventory, Lo
             ORDER BY si.seatId
             """)
     List<SeatStatusRow> findStatusRows(@Param("sessionId") Long sessionId);
+
+    /**
+     * 재고 행 한 건을 <b>락 없이</b> 읽는다. {@code none} 베이스라인의 "조회 후
+     * UPDATE"에서 조회에 해당한다(concurrency-spec.md 4.1).
+     *
+     * <p>{@code @Lock}을 붙이지 않는다 — 붙이면 그 순간 비관적 락 전략이 된다.
+     */
+    Optional<SeatInventory> findBySessionIdAndSeatId(Long sessionId, Long seatId);
+
+    /**
+     * 재고 행을 <b>조건 없이</b> HELD로 바꾼다. {@code none} 베이스라인 전용이다.
+     *
+     * <p><b>WHERE 절에 {@code id}만 있다.</b> {@code status = 'AVAILABLE'}이나
+     * {@code version = ?} 같은 조건을 넣으면 그 순간 낙관적 락(4.3)이 되어
+     * 베이스라인이 아니게 된다. 판정은 이 UPDATE가 아니라 앞선 조회 결과에 대한
+     * 자바 쪽 비교가 하며, 그 둘 사이의 틈이 정확히 초과 예약이 발생하는
+     * 지점이다 — 이 이슈가 만들려는 실패 증거다.
+     *
+     * <p><b>반환 타입이 {@code void}인 것도 의도다.</b> {@code int}로 두면
+     * {@code rowsAffected}로 분기하고 싶어지는데, 그 판정은 조건부 UPDATE
+     * 전략의 것이지 베이스라인의 것이 아니다. 타입 자체로 막아 둔다.
+     *
+     * <p>{@code held_until}은 DB {@code now()}로 계산한다 — 앱 서버 2대의 시계가
+     * 어긋나면 만료 판정이 인스턴스마다 달라진다(concurrency-spec.md 3절).
+     */
+    @Modifying
+    @Query(value = """
+            UPDATE seat_inventory
+               SET status = 'HELD',
+                   hold_id = :holdId,
+                   held_until = now() + (:ttlSeconds * interval '1 second'),
+                   version = version + 1
+             WHERE id = :id
+            """, nativeQuery = true)
+    void markHeldUnconditionally(@Param("id") Long id,
+                                 @Param("holdId") String holdId,
+                                 @Param("ttlSeconds") int ttlSeconds);
 }

@@ -49,6 +49,10 @@ services:
       DB_PASSWORD: holdfast
       DB_NAME: holdfast
       JPA_DDL_AUTO: validate  # Flyway가 스키마를 만들고, JPA는 엔티티와 일치하는지만 검증한다.
+      # 락 전략 스위치(concurrency-spec 4절). 측정할 때 이 값만 바꾼다.
+      # 현재 구현된 것은 none(베이스라인)뿐이다.
+      # 주의: none으로 측정할 때는 seed.sh가 U-2 인덱스를 지운다(erd.md 3.1).
+      HOLDFAST_STRATEGY: ${HOLDFAST_STRATEGY:-none}
       REDIS_HOST: redis
       REDIS_PORT: 6379
     depends_on:
@@ -68,6 +72,7 @@ services:
       DB_PASSWORD: holdfast
       DB_NAME: holdfast
       JPA_DDL_AUTO: validate
+      HOLDFAST_STRATEGY: ${HOLDFAST_STRATEGY:-none}
       REDIS_HOST: redis
       REDIS_PORT: 6379
     depends_on:
