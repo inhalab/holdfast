@@ -3,8 +3,20 @@
 #
 #   1. 시드 초기화
 #   2. 워밍업 30초 — 집계에서 제외 (시나리오가 처리한다)
-#   3. 본 측정
-#   4. 전략당 3회 반복, 중앙값 채택 (summarize.mjs가 계산한다)
+#   3. **본 측정 시작 시 시드 재초기화** — 아래 설명
+#   4. 본 측정
+#   5. 전략당 3회 반복, 중앙값 채택 (summarize.mjs가 계산한다)
+#
+# ## 3단계가 필요한 이유
+#
+# 좌석은 유한 자원이고 확정된 좌석은 돌아오지 않는다. 그래서 워밍업 30초가
+# 재고를 전부 소모해 버리고, 정작 측정 구간에는 경합이 남지 않는다. 실제로
+# 세 경합도 모두 측정 구간 성공 0건 · 409율 100%로 나왔고, 극단(1석/200VU)은
+# 램프업이 도착을 직렬화해 초과 확정(V-1)이 0건이었다.
+#
+# 워밍업의 목적은 JIT과 커넥션 풀을 데우는 것이지 경합 구간을 버리는 것이
+# 아니다. 재초기화는 그 목적을 살리면서 경합을 측정 구간으로 옮긴다. VU가
+# 전부 올라온 상태에서 좌석이 열리므로 실제 티켓팅 오픈 순간에 더 가깝다.
 #
 # 사용:
 #   load-test/scripts/run.sh smoke                     # 스모크만
@@ -57,11 +69,38 @@ for run in $(seq 1 "$REPEATS"); do
   # 7.4-1 시드 초기화. 매 회차마다 같은 상태에서 시작한다(7.3).
   "$ROOT/load-test/scripts/seed.sh" "$SCENARIO" "$STRATEGY"
 
-  # 7.4-2,3 워밍업 + 본 측정
-  k6_run /scenarios/reservation.js \
-    -e "SCENARIO=$SCENARIO" -e "STRATEGY=$STRATEGY" -e "RUN=$run" \
-    -e "WARMUP_SEC=$WARMUP_SEC" -e "DURATION_SEC=$DURATION_SEC" \
-    || echo "[run] k6가 임계값 위반으로 실패했다 — 결과는 남아 있다"
+  # 7.4-2,3,4 워밍업 → 본 측정 시작 시 시드 재초기화 → 본 측정
+  #
+  # 재초기화 시점은 시나리오가 알려준다. 워밍업 경계를 넘은 첫 요청이
+  # RESEED_MARKER를 찍으면 그 줄을 보고 시드를 다시 돌린다. 호스트에서
+  # 시계로 재면 컨테이너 기동 시간만큼 어긋나 재초기화가 워밍업 안으로
+  # 들어갈 수 있고, 그러면 열린 재고를 워밍업이 도로 소모해 버린다.
+  # k6가 임계값 위반으로 0이 아닌 코드를 내도 결과 JSON은 남으므로 여기서
+  # 중단하지 않는다. 파이프라인 전체를 묶어 pipefail이 스크립트를 죽이지 않게 한다.
+  {
+    k6_run /scenarios/reservation.js \
+      -e "SCENARIO=$SCENARIO" -e "STRATEGY=$STRATEGY" -e "RUN=$run" \
+      -e "WARMUP_SEC=$WARMUP_SEC" -e "DURATION_SEC=$DURATION_SEC" 2>&1 \
+      || echo "[run] k6가 임계값 위반으로 실패했다 — 결과는 남아 있다"
+  } | {
+    reseeded=0
+    while IFS= read -r line; do
+      printf '%s\n' "$line"
+      case "$line" in
+        *HOLDFAST_RESEED_NOW*)
+          if [ "$reseeded" = "0" ]; then
+            reseeded=1
+            echo "[run] 본 측정 시작 — 시드 재초기화 (7.4-3)"
+            # 실패를 삼키지 않는다. 재초기화가 안 된 채로 이어지면 매진 상태를
+            # 재면서 숫자는 그럴듯하게 나온다 — 가장 알아채기 어려운 오염이다.
+            if ! "$ROOT/load-test/scripts/seed.sh" "$SCENARIO" "$STRATEGY" --reset; then
+              echo "[run] !! RESEED_FAILED — 이 회차는 폐기한다 (7.4-3)"
+            fi
+          fi
+          ;;
+      esac
+    done
+  }
 
   # 7.1 초과 예약은 k6가 아니라 DB 검증 쿼리로 센다.
   "$ROOT/load-test/scripts/verify.sh" || true

@@ -1,10 +1,16 @@
 // config.js — 7.2 경합도 3단계와 7.4 측정 프로토콜을 환경변수로 전환한다.
 
 // 7.2 경합도 3단계. 좌석 수와 VU는 설계서가 못박은 값이므로 바꾸지 않는다.
+//
+// userPool은 7.3 고정 변수 표의 "시나리오별 사용자 수"이며 **VU 수와 다르다.**
+// 사용자 풀이 VU 수와 같으면 저경합에서 1인 최대 매수(4매)가 좌석보다 먼저
+// 바닥나, 좌석 경합이 아니라 할당량 거절을 재게 된다. scripts/seed.sh의 표와
+// 반드시 같은 값이어야 한다 — 시드가 만들지 않은 사용자로 요청하면 앱이
+// 할당량 행을 찾지 못해 500을 낸다.
 export const PROFILES = {
-  low:     { seats: 1000, vus: 100, purpose: '오버헤드 비교' },
-  high:    { seats: 10,   vus: 500, purpose: '전략 차이' },
-  extreme: { seats: 1,    vus: 200, purpose: '정합성 한계' },
+  low:     { seats: 1000, vus: 100, userPool: 400, purpose: '오버헤드 비교' },
+  high:    { seats: 10,   vus: 500, userPool: 500, purpose: '전략 차이' },
+  extreme: { seats: 1,    vus: 200, userPool: 200, purpose: '정합성 한계' },
 };
 
 function intEnv(name, fallback) {
@@ -67,6 +73,7 @@ export function loadConfig() {
     profile,
     seats: profile.seats,
     vus: profile.vus,
+    userPool: profile.userPool,
     warmupSec,
     warmupMs: warmupSec * 1000,
     durationSec,

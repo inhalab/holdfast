@@ -44,9 +44,27 @@ export function setup() {
 }
 
 export default function () {
-  // 사용자는 VU마다 다르게 둔다. 같은 사용자로 몰면 1인 최대 매수(CS-6)가 먼저
+  // 사용자는 요청마다 다르게 둔다. 같은 사용자로 몰면 1인 최대 매수(CS-6)가 먼저
   // 걸려서, 7.2가 보려는 좌석 경합이 아니라 할당량 경합을 재게 된다.
-  const userId = exec.vu.idInTest;
+  //
+  // **VU 번호를 그대로 쓰면 이 의도가 지켜지지 않는다.** VU 하나는 실행 내내
+  // 같은 사용자이므로 4매를 채우고 나면 남은 요청이 전부 QUOTA_EXCEEDED가 된다.
+  // 저경합(1000석/100VU)에서 실제로 400석에서 멈추고 600석이 미사용으로 남았다.
+  //
+  // 그래서 실행 전체에서 고유한 반복 번호로 사용자 풀을 순회한다. 풀 크기는
+  // 좌석을 다 소화할 만큼 크고(1000석 ÷ 4매 = 250명), 동시에 도는 VU 수 이상이라
+  // 두 VU가 같은 할당량 행을 동시에 다투지 않는다.
+  const userId = (exec.scenario.iterationInTest % cfg.userPool) + 1;
+
+  // 7.4: 본 측정이 시작되는 순간 시드를 다시 초기화한다. 좌석은 유한 자원이라
+  // 워밍업 30초가 재고를 전부 소모해 버려, 정작 측정 구간에는 경합이 남지 않고
+  // 매진 상태의 409만 남는다(측정 구간 성공 0건). 재초기화 시점을 호스트가
+  // 알아야 하므로 경계를 넘는 순간 표식을 한 번 찍는다 — scripts/run.sh가 이
+  // 줄을 보고 seed.sh를 실행한다.
+  //
+  // 표식은 VU 1만, 딱 한 번 찍는다. k6는 VU마다 모듈 인스턴스가 따로라
+  // 모듈 스코프 플래그로 충분하다.
+  signalMeasurementStart();
 
   // 좌석은 시드가 만든 연속 구간에서 고른다. 극단(1석)이면 모든 VU가 같은 좌석을
   // 노리고, 고경합(10석)이면 10석에 500 VU가 몰린다 — 7.2가 의도한 구도다.
@@ -77,6 +95,26 @@ export default function () {
   // 부하가 VU 수가 아니라 서버 처리량에 종속된다.
   sleep(1);
 }
+
+/**
+ * 본 측정 시작 표식. scripts/run.sh가 이 줄을 보고 시드를 재초기화한다.
+ *
+ * **경계를 넘은 뒤에 찍는다.** 미리 찍어 재초기화가 워밍업 안에서 끝나면 열린
+ * 재고를 워밍업이 도로 소모해 원래 문제로 돌아간다. 반대로 조금 늦는 것은
+ * 측정 구간 앞머리에 매진 상태 409가 몇백 ms 섞이는 정도라 해가 적다.
+ *
+ * VU 하나만 찍게 하면 그 VU가 sleep(1) 중일 때 최대 1초까지 늦어져 실행마다
+ * 흔들린다. 앞쪽 다섯 VU가 각자 한 번씩 찍고 run.sh가 **첫 줄에만** 반응해,
+ * 지연은 줄이고 로그는 다섯 줄로 묶는다.
+ */
+let signalled = false;
+function signalMeasurementStart() {
+  if (signalled || exec.vu.idInTest > 5 || inWarmup(cfg.warmupMs)) return;
+  signalled = true;
+  console.log(RESEED_MARKER);
+}
+
+export const RESEED_MARKER = 'HOLDFAST_RESEED_NOW';
 
 function pickSeats(c) {
   const out = [];
