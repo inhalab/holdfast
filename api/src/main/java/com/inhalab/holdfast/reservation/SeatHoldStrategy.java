@@ -10,7 +10,7 @@ package com.inhalab.holdfast.reservation;
  * <table>
  *   <caption>프로퍼티 값과 전략</caption>
  *   <tr><td>{@code none}</td><td>베이스라인 (락 없음) — {@link NoneSeatHoldStrategy}</td></tr>
- *   <tr><td>{@code pessimistic}</td><td>비관적 락 (미구현)</td></tr>
+ *   <tr><td>{@code pessimistic}</td><td>비관적 락 ({@code FOR UPDATE}) — {@link PessimisticSeatHoldStrategy}</td></tr>
  *   <tr><td>{@code optimistic}</td><td>낙관적 락 (미구현)</td></tr>
  *   <tr><td>{@code unique}</td><td>DB 유니크 제약 (미구현)</td></tr>
  *   <tr><td>{@code redis}</td><td>Redis 분산락 (미구현)</td></tr>

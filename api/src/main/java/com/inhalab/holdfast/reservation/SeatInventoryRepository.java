@@ -2,7 +2,9 @@ package com.inhalab.holdfast.reservation;
 
 import com.inhalab.holdfast.seat.SeatMapRow;
 import com.inhalab.holdfast.seat.SeatStatusRow;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,8 +17,13 @@ import java.util.Optional;
  * 함께 둔다 — Spring Data 관례이자, erd.md 4절이 정한 대로 이 테이블이 CS-1의
  * 쓰기 경로임을 리뷰 경계로 삼기 위해서다.
  *
- * <p>아래 두 메서드는 전부 읽기 전용 SELECT다. 좌석·회차 조회는 락을 잡지
- * 않는다 — {@code SELECT ... FOR UPDATE}도, {@code @Lock}도 쓰지 않는다.
+ * <p><b>좌석맵·폴링 조회는 락을 잡지 않는다</b> — {@link #findSeatMapRows},
+ * {@link #findStatusRows}, {@link #findBySessionIdAndSeatId}에는
+ * {@code FOR UPDATE}도 {@code @Lock}도 붙이지 않는다. 조회가 락을 잡으면
+ * 폴링만으로 예약 경로가 막힌다.
+ *
+ * <p>락을 잡는 조회는 {@link #findForUpdate} 하나뿐이며 {@code pessimistic}
+ * 전략만 쓴다(concurrency-spec.md 4.2).
  */
 public interface SeatInventoryRepository extends JpaRepository<SeatInventory, Long> {
 
@@ -60,21 +67,25 @@ public interface SeatInventoryRepository extends JpaRepository<SeatInventory, Lo
     Optional<SeatInventory> findBySessionIdAndSeatId(Long sessionId, Long seatId);
 
     /**
-     * 재고 행을 <b>조건 없이</b> HELD로 바꾼다. {@code none} 베이스라인 전용이다.
+     * 재고 행 한 건을 <b>{@code SELECT ... FOR UPDATE}로</b> 읽는다.
+     * {@code pessimistic} 전략의 실체다(concurrency-spec.md 4.2).
      *
-     * <p><b>WHERE 절에 {@code id}만 있다.</b> {@code status = 'AVAILABLE'}이나
-     * {@code version = ?} 같은 조건을 넣으면 그 순간 낙관적 락(4.3)이 되어
-     * 베이스라인이 아니게 된다. 판정은 이 UPDATE가 아니라 앞선 조회 결과에 대한
-     * 자바 쪽 비교가 하며, 그 둘 사이의 틈이 정확히 초과 예약이 발생하는
-     * 지점이다 — 이 이슈가 만들려는 실패 증거다.
+     * <p>이 락은 <b>트랜잭션 종료까지</b> 행을 점유하며, 대기하는 동안 DB
+     * 커넥션을 계속 쥐고 있다 — 그 점이 이 전략의 성능 특성을 지배한다(4.2).
+     * 대기 상한은 Postgres {@code lock_timeout} 1초로 끊는다(7.3). 상한이 없으면
+     * 커넥션 풀이 먼저 말라 측정 대상이 락 경합에서 커넥션 고갈로 바뀐다.
      *
-     * <p><b>반환 타입이 {@code void}인 것도 의도다.</b> {@code int}로 두면
-     * {@code rowsAffected}로 분기하고 싶어지는데, 그 판정은 조건부 UPDATE
-     * 전략의 것이지 베이스라인의 것이 아니다. 타입 자체로 막아 둔다.
+     * <p><b>{@code NOWAIT}·{@code SKIP LOCKED} 변형은 쓰지 않는다.</b> 4.2가
+     * 범위에서 제외했다.
      *
-     * <p>{@code held_until}은 DB {@code now()}로 계산한다 — 앱 서버 2대의 시계가
-     * 어긋나면 만료 판정이 인스턴스마다 달라진다(concurrency-spec.md 3절).
+     * <p>호출 측은 좌석 ID 오름차순으로만 이 메서드를 부른다(5.1). 순서가
+     * 어긋나면 두 요청이 서로의 행을 기다려 데드락이 난다.
      */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT si FROM SeatInventory si WHERE si.sessionId = :sessionId AND si.seatId = :seatId")
+    Optional<SeatInventory> findForUpdate(@Param("sessionId") Long sessionId,
+                                          @Param("seatId") Long seatId);
+
     /**
      * <b>lazy 검증 확정 쿼리.</b> concurrency-spec.md 3절이 정한 형태 그대로다.
      *
@@ -156,6 +167,31 @@ public interface SeatInventoryRepository extends JpaRepository<SeatInventory, Lo
             """, nativeQuery = true)
     int releaseSold(@Param("seatInventoryId") long seatInventoryId);
 
+    /**
+     * 재고 행을 <b>조건 없이</b> HELD로 바꾼다.
+     *
+     * <p><b>WHERE 절에 {@code id}만 있다.</b> {@code status = 'AVAILABLE'}이나
+     * {@code version = ?} 같은 조건을 넣으면 그 순간 낙관적 락(4.3)이 된다.
+     * 이 UPDATE 자체는 아무것도 판정하지 않는다.
+     *
+     * <p><b>그래서 호출 측은 둘 중 하나여야 한다.</b>
+     *
+     * <ul>
+     *   <li>{@code none} — 아무 보호도 없다. 앞선 조회에 대한 자바 쪽 비교가
+     *       유일한 판정이고, 그 둘 사이의 틈이 정확히 초과 예약이 발생하는
+     *       지점이다(4.1). 실패 증거를 만드는 것이 목적이다.</li>
+     *   <li>{@code pessimistic} — 같은 행을 이미 {@link #findForUpdate}로 잡고
+     *       있다. <b>안전성이 WHERE 절이 아니라 행 락에서 나온다</b>(4.2). 락을
+     *       쥔 채 읽은 상태가 커밋 전까지 바뀌지 않으므로 조건이 필요 없다.</li>
+     * </ul>
+     *
+     * <p><b>반환 타입이 {@code void}인 것도 의도다.</b> {@code int}로 두면
+     * {@code rowsAffected}로 분기하고 싶어지는데, 그 판정은 조건부 UPDATE
+     * 전략의 것이다. 타입 자체로 막아 둔다.
+     *
+     * <p>{@code held_until}은 DB {@code now()}로 계산한다 — 앱 서버 2대의 시계가
+     * 어긋나면 만료 판정이 인스턴스마다 달라진다(concurrency-spec.md 3절).
+     */
     @Modifying
     @Query(value = """
             UPDATE seat_inventory
