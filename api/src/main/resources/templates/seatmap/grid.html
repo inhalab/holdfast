@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<!--
+  좌석 격자 fragment. 최초 페이지 렌더(index.html)와 3초 폴링 응답이 이 fragment를 공유한다.
+  폴링 시 seat/ 컨트롤러가 같은 fragment를 렌더해 반환하고, htmx가 #seat-grid를 통째로 교체한다.
+
+  design-spec 5.3: 격자 형태 최소 구현. SVG 좌석 배치에 시간 쏟지 말 것.
+  좌석 status(AVAILABLE/HELD/SOLD)만 서버가 칠하고, 내 선택·내 홀드 표시는 seatmap.js가
+  클라이언트 보관 목록과 대조해 덧입힌다 (openapi: HELD는 내 홀드/남 홀드를 구분하지 않는다).
+-->
+<body>
+<div th:fragment="grid(zones)" id="seat-grid">
+    <div class="zone" th:each="zone : ${zones}">
+        <h3 class="zone-name" th:text="${zone.name}">A구역</h3>
+        <div class="seats">
+            <button type="button" class="seat"
+                    th:each="seat : ${zone.seats}"
+                    th:classappend="${seat.status == 'AVAILABLE' ? 'is-available' : (seat.status == 'HELD' ? 'is-held' : 'is-sold')}"
+                    th:attr="data-seat-id=${seat.seatId},
+                             data-status=${seat.status},
+                             data-seat-no=${seat.seatNo}"
+                    th:style="|grid-row:${seat.rowIndex}; grid-column:${seat.colIndex}|"
+                    th:disabled="${seat.status != 'AVAILABLE'}"
+                    th:text="${seat.seatNo}">A-1</button>
+        </div>
+    </div>
+</div>
+</body>
+</html>

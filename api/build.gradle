@@ -57,6 +57,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    // Boot 4는 테스트 슬라이스 자동설정도 기능별로 쪼갰다(위 flyway 주석과 같은 이유).
+    // @WebMvcTest는 spring-boot-test-autoconfigure에 없고 이 모듈에 있다.
+    testImplementation 'org.springframework.boot:spring-boot-webmvc-test'
 
     // 단위 경합 테스트는 실제 Postgres에서 돌린다. concurrency-spec 8절:
     // "H2를 쓰지 않는다. FOR UPDATE 의미론이 Postgres와 달라 동시성 테스트가
