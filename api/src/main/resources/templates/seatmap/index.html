@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="'회차 ' + ${seatMap.sessionId} + ' 좌석 선택'">좌석 선택</title>
+    <link rel="stylesheet" th:href="@{/css/seatmap.css}">
+    <!-- htmx: webjar 정적 제공. 저장소에 webjars-locator가 없어 버전 경로로 참조한다.
+         버전은 build.gradle의 org.webjars.npm:htmx.org 핀(2.0.4)과 일치시킨다. -->
+    <script th:src="@{/webjars/htmx.org/2.0.4/dist/htmx.min.js}"></script>
+</head>
+<body>
+<!--
+  좌석 선택 상태·holdId는 전부 클라이언트(seatmap.js)가 보관한다. 서버 세션 금지
+  (concurrency-spec 0.4: 앱 2대에서 세션 공유는 측정 오염 요인).
+  화면이 쓰는 회차 메타는 data-* 로 내려 JS가 읽는다.
+-->
+<main class="seatmap"
+      th:attr="data-session-id=${seatMap.sessionId},
+               data-max-per-user=${seatMap.maxPerUser},
+               data-hold-ttl=${seatMap.holdTtlSeconds},
+               data-user-id=${userId}">
+
+    <header class="page-head">
+        <h1 th:text="'회차 ' + ${seatMap.sessionId} + ' 좌석 선택'">좌석 선택</h1>
+        <p class="meta">
+            <span th:text="'상태 ' + ${seatMap.sessionStatus}">상태 OPEN</span>
+            <span th:text="'· 1인 최대 ' + ${seatMap.maxPerUser} + '매'">· 1인 최대 4매</span>
+        </p>
+        <ul class="legend" aria-hidden="true">
+            <li><span class="swatch is-available"></span>선택 가능</li>
+            <li><span class="swatch is-selected"></span>내 선택</li>
+            <li><span class="swatch is-held-mine"></span>내 선점</li>
+            <li><span class="swatch is-held"></span>선점 중</li>
+            <li><span class="swatch is-sold"></span>판매 완료</li>
+        </ul>
+    </header>
+
+    <div class="layout">
+        <!--
+          좌석 격자: 최초 서버 렌더만 한다. 위치(rowIndex/colIndex)·좌석번호는
+          회차 동안 바뀌지 않으므로 폴링으로 다시 그리지 않는다.
+
+          3초 폴링은 화면 밖 status-feed가 받는다. seat/SeatMapController의
+          text/html 응답은 seat/조회 API(#37) 담당 fragment(fragments/seat-status,
+          seatId+status만 있는 <li> 목록)를 그대로 쓴다 — 이 화면의 격자 구조와는
+          별개다. seatmap.js가 그 <li>를 읽어 이미 그려진 좌석 버튼의 상태 클래스만
+          바꾼다. ETag/If-None-Match(→304 no-op)도 거기서 처리한다.
+        -->
+        <section class="grid-wrap">
+            <div th:replace="~{seatmap/grid :: grid(${seatMap.zones})}"></div>
+        </section>
+        <div id="status-feed" hidden
+             th:attr="hx-get=@{/api/sessions/{id}/seats/status(id=${seatMap.sessionId})}"
+             hx-trigger="every 3s"
+             hx-swap="innerHTML"
+             hx-headers='{"Accept": "text/html"}'></div>
+
+        <aside class="panel">
+            <section id="selection-panel">
+                <h2>선택한 좌석</h2>
+                <ul id="selected-list" class="seat-list">
+                    <li class="empty">좌석을 선택하세요</li>
+                </ul>
+                <button type="button" id="hold-btn" class="primary" disabled>선점하기</button>
+            </section>
+
+            <section id="hold-panel" hidden>
+                <h2>선점 중</h2>
+                <ul id="held-list" class="seat-list"></ul>
+                <p class="countdown">남은 시간 <span id="countdown">--:--</span></p>
+                <div class="actions">
+                    <button type="button" id="confirm-btn" class="primary">예약 확정</button>
+                    <button type="button" id="release-btn" class="secondary">선점 해제</button>
+                </div>
+            </section>
+
+            <p id="message" class="message" role="status" aria-live="polite"></p>
+        </aside>
+    </div>
+</main>
+
+<script th:src="@{/js/seatmap.js}"></script>
+</body>
+</html>
