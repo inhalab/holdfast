@@ -1,0 +1,47 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.1.1'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.inhalab'
+version = '0.0.1'
+
+java {
+    toolchain {
+        // 팀 확정 스택: Java 25 (Spring Boot 4.1은 Java 17 최소, 25 first-class 지원)
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // 웹 + 서버렌더(Thymeleaf)
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+
+    // JPA — 락 전략의 핵심. 비관적 락 @Lock, 낙관적 락 @Version 을 어노테이션으로.
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+
+    // Redis — 분산락(Redisson). Boot 4.1.x는 스타터만으로 충분(내부 spring-data-41 번들).
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.redisson:redisson-spring-boot-starter:4.7.0'
+
+    // htmx — 서버렌더 화면의 부분 갱신용(webjar로 정적 제공)
+    implementation 'org.webjars.npm:htmx.org:2.0.4'
+
+    // PostgreSQL 드라이버
+    runtimeOnly 'org.postgresql:postgresql'
+
+    // 헬스체크 등 운영 엔드포인트
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
