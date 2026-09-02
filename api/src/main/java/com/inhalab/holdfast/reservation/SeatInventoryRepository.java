@@ -87,6 +87,44 @@ public interface SeatInventoryRepository extends JpaRepository<SeatInventory, Lo
                                           @Param("seatId") Long seatId);
 
     /**
+     * <b>version 조건부 UPDATE.</b> {@code optimistic} 전략의 실체다
+     * (concurrency-spec.md 4.3).
+     *
+     * <p>{@code rowsAffected = 0}이면 <b>충돌</b>이다 — 읽은 뒤 UPDATE하기까지
+     * 사이에 다른 요청이 같은 행을 바꿨다. 호출 측이 재시도한다.
+     *
+     * <p><b>JPA {@code @Version}을 쓰지 않는 이유</b>가 여기 있다. 그쪽은 버전
+     * 증가가 flush에 묶이고 {@code OptimisticLockException}이 커밋 시점, 즉
+     * {@code @Transactional} 메서드 <b>바깥</b>에서 터져 같은 트랜잭션 안에서
+     * 재시도할 수 없다(4.3). 명시적 UPDATE는 {@code rowsAffected}가 그 자리에서
+     * 돌아오므로 트랜잭션을 유지한 채 다시 시도할 수 있다.
+     *
+     * <p><b>4.3이 적은 SQL과 한 곳이 다르다.</b> 그쪽 예시는 조건이
+     * {@code status = 'AVAILABLE'}뿐인데, 여기서는 <b>만료된 HELD 행도 받는다.</b>
+     * 만료 홀드를 넘겨받는 경로가 없으면 재고가 {@code HELD}로 굳은 좌석을
+     * 영원히 잡을 수 없고, 재시도 상한만 소진하다 끝난다. 만료 판정 기준은
+     * DB {@code now()}다(3절).
+     *
+     * <p>이 UPDATE는 아무 락도 잡지 않는다. 직렬화는 Postgres가 같은 행의 쓰기를
+     * 순서대로 처리하는 것과 {@code version} 비교가 함께 한다.
+     */
+    @Modifying
+    @Query(value = """
+            UPDATE seat_inventory
+               SET status = 'HELD',
+                   hold_id = :holdId,
+                   held_until = now() + (:ttlSeconds * interval '1 second'),
+                   version = version + 1
+             WHERE id = :id
+               AND version = :version
+               AND (status = 'AVAILABLE' OR (status = 'HELD' AND held_until <= now()))
+            """, nativeQuery = true)
+    int takeHeldIfVersionMatches(@Param("id") Long id,
+                                 @Param("version") Long version,
+                                 @Param("holdId") String holdId,
+                                 @Param("ttlSeconds") int ttlSeconds);
+
+    /**
      * <b>lazy 검증 확정 쿼리.</b> concurrency-spec.md 3절이 정한 형태 그대로다.
      *
      * <p>만료 판정을 확정과 <b>같은 SQL 문 안에</b> 넣는 것이 핵심이다. 별도로
