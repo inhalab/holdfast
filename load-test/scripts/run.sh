@@ -62,6 +62,23 @@ if [ "$DURATION_SEC" -lt "$FINAL_DURATION_SEC" ]; then
   echo
 fi
 
+# 7.1의 Actuator 출처 지표(커넥션 풀, 낙관적 재시도·소진, 제약 위반)를 파일로
+# 남긴다. 값이 인스턴스 기동 이후 누적이라, 7.4.2의 대조군으로 넘어가며 앱을
+# 재기동하는 순간 사라진다 — 그래서 회차 직후에 자동으로 받아둔다.
+#
+# node는 MSYS 경로 변환이 필요한 네이티브 exe다(위 docker용 /scenarios/... 보호와
+# 반대 상황). MSYS_NO_PATHCONV는 "값이 있으면 비활성화"라 =0으로는 안 풀린다 —
+# env -u로 아예 지워야 실제 호스트 경로로 정상 변환된다.
+snapshot_metrics() {  # $1 = run 라벨
+  env -u MSYS_NO_PATHCONV node "$ROOT/load-test/scripts/metrics-snapshot.mjs" \
+    --label "$STRATEGY/$SCENARIO $1" \
+    --strategy "$STRATEGY" --scenario "$SCENARIO" --run "$1" \
+    --out "$ROOT/load-test/results/metrics-$STRATEGY-$SCENARIO-$1.json" || true
+}
+
+# 기준선. 1회차의 델타를 내려면 첫 실행 **전** 값이 있어야 한다.
+snapshot_metrics "run0"
+
 for run in $(seq 1 "$REPEATS"); do
   echo
   echo "════ $STRATEGY / $SCENARIO — ${run}회차 (총 ${REPEATS}회) ════"
@@ -103,17 +120,13 @@ for run in $(seq 1 "$REPEATS"); do
   }
 
   # 7.1 초과 예약은 k6가 아니라 DB 검증 쿼리로 센다.
-  "$ROOT/load-test/scripts/verify.sh" || true
+  # **콘솔로만 흘리지 않고 파일에도 남긴다.** 다음 회차의 시드가 DB를 덮으므로,
+  # 여기서 받아두지 않으면 그 회차의 V-1·V-2를 되찾을 방법이 없다.
+  "$ROOT/load-test/scripts/verify.sh" 2>&1 \
+    | tee "$ROOT/load-test/results/verify-$STRATEGY-$SCENARIO-run${run}.txt" || true
 
-  # 7.1 커넥션 풀 대기는 Actuator 스냅샷으로 본다(이슈 #44). 인스턴스 기동
-  # 시점부터 누적이므로 전략 비교에는 마지막 회차 직후 값을 쓴다.
-  #
-  # node는 MSYS 경로 변환이 필요한 네이티브 exe다(위 docker용 /scenarios/...
-  # 보호와 반대 상황). MSYS_NO_PATHCONV는 "값이 있으면 비활성화"라 =0으로는
-  # 안 풀린다 — env -u로 아예 지워야 실제 호스트 경로로 정상 변환된다.
-  # 켠 채로 두면 node가 /e/holdfast/... 를 "E:\e\holdfast\..."로 잘못 풀어
-  # 경로를 못 찾는다.
-  env -u MSYS_NO_PATHCONV node "$ROOT/load-test/scripts/pool-metrics.mjs" "$STRATEGY/$SCENARIO run${run}/${REPEATS}" || true
+  # 7.1 Actuator 출처 지표. **전략 전환 전에 마지막 스냅샷이 확보된다.**
+  snapshot_metrics "run${run}"
 done
 
 echo
