@@ -26,8 +26,8 @@ SCENARIO=sustained
 REPEATS="${REPEATS:-3}"
 WARMUP_SEC="${WARMUP_SEC:-30}"
 DURATION_SEC="${DURATION_SEC:-30}"
-SEATS="${SUSTAINED_SEATS:-3}"
-SLEEP_MS="${SUSTAINED_SLEEP_MS:-1000}"   # 도착률 손잡이 (7.2.2)
+SEATS="${SUSTAINED_SEATS:-1}"
+SLEEP_MS="${SUSTAINED_SLEEP_MS:-50}"   # 도착률 손잡이 (7.2.2)
 SESSION_ID="${SESSION_ID:-1}"
 DB_SERVICE="${DB_SERVICE:-db}"
 DB_USER="${DB_USER:-holdfast}"
@@ -101,14 +101,19 @@ MSG
 done
 
 echo
-echo "[sustained] 완료. 좌석 수 보정 판정:"
+echo "[sustained] 완료. 확인할 것:"
 cat <<'MSG'
 
-  목표는 락 포기율 1~20%다(7.2.2).
-    0%      → 좌석 수를 줄인다 (대기가 생기지 않았다)
-    1~20%   → 확정. 이 값을 7.2.2와 7.3에 올리고 전 전략에서 고정한다
-    50% 초과 → 좌석 수를 늘린다 (포화. p95가 "포기까지 걸린 시간"이 된다)
+  확정 설정은 좌석 1석 / VU 500 / sleep 50ms 다 (7.2.2, 파일럿 5회).
+  **락 포기율은 판정 지표가 아니다.** 0이 정상이며, 0이기 때문에 7.6.1의
+  함정(포기가 많을수록 p95가 좋아 보인다)을 피해 두 전략의 홀드 p95를
+  직접 비교할 수 있다.
 
-  요약에서 볼 것: "락 포기율", "홀드 p95"(헤드라인), "회수 성공률".
+  7.5 판정은 커넥션 풀 지표로 한다.
+    1차: 점유 시간(hikaricp.connections.usage) — 전략이 직접 결정하는 값
+    2차: 획득 대기(.acquire)          — 점유의 결과이며 도착률에도 좌우된다
+    redis가 홀드 p95도 낮고 두 값도 낮아야 검증. p95만 앞서면 기각.
+
+  요약에서 볼 것: "홀드 p95"(헤드라인), "회수 성공률", 위 pool 지표.
 MSG
 exit "$FAILED"

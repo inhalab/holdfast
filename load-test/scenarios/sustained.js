@@ -32,13 +32,15 @@ import { extractRow, renderText } from './lib/summary.js';
 const cfg = loadConfig();
 
 /**
- * 반복 사이 대기(ms). 기본 1000은 경합도 3단계와 같은 값이고, 낮출수록 도착률이
- * 올라가 행 락 대기열이 깊어진다. 7.2.2의 좌석 수 보정이 목표 구간에 닿지 못해
- * 추가한 손잡이다.
+ * 반복 사이 대기(ms). **50ms는 파일럿 5회로 확정한 값이다**(7.2.2).
+ *
+ * 이 시나리오의 유효한 손잡이는 좌석 수가 아니라 도착률이다. 1000ms에서
+ * 홀드 p95가 47ms였고 50ms에서 236ms가 됐다 — 응답시간의 대부분이 락 대기이며
+ * 그것이 7.5가 재려는 값이다.
  */
 const SLEEP_MS = (() => {
   const v = __ENV.SUSTAINED_SLEEP_MS;
-  if (v === undefined || v === '') return 1000;
+  if (v === undefined || v === '') return 50;
   const n = parseInt(v, 10);
   if (Number.isNaN(n) || n < 1) throw new Error(`SUSTAINED_SLEEP_MS가 잘못됐다: ${v}`);
   return n;

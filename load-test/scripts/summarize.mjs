@@ -210,14 +210,8 @@ function renderSustained(rows) {
       L.push(`> ⚠ ${r.strategy}: 파일럿/개발 실행 ${r.devRuns}건 포함(본 측정 120초 미만). ` +
              `좌석 수 보정에만 쓰고 기록 양식에는 싣지 않는다.`);
     }
-    const g = r.cells.lockGiveup;
-    if (g !== '—') {
-      const pct = parseFloat(g);
-      if (!Number.isNaN(pct)) {
-        if (pct === 0) L.push(`> ⚠ ${r.strategy}: 락 포기율 0% — 대기가 생기지 않았다. **좌석 수를 줄인다**(7.2.2).`);
-        else if (pct > 50) L.push(`> ⚠ ${r.strategy}: 락 포기율 ${g} — 포화 상태다. **좌석 수를 늘린다**(7.2.2).`);
-      }
-    }
+    // 락 포기율은 판정 지표가 아니다(7.2.2 보정 기록). 확정 설정에서 0이 정상이고,
+    // 0이기 때문에 7.6.1의 함정을 피해 두 전략의 홀드 p95를 직접 비교할 수 있다.
   }
   return L.join('\n');
 }

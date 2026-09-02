@@ -24,16 +24,17 @@ export const PROFILES = {
 /**
  * 지속 경합 시나리오의 좌석 수.
  *
- * 기본값 3석은 `f = (홀드+해제 트랜잭션) × (초당 회수 ÷ 좌석 수)` 로 역산한
- * 출발점이다(7.2.2). VU 500 · sleep 1초에서 10석은 f≈0.2로 대기가 얕고, 1석은
- * f>1로 포화해 p95가 "포기까지 걸린 시간"이 된다.
+ * **1석은 파일럿 5회로 확정한 값이다**(7.2.2). 좌석 수는 이 시나리오의 유효한
+ * 손잡이가 아니라는 것이 파일럿에서 드러났다 — 3석 24ms · 2석 25ms · 1석 47ms로,
+ * 줄여도 좌석당 회전이 함께 줄어 행 락 점유율이 크게 오르지 않는다. 대기를
+ * 깊게 만드는 손잡이는 도착률(SUSTAINED_SLEEP_MS)이다.
  *
  * **scripts/seed.sh의 sustained 항목과 반드시 같은 값이어야 한다.** 시드가 만든
  * 좌석보다 큰 번호를 고르면 SEAT_NOT_IN_SESSION이 섞여 측정이 오염된다.
  */
 function sustainedSeats() {
   const v = __ENV.SUSTAINED_SEATS;
-  if (v === undefined || v === '') return 3;
+  if (v === undefined || v === '') return 1;
   const n = parseInt(v, 10);
   if (Number.isNaN(n) || n < 1) throw new Error(`SUSTAINED_SEATS가 잘못됐다: ${v}`);
   return n;
