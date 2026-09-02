@@ -156,6 +156,66 @@ function render(scenario, rows) {
   return L.join('\n');
 }
 
+/** 7.2.2 지속 경합 — 7.6과 다른 표다. 헤드라인은 홀드 요청만의 p95다. */
+function buildSustained(strategy, runs) {
+  const na = NOT_APPLICABLE[strategy] || [];
+  const dash = (key, value) => (na.includes(key) ? '—' : value);
+  return {
+    strategy,
+    runs: runs.length,
+    devRuns: runs.filter((r) => r.row.isFinalRun !== true).length,
+    recoveryFailed: runs.reduce((a, r) => a + (r.row.counts?.recoveryFailed || 0), 0),
+    cells: {
+      holdP95: fmtMs(median(runs.map((r) => r.row.holdP95))),
+      holdP99: fmtMs(median(runs.map((r) => r.row.holdP99))),
+      lockGiveup: dash('lockGiveup', fmtPct(median(runs.map((r) => r.row.lockGiveupRate)))),
+      poolWait: '?',                                   // ← Actuator(7.1)
+      poolUsage: '?',                                  // ← Actuator(7.1)
+      retries: dash('retries', '?'),
+      violations: dash('violations', '?'),
+      recovery: fmtPct(median(runs.map((r) => r.row.recoveryRate))),
+      rejection409: fmtPct(median(runs.map((r) => r.row.normalRejectionRate))),
+      errorRate: fmtPct(median(runs.map((r) => r.row.errorRate))),
+    },
+  };
+}
+
+function renderSustained(rows) {
+  const L = [];
+  L.push('## 7.2.2 지속 경합 시나리오 — **7.6 기록 양식과 다른 표다**');
+  L.push('');
+  L.push('이 표의 p95에는 락 대기가 들어 있고 7.6의 p95에는 들어 있지 않다.');
+  L.push('같은 열에 놓으면 두 값이 같은 것을 재는 것처럼 보인다.');
+  L.push('');
+  L.push('| 전략 | 홀드 p95 | 홀드 p99 | 락 포기율 | 풀 대기 | 풀 점유 | 재시도 | 제약위반 | 회수 성공률 | 409율 | 오류율 |');
+  L.push('|---|---|---|---|---|---|---|---|---|---|---|');
+  for (const r of rows) {
+    const c = r.cells;
+    L.push(`| ${r.strategy} | ${c.holdP95} | ${c.holdP99} | ${c.lockGiveup} | ${c.poolWait} | ` +
+           `${c.poolUsage} | ${c.retries} | ${c.violations} | ${c.recovery} | ${c.rejection409} | ${c.errorRate} |`);
+  }
+  L.push('');
+  L.push('**홀드 p95는 `operation=hold` 태그만의 값이다** — 해제 요청은 빠져 있다(7.2.2).');
+  L.push('`?` = 출처가 k6가 아니다. 풀 대기·점유는 Actuator에서 가져온다(7.1).');
+  L.push('');
+  for (const r of rows) {
+    if (r.recoveryFailed > 0) {
+      L.push(`> ❌ ${r.strategy}: 회수 실패 ${r.recoveryFailed}건. **이 실행을 폐기한다** — ` +
+             `홀드해 놓고 해제하지 못한 좌석이 순환에서 빠졌다(7.2.2).`);
+    }
+    if (r.runs !== 3) {
+      L.push(`> ⚠ ${r.strategy}: 실행 ${r.runs}회. 7.4는 전략당 3회 반복 후 중앙값을 요구한다.`);
+    }
+    if (r.devRuns > 0) {
+      L.push(`> ⚠ ${r.strategy}: 파일럿/개발 실행 ${r.devRuns}건 포함(본 측정 120초 미만). ` +
+             `좌석 수 보정에만 쓰고 기록 양식에는 싣지 않는다.`);
+    }
+    // 락 포기율은 판정 지표가 아니다(7.2.2 보정 기록). 확정 설정에서 0이 정상이고,
+    // 0이기 때문에 7.6.1의 함정을 피해 두 전략의 홀드 p95를 직접 비교할 수 있다.
+  }
+  return L.join('\n');
+}
+
 const args = parseArgs(process.argv);
 const all = loadRuns(args.scenario, args.strategy);
 
@@ -169,6 +229,14 @@ const scenarios = args.scenario ? [args.scenario] : [...new Set(all.map((r) => r
 for (const sc of scenarios) {
   const inScenario = all.filter((r) => r.row.scenario === sc);
   const strategies = STRATEGY_ORDER.filter((s) => inScenario.some((r) => r.row.strategy === s));
+  // 7.2.2 지속 경합은 7.6 기록 양식에 넣지 않는다. 그쪽 p95에는 락 대기가 들어
+  // 있고 7.6의 p95에는 들어 있지 않아, 같은 표에 놓으면 두 값이 같은 것을 재는
+  // 것처럼 보인다.
+  if (sc === 'sustained') {
+    console.log(renderSustained(strategies.map((s) => buildSustained(s, inScenario.filter((r) => r.row.strategy === s)))));
+    console.log();
+    continue;
+  }
   const rows = strategies.map((s) => buildRow(s, inScenario.filter((r) => r.row.strategy === s)));
   console.log(render(sc, rows));
   console.log();
