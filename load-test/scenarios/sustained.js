@@ -31,6 +31,19 @@ import { extractRow, renderText } from './lib/summary.js';
 
 const cfg = loadConfig();
 
+/**
+ * 반복 사이 대기(ms). 기본 1000은 경합도 3단계와 같은 값이고, 낮출수록 도착률이
+ * 올라가 행 락 대기열이 깊어진다. 7.2.2의 좌석 수 보정이 목표 구간에 닿지 못해
+ * 추가한 손잡이다.
+ */
+const SLEEP_MS = (() => {
+  const v = __ENV.SUSTAINED_SLEEP_MS;
+  if (v === undefined || v === '') return 1000;
+  const n = parseInt(v, 10);
+  if (Number.isNaN(n) || n < 1) throw new Error(`SUSTAINED_SLEEP_MS가 잘못됐다: ${v}`);
+  return n;
+})();
+
 if (cfg.scenario !== 'sustained') {
   throw new Error(`이 시나리오는 SCENARIO=sustained로만 돈다: ${cfg.scenario}`);
 }
@@ -56,7 +69,7 @@ export const options = {
 export function setup() {
   console.log(
     `[setup] 지속 경합 — 전략=${cfg.strategy} 좌석=${cfg.seats} VU=${cfg.vus} ` +
-    `사용자풀=${cfg.userPool} 워밍업=${cfg.warmupSec}s 본측정=${cfg.durationSec}s`
+    `사용자풀=${cfg.userPool} sleep=${SLEEP_MS}ms 워밍업=${cfg.warmupSec}s 본측정=${cfg.durationSec}s`
   );
   console.log('[setup] 한 반복 = 홀드 → (성공 시) 해제. 확정하지 않는다 (7.2.2)');
   console.log('[setup] 헤드라인 지표는 hold_req_duration p95 — 해제 요청은 제외된다');
@@ -101,9 +114,14 @@ export default function () {
     }
   }
 
-  // 경합도 3단계와 같은 값. 0으로 두면 부하가 VU 수가 아니라 서버 처리량에
-  // 종속되어 좌석 수 보정(7.2.2)의 근거가 무너진다.
-  sleep(1);
+  // **이 시나리오의 보정 손잡이다**(7.2.2). 경합도 3단계는 1초로 고정이지만,
+  // 여기서는 도착률을 올려야 락 대기가 실제로 깊어진다. 좌석 수를 줄이는 것으로는
+  // 목표에 닿지 못한다는 것이 파일럿에서 확인됐다 — 행 락은 커밋 시점에 풀려서
+  // 좌석이 논리적으로 잡혀 있는 동안에도 대부분 자유롭기 때문이다.
+  //
+  // 0으로 두지 않는다. 완전한 폐루프가 되면 도착률이 서버 처리량에 종속되어
+  // 손잡이가 사라진다.
+  sleep(SLEEP_MS / 1000);
 }
 
 export function handleSummary(data) {

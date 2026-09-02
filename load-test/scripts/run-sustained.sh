@@ -27,6 +27,7 @@ REPEATS="${REPEATS:-3}"
 WARMUP_SEC="${WARMUP_SEC:-30}"
 DURATION_SEC="${DURATION_SEC:-30}"
 SEATS="${SUSTAINED_SEATS:-3}"
+SLEEP_MS="${SUSTAINED_SLEEP_MS:-1000}"   # 도착률 손잡이 (7.2.2)
 SESSION_ID="${SESSION_ID:-1}"
 DB_SERVICE="${DB_SERVICE:-db}"
 DB_USER="${DB_USER:-holdfast}"
@@ -50,7 +51,7 @@ fi
 FAILED=0
 for run in $(seq 1 "$REPEATS"); do
   echo
-  echo "════ 지속 경합 — $STRATEGY / 좌석 ${SEATS}석 / ${run}회차 (총 ${REPEATS}회) ════"
+  echo "════ 지속 경합 — $STRATEGY / 좌석 ${SEATS}석 / sleep ${SLEEP_MS}ms / ${run}회차 (총 ${REPEATS}회) ════"
 
   SUSTAINED_SEATS="$SEATS" "$ROOT/load-test/scripts/seed.sh" "$SCENARIO" "$STRATEGY"
 
@@ -64,7 +65,7 @@ for run in $(seq 1 "$REPEATS"); do
     --profile load run --rm \
     -e "SCENARIO=$SCENARIO" -e "STRATEGY=$STRATEGY" -e "RUN=$run" \
     -e "WARMUP_SEC=$WARMUP_SEC" -e "DURATION_SEC=$DURATION_SEC" \
-    -e "SUSTAINED_SEATS=$SEATS" \
+    -e "SUSTAINED_SEATS=$SEATS" -e "SUSTAINED_SLEEP_MS=$SLEEP_MS" \
     k6 run /scenarios/sustained.js \
     || echo "[sustained] k6가 임계값 위반으로 실패했다 — 결과는 남아 있다"
 
