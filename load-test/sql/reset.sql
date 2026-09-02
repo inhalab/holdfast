@@ -37,6 +37,31 @@ BEGIN;
 -- 기다리다 실패하는 편이 낫다 — 호출자가 재시도한다(scripts/seed.sh).
 SET LOCAL lock_timeout = '5s';
 
+-- **진행 중인 홀드와 직렬화한다. 이 한 줄이 없으면 재초기화가 오염을 만든다.**
+--
+-- 이 트랜잭션은 삭제를 먼저 하고 재고를 나중에 되돌린다. 그 사이에 진행 중이던
+-- 홀드 트랜잭션이 커밋하면, 그 행은 이미 지나간 DELETE를 피해 살아남는데
+-- 뒤이은 재고 UPDATE가 좌석을 AVAILABLE로 되돌려 버린다. 결과는 둘 중 하나다.
+--
+--   * 살아남은 예약이 CONFIRMED면 → 그 좌석을 다른 요청이 다시 팔아
+--     **초과 확정(V-1)** 이 만들어진다. U-2는 status='HELD'만 보므로 막지 못한다.
+--   * 살아남은 홀드가 HELD면 → 다음 INSERT가 U-2에 걸려 **제약 위반**이 오른다.
+--
+-- 둘 다 전략의 결함이 아니라 측정 장치가 만든 것이다. 실제로 저경합에서
+-- V-1과 제약 위반이 함께 관측됐다(results/reseed-artifact-investigation.md).
+--
+-- 좌석 행을 먼저 잠그면 그 창이 닫힌다. 진행 중인 홀드는 커밋될 때까지 이
+-- 잠금을 막고, 아직 시작하지 않은 홀드는 여기서 대기하다 초기화된 상태를 본다.
+--
+-- **ORDER BY seat_id는 5.1의 전역 락 순서와 맞춘 것이다.** 애플리케이션이
+-- 좌석 ID 오름차순으로 잡으므로 같은 순서로 잠가야 데드락이 나지 않는다.
+SELECT count(*) AS "잠근 좌석 수" FROM (
+  SELECT seat_id FROM seat_inventory
+   WHERE session_id = :session_id
+   ORDER BY seat_id
+     FOR UPDATE
+) locked;
+
 -- 자식 테이블부터. FK 참조가 남아 있으면 부모 삭제가 실패한다.
 DELETE FROM ticket_scan;
 DELETE FROM ticket;
