@@ -467,6 +467,46 @@ Postgres 로그의 `deadlock detected` 항목으로도 교차 확인한다. `dea
 전원이 포기하는 퇴화 상태다. 3석에서 시작해 파일럿 1회로 확인하고, 벗어나면
 좌석 수만 조정한다.
 
+###### 보정 기록 — 위 모델은 실측에서 틀렸다
+
+3석 파일럿(`pessimistic`, 30초)에서 **락 포기율이 0%**로 나왔다. 회차 자체는
+유효했다 — 회수 성공률 100%, 잔여 활성 홀드 0, 미반환 좌석 0, V-6 0, 5xx 0.
+
+| 값 | 실측 |
+|---|---|
+| 홀드 시도 | 491/s |
+| 홀드 성공 | 102/s (20.8%) |
+| 좌석당 회전 | 34/s (30초에 좌석당 1,956회) |
+| 정상 거절 | 65.6% (전부 `SEAT_HELD_BY_OTHER`) |
+| **락 포기** | **0건** |
+
+**위 `f` 공식이 잘못됐다. 분자를 "초당 회수 횟수"로 잡은 것이 오류다.** 행 락은
+회수에 성공한 요청만 잡는 것이 아니라 **모든 시도가 잡는다** — 거절되는 요청도
+`FOR UPDATE`로 행을 잡고 상태를 읽은 뒤 놓는다. 대기를 만드는 것은 그쪽이다.
+
+```
+ρ = (초당 시도 ÷ 좌석 수) × 요청당 행 락 점유 시간
+```
+
+3석 실측에 대입하면 `ρ ≈ (491 ÷ 3) × 2ms ≈ 0.33`이다. 대기가 생기긴 하지만
+평균 1ms 수준이라 `lock_timeout` 1초 근처에도 가지 않는다.
+
+**두 가지 점유를 구분해야 한다.**
+
+| 구분 | 지속 시간 | 3석 실측 |
+|---|---|---|
+| **논리적 점유** (`HELD` 상태) | 홀드 커밋 → 해제 커밋, 왕복 한 번 ≈ 24ms | 좌석당 **82%** |
+| **행 락 점유** (`FOR UPDATE`) | 트랜잭션 안에서만 ≈ 2ms | 좌석당 **33%** |
+
+거절률 79%를 만드는 것은 앞의 값이고, 락 대기를 만드는 것은 뒤의 값이다.
+**행 락은 커밋 시점에 풀리므로 좌석이 논리적으로 잡혀 있는 동안 대부분 자유롭다.**
+이것이 락 포기가 0인 이유이며, 좌석 수를 줄여 `ρ → 1`로 밀어야 대기가 1초를
+넘기기 시작한다.
+
+**남은 보정 후보는 2석과 1석이다.** `ρ`는 좌석 수에 반비례하므로 2석에서
+약 0.5, 1석에서 약 1.0이다. 전이가 가파르므로 두 값을 함께 재고 목표 구간에
+드는 쪽을 택한다.
+
 **보정은 `pessimistic` 한 전략에서만 하고 그 값을 고정한다.** 전략마다 맞추면
 좌석 수가 변수가 되어 비교가 깨진다. 확정된 좌석 수는 7.3 고정 변수 표에
 올린다.
@@ -504,16 +544,33 @@ Postgres 로그의 `deadlock detected` 항목으로도 교차 확인한다. `dea
 해제하면 예약이 `CANCELLED`가 되어 `status='CONFIRMED'`만 세는 V-1이
 구조적으로 0이 된다. 이 시나리오에서는 **점유 구간이 겹쳤는지**를 본다.
 
+예약 하나의 점유 구간은 `[created_at, cancelled_at)`이다. 예약 행은 홀드 시점에
+만들어지고(erd 4절) 해제 시 `CANCELLED` + `cancelled_at`이 찍힌다. 아직 살아
+있는 홀드는 끝이 없으므로 `infinity`로 둔다.
+
+**쌍끼리 조인하지 않는다.** 이 시나리오는 좌석 몇 개에 수만 건의 예약을 쌓으므로
+self-join이 좌석당 O(n²)로 폭발한다 — 3석에 1만 건씩이면 1.5억 쌍이다. 실측
+파일럿에서 30초 만에 좌석당 1,956회가 돌았다. 좌석별로 시작 시각 순으로 훑으며
+**앞선 구간들의 최대 종료 시각과만** 비교하면 O(n log n)으로 같은 답을 얻는다.
+
 ```sql
 -- V-6 점유 구간 중첩: 같은 재고 행을 두 예약이 동시에 점유한 적이 있는가.
--- reservation의 created_at / cancelled_at / confirmed_at 으로 구간을 만든다.
-SELECT count(*) FROM reservation_seat a
-  JOIN reservation ra ON ra.id = a.reservation_id
-  JOIN reservation_seat b ON b.seat_inventory_id = a.seat_inventory_id AND b.id > a.id
-  JOIN reservation rb ON rb.id = b.reservation_id
- WHERE ra.created_at < coalesce(rb.cancelled_at, 'infinity')
-   AND rb.created_at < coalesce(ra.cancelled_at, 'infinity');
+SELECT count(*) FROM (
+  SELECT r.created_at,
+         max(coalesce(r.cancelled_at, 'infinity'::timestamptz))
+           OVER (PARTITION BY rs.seat_inventory_id
+                 ORDER BY r.created_at
+                 ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS prev_end
+  FROM reservation_seat rs
+  JOIN reservation r ON r.id = rs.reservation_id
+  JOIN seat_inventory si ON si.id = rs.seat_inventory_id
+  WHERE si.session_id = :session_id
+) t
+WHERE t.prev_end IS NOT NULL AND t.created_at < t.prev_end;
 ```
+
+구현은 `load-test/sql/verify-sustained.sql`에 있으며, 회수 누수 검증(L-1·L-2)도
+같은 파일에 있다.
 
 **검수 기준의 정본은 여전히 경합도 3단계다.** 이 시나리오는 락 대기 특성을
 재기 위한 것이고, V-6은 회수를 섞은 상태에서도 초과 점유가 없었는지 확인하는
