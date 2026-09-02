@@ -77,12 +77,21 @@ holdfast:
   optimistic:
     max-retries: ${OPTIMISTIC_MAX_RETRIES:3}
     backoff-base-ms: ${OPTIMISTIC_BACKOFF_BASE_MS:2}
+  # Redis 분산락(concurrency-spec.md 4.5). 둘 다 7.3 고정 변수다.
+  #
+  # lease-time-ms를 반드시 명시한다. 생략하면 Redisson 워치독이 30초 리스를
+  # 10초마다 자동 연장하는데, 락을 오래 쥐는 버그가 측정에서 가려지고 실행마다
+  # 결과가 달라진다(4.5).
+  #
+  # wait-time-ms 1초는 검수 기준 p95 3초의 시간 예산에서 나온 값이다. 락 대기에
+  # 3초를 다 주면 DB·앱·네트워크에 쓸 예산이 남지 않는다(7.3).
+  redis:
+    wait-time-ms: ${REDIS_LOCK_WAIT_MS:1000}
+    lease-time-ms: ${REDIS_LOCK_LEASE_MS:10000}
   # 락 전략 스위치(concurrency-spec.md 4절). none/pessimistic/optimistic/unique/redis.
   # k6 시나리오는 고정하고 이 값만 바꿔 측정한다.
   #
-  # 현재 구현된 것은 none, pessimistic, optimistic, unique다. redis를 넣으면
-  # SeatHoldStrategy 빈이 없어 기동에 실패한다 — 측정 도중 "구현되지 않은 전략을 쟀다"가 되는
-  # 것보다 기동 시점에 드러나는 편이 낫다.
+  # 다섯 전략이 모두 구현됐다.
   #
   # 주의: none일 때만 seed.sh가 U-2 인덱스를 지운다. 나머지 전략은 U-2를 걸고
   # 측정해야 제약 위반 카운터가 의미를 갖는다(7.6). 그 의미는 전략마다 다르다 —

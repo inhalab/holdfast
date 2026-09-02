@@ -13,7 +13,7 @@ package com.inhalab.holdfast.reservation;
  *   <tr><td>{@code pessimistic}</td><td>비관적 락 ({@code FOR UPDATE}) — {@link PessimisticSeatHoldStrategy}</td></tr>
  *   <tr><td>{@code optimistic}</td><td>낙관적 락 (version 조건부 UPDATE) — {@link OptimisticSeatHoldStrategy}</td></tr>
  *   <tr><td>{@code unique}</td><td>DB 유니크 제약 (앱 락 없음) — {@link UniqueSeatHoldStrategy}</td></tr>
- *   <tr><td>{@code redis}</td><td>Redis 분산락 (미구현)</td></tr>
+ *   <tr><td>{@code redis}</td><td>Redis 분산락 ({@code RLock}) — {@link RedisSeatHoldStrategy}</td></tr>
  * </table>
  *
  * <p><b>구현체가 책임지지 않는 것</b>은 CS-6 사용자 할당량 행 선행 락(1.1)과
