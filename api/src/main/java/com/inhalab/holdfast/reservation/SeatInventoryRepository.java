@@ -224,11 +224,14 @@ public interface SeatInventoryRepository extends JpaRepository<SeatInventory, Lo
      *   <li>{@code unique} — 바로 앞의 {@code seat_hold} INSERT가 U-2로 이미
      *       승자를 결정했다. <b>안전성이 유니크 제약에서 나온다</b>(4.4). 진
      *       요청은 여기까지 오지 못하고 제약 위반으로 트랜잭션째 되돌아간다.</li>
+     *   <li>{@code redis} — 분산락을 쥐고 있다. <b>안전성이 그 락에서 나오되,
+     *       그 락은 정합성을 보장하지 않는다</b>(4.5.1) — 리스가 만료되면 둘이
+     *       동시에 여기 도달할 수 있고 그때는 U-2가 받아낸다.</li>
      * </ul>
      *
-     * <p><b>셋의 공통점은 "이 UPDATE가 판정하지 않는다"이고, 차이는 무엇이
+     * <p><b>넷의 공통점은 "이 UPDATE가 판정하지 않는다"이고, 차이는 무엇이
      * 배타성을 보장하느냐다</b> — 아무것도(none) / 행 락(pessimistic) /
-     * 유니크 제약(unique). {@code optimistic}만 이 메서드를 쓰지 않는다.
+     * 유니크 제약(unique) / 분산락(redis). {@code optimistic}만 이 메서드를 쓰지 않는다.
      * 그쪽은 판정을 UPDATE 안에 넣어야 하므로
      * {@link #takeHeldIfVersionMatches}가 따로 있다.
      *
