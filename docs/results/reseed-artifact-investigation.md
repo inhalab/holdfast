@@ -7,6 +7,10 @@
 `p95-inversion-investigation.md`·`sustained-lock-wait-investigation.md`와 같은
 성격의 문서다.
 
+**세 번째 폐기다.** nginx 커넥션 고갈, `TRUNCATE` 데드락에 이어 세 번째이며,
+셋 다 "숫자는 그럴듯한데 재고 있는 대상이 달랐다"는 같은 종류다 —
+[`discarded-measurements.md`](discarded-measurements.md).
+
 ## 0. 판정
 
 | 질문 | 답 |
