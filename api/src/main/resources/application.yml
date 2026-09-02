@@ -66,11 +66,22 @@ holdfast:
   # 무한 대기이고, 비관적 락은 대기 중 커넥션을 쥐므로(4.2) 풀이 먼저 말라
   # 측정 대상이 락 경합에서 커넥션 고갈로 바뀐다.
   lock-timeout-ms: ${LOCK_TIMEOUT_MS:1000}
+  # 낙관적 락 재시도(concurrency-spec.md 4.3).
+  #
+  # **상한 3회는 설계값이 아니라 시작값이다.** 고경합에서 재시도 분포를 관측한
+  # 뒤 조정하고, 조정 전후 값을 함께 기록한다(4.3). 그래서 프로퍼티로 뺐다.
+  # 최초 시도는 상한에 포함되지 않는다 — 3이면 최대 4번 시도한다.
+  #
+  # 백오프 기준 간격이 2ms로 작은 이유는 이 응용의 임계 구역이 서브밀리초이기
+  # 때문이다(7.7.1). 수십 ms를 쉬면 재시도가 아니라 대기를 재게 된다.
+  optimistic:
+    max-retries: ${OPTIMISTIC_MAX_RETRIES:3}
+    backoff-base-ms: ${OPTIMISTIC_BACKOFF_BASE_MS:2}
   # 락 전략 스위치(concurrency-spec.md 4절). none/pessimistic/optimistic/unique/redis.
   # k6 시나리오는 고정하고 이 값만 바꿔 측정한다.
   #
-  # 현재 구현된 것은 none, pessimistic이다. 나머지를 넣으면 SeatHoldStrategy
-  # 빈이 없어 기동에 실패한다 — 측정 도중 "구현되지 않은 전략을 쟀다"가 되는
+  # 현재 구현된 것은 none, pessimistic, optimistic이다. 나머지를 넣으면
+  # SeatHoldStrategy 빈이 없어 기동에 실패한다 — 측정 도중 "구현되지 않은 전략을 쟀다"가 되는
   # 것보다 기동 시점에 드러나는 편이 낫다.
   #
   # 주의: none일 때만 seed.sh가 U-2 인덱스를 지운다. pessimistic은 U-2를 걸고

@@ -1,5 +1,7 @@
 package com.inhalab.holdfast.api;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
@@ -56,6 +58,28 @@ import java.util.Map;
 public class ApiExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
+
+    /**
+     * 제약 위반 발생 횟수. 7.1이 "앱 커스텀 메트릭"으로 출처를 못박은 값이다.
+     *
+     * <p><b>k6로는 셀 수 없다.</b> U-2 위반은 아래에서 409
+     * {@code SEAT_HELD_BY_OTHER}로 변환되므로 클라이언트에서는 정상 거절과
+     * 구분되지 않는다. 그동안은 Postgres 로그의 duplicate key 메시지를 세어
+     * 대신했는데(results/m2-pessimistic.md 1.1), 로그 수준에 의존하는 방식이라
+     * 메트릭으로 옮긴다.
+     *
+     * <p>제약 이름을 태그로 붙인다. {@code unique} 전략에서 U-2 위반은 정상
+     * 동작이고(4.4) 다른 전략에서는 앱 락이 샜다는 신호라, 어느 제약이
+     * 걸렸는지가 해석을 가른다.
+     */
+    private final Counter.Builder violationCounter = Counter.builder("holdfast.constraint.violations")
+            .description("유니크 제약 위반 횟수. 앱 레벨 락이 샜는지의 지표 (7.1, 7.6)");
+
+    private final MeterRegistry meterRegistry;
+
+    public ApiExceptionHandler(MeterRegistry meterRegistry) {
+        this.meterRegistry = meterRegistry;
+    }
 
     /**
      * 유니크 제약 이름 → 코드. 이름을 보고 구분하는 이유는 같은
@@ -118,6 +142,7 @@ public class ApiExceptionHandler {
         String message = String.valueOf(ex.getMostSpecificCause().getMessage()).toLowerCase(Locale.ROOT);
         for (Map.Entry<String, ErrorCode> entry : CONSTRAINT_CODES.entrySet()) {
             if (message.contains(entry.getKey())) {
+                violationCounter.tag("constraint", entry.getKey()).register(meterRegistry).increment();
                 log.debug("제약 {} 위반을 409 {}로 변환한다", entry.getKey(), entry.getValue());
                 return respond(entry.getValue(), entry.getValue().defaultDetail(), List.of());
             }
