@@ -11,7 +11,33 @@ export const PROFILES = {
   low:     { seats: 1000, vus: 100, userPool: 400, purpose: '오버헤드 비교' },
   high:    { seats: 10,   vus: 500, userPool: 500, purpose: '전략 차이' },
   extreme: { seats: 1,    vus: 200, userPool: 200, purpose: '정합성 한계' },
+
+  // 7.2.2 지속 경합. 경합도 3단계와 **다른 표에 기록한다** — 이쪽 p95에는 락
+  // 대기가 들어 있고 저쪽에는 들어 있지 않다.
+  //
+  // 좌석 수는 행 락 점유율로 역산한 값이며 SUSTAINED_SEATS로 보정한다. 보정은
+  // pessimistic 한 전략에서만 하고 그 값을 고정한다 — 전략마다 맞추면 좌석 수가
+  // 변수가 되어 비교가 깨진다.
+  sustained: { seats: sustainedSeats(), vus: 500, userPool: 500, purpose: '락 대기 유지' },
 };
+
+/**
+ * 지속 경합 시나리오의 좌석 수.
+ *
+ * 기본값 3석은 `f = (홀드+해제 트랜잭션) × (초당 회수 ÷ 좌석 수)` 로 역산한
+ * 출발점이다(7.2.2). VU 500 · sleep 1초에서 10석은 f≈0.2로 대기가 얕고, 1석은
+ * f>1로 포화해 p95가 "포기까지 걸린 시간"이 된다.
+ *
+ * **scripts/seed.sh의 sustained 항목과 반드시 같은 값이어야 한다.** 시드가 만든
+ * 좌석보다 큰 번호를 고르면 SEAT_NOT_IN_SESSION이 섞여 측정이 오염된다.
+ */
+function sustainedSeats() {
+  const v = __ENV.SUSTAINED_SEATS;
+  if (v === undefined || v === '') return 3;
+  const n = parseInt(v, 10);
+  if (Number.isNaN(n) || n < 1) throw new Error(`SUSTAINED_SEATS가 잘못됐다: ${v}`);
+  return n;
+}
 
 function intEnv(name, fallback) {
   const v = __ENV[name];

@@ -36,7 +36,12 @@ case "$SCENARIO" in
   # 할당량 행을 다투지 않도록(CS-6 직렬화가 좌석 경합에 섞이지 않도록) VU 수에 맞춘다.
   high)    SEATS=10;   VUS=500; USERS=500 ;;   # 7.2 고경합
   extreme) SEATS=1;    VUS=200; USERS=200 ;;   # 7.2 극단
-  *) echo "SCENARIO는 low|high|extreme 중 하나여야 한다: $SCENARIO" >&2; exit 2 ;;
+  # 7.2.2 지속 경합. 좌석 수는 행 락 점유율로 역산한 값이며 SUSTAINED_SEATS로
+  # 보정한다. **scenarios/lib/config.js의 sustained 항목과 같은 값이어야 한다** —
+  # 시드가 만든 좌석보다 큰 번호를 k6가 고르면 SEAT_NOT_IN_SESSION이 섞인다.
+  # 보정은 pessimistic 한 전략에서만 하고 그 값을 고정한다(7.2.2).
+  sustained) SEATS="${SUSTAINED_SEATS:-3}"; VUS=500; USERS=500 ;;
+  *) echo "SCENARIO는 low|high|extreme|sustained 중 하나여야 한다: $SCENARIO" >&2; exit 2 ;;
 esac
 
 DB_SERVICE="${DB_SERVICE:-db}"

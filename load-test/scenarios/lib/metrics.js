@@ -80,6 +80,37 @@ export function recordHoldOutcome(confirmed, tags = {}) {
   }
 }
 
+// --- 지속 경합 시나리오 (7.2.2) --------------------------------------------
+
+/**
+ * <b>홀드 요청만의 응답시간.</b> 7.2.2의 헤드라인 지표다.
+ *
+ * `measured_req_duration`에는 해제 요청이 함께 들어간다. 해제는 락을 두고
+ * 겨루는 요청이 아니라 반납이라, 섞이면 "락을 기다린 시간"이 희석된다.
+ * 7.2.2가 `operation=hold` 태그만 쓰라고 정한 이유이며, k6 요약은 태그별로
+ * 쪼개 주지 않으므로 메트릭을 따로 둔다.
+ */
+export const holdDuration = new Trend('hold_req_duration', true);
+
+/**
+ * 회수 성공률. 홀드에 성공한 요청 중 해제까지 성공한 비율이다.
+ *
+ * <b>이 값이 1에서 떨어지면 그 실행을 폐기한다(7.2.2).</b> 홀드해 놓고 해제하지
+ * 못한 좌석은 순환에서 빠지는데, 청소 스케줄러가 없으므로 `none`에서는 영구히
+ * 빠진다. 나머지 네 전략은 TTL 만료 뒤 다음 요청이 정리하지만 그때까지 그
+ * 좌석은 죽어 있다. 좌석이 3석뿐이라 한 건만 새도 재고의 3분의 1이 사라진다.
+ */
+export const recoveryRate = new Rate('recovery_rate');
+export const recoveryFailedTotal = new Counter('recovery_failed_total');
+
+/** 홀드 성공 한 건의 회수 결과를 기록한다. */
+export function recordRecovery(released, tags = {}) {
+  recoveryRate.add(released, tags);
+  if (!released) {
+    recoveryFailedTotal.add(1, tags);
+  }
+}
+
 // --- 워밍업 경계 -------------------------------------------------------------
 
 /**

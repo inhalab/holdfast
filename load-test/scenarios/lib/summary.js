@@ -42,6 +42,13 @@ export function extractRow(data, cfg) {
     errorRate: metricValue(data, 'error_rate', 'rate'),
     phantomHoldRate: metricValue(data, 'phantom_hold_rate', 'rate'),
 
+    // 7.2.2 지속 경합의 헤드라인 지표. 해제 요청이 섞이지 않은 홀드만의 값이다.
+    // 다른 시나리오에서는 이 메트릭이 비어 있어 null이 된다.
+    holdP95: metricValue(data, 'hold_req_duration', 'p(95)'),
+    holdP99: metricValue(data, 'hold_req_duration', 'p(99)'),
+    holdCount: metricValue(data, 'hold_req_duration', 'count'),
+    recoveryRate: metricValue(data, 'recovery_rate', 'rate'),
+
     counts: {
       success: metricValue(data, 'bucket_success_total', 'count') || 0,
       normalRejection: metricValue(data, 'bucket_normal_rejection_total', 'count') || 0,
@@ -53,6 +60,7 @@ export function extractRow(data, cfg) {
       lockTimeout: metricValue(data, 'giveup_lock_timeout_total', 'count') || 0,
       retryExhausted: metricValue(data, 'giveup_retry_exhausted_total', 'count') || 0,
       phantomHold: metricValue(data, 'phantom_hold_total', 'count') || 0,
+      recoveryFailed: metricValue(data, 'recovery_failed_total', 'count') || 0,
     },
 
     // k6가 재지 않는 값들. summarize.mjs가 DB·Actuator에서 채운다(7.1).
@@ -78,6 +86,20 @@ export function renderText(row) {
   L.push(` 오류율(5xx)     ${fmt(pct(row.errorRate))} %   ${row.counts.serverError}건`);
   L.push(` 팬텀 홀드율     ${fmt(pct(row.phantomHoldRate))} %   ${row.counts.phantomHold}건` +
          '  (홀드 201 → 확정 실패, 7.6.3)');
+  // 7.2.2 지속 경합에서만 값이 있다. 메트릭은 어느 시나리오에서나 등록되므로
+  // 값의 유무가 아니라 **표본 수**로 판단한다 — 0 표본이면 p95가 0으로 나온다.
+  if (row.holdCount > 0) {
+    L.push('');
+    L.push(' ── 지속 경합 (7.2.2) — 7.6 표에 넣지 않는다 ──');
+    L.push(` 홀드 p95       ${fmt(row.holdP95)} ms   ← 헤드라인 지표 (해제 제외)`);
+    L.push(` 홀드 p99       ${fmt(row.holdP99)} ms`);
+    L.push(` 홀드 요청 수   ${row.holdCount}`);
+    L.push(` 회수 성공률    ${fmt(pct(row.recoveryRate))} %   실패 ${row.counts.recoveryFailed}건` +
+           (row.counts.recoveryFailed > 0
+             ? '  ← 0이 아니다. 좌석이 순환에서 빠졌으므로 이 실행을 폐기한다'
+             : ''));
+  }
+
   L.push('');
   L.push(` 성공            ${row.counts.success}건`);
   L.push(` 상태 거절       ${row.counts.stateRejection}건  (어느 열에도 넣지 않음)`);
