@@ -1035,8 +1035,12 @@ JIT 컴파일이 끝나도 p95·p99는 꼬리 분포라 표본이 적으면 실�
 베이스라인이 위반한 검수 기준(REQ-01)을 행 락이 회복했다. 제약 위반 0은 U-2가
 한 번도 발동하지 않았다는 뜻이며, 앱 락이 새지 않았다는 근거다(7.1).
 
-**`none`과 `pessimistic`의 p95를 직접 비교하지 않는다.** 두 값은 같은 것을 재고
-있지 않다 — 7.4.2와 [`p95-inversion-investigation.md`](results/p95-inversion-investigation.md)를 함께 읽는다.
+**p95 열을 전략 간 순위로 읽지 않는다.** 다섯 전략이 모두 18~41ms 대역에
+들어가는데 같은 `none` 대조군도 세션마다 그 폭으로 흔들린다 — **세션 간 변동이
+전략 간 차이보다 크다.** 이 표는 상세 기록이므로 절댓값을 그대로 싣되, 판정은
+7.7.1의 대조군 대비로 한다. 근거는
+[`p95-inversion-investigation.md`](results/p95-inversion-investigation.md)와
+[`m3-conclusion.md`](results/m3-conclusion.md) 2.5절에 있다.
 
 **저경합 — 1000석 / 100 VU**
 
