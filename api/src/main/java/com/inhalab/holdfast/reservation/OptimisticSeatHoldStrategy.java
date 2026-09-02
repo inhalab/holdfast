@@ -62,6 +62,32 @@ import java.util.concurrent.ThreadLocalRandom;
  *
  * <p><b>정상 거절과 섞지 않는다.</b> 좌석이 이미 팔려서 거절한 것은 409율이고,
  * 재시도를 소진한 것은 <b>좌석이 남아 있었을 수도 있는데</b> 포기한 것이다.
+ *
+ * <h2>만료 홀드 인수 — 두 테이블을 같은 순서로 건드린다</h2>
+ *
+ * <p>재고 행이 {@code HELD}인데 만료된 좌석은 넘겨받을 수 있어야 한다. 그런데
+ * <b>재고만 넘겨받으면 U-2가 INSERT를 막는다</b> — 부분 인덱스
+ * {@code ux_seat_hold_active}가 {@code status='HELD'}인 {@code seat_hold} 행만
+ * 보므로, 만료됐어도 {@code HELD}로 남아 있으면 자리가 차 있는 것이다.
+ *
+ * <p>그래서 한 트랜잭션 안에서 <b>재고 인수 → 홀드 정리 → 홀드 INSERT</b> 순으로
+ * 진행한다(erd.md 4.1의 전역 락 순서와 같다).
+ *
+ * <pre>
+ * 1. takeHeldIfVersionMatches  seat_inventory  version 일치 + (AVAILABLE 또는 만료 HELD)
+ * 2. releaseExpired            seat_hold       만료 HELD → RELEASED  ← U-2 자리를 비운다
+ * 3. insertHeld                seat_hold       새 HELD 행
+ * </pre>
+ *
+ * <p><b>한쪽만 성공한 상태는 커밋되지 않는다.</b> 셋은 호출자
+ * ({@link SeatHoldService#hold})의 한 트랜잭션 안에 있다. 3에서 U-2가 걸리면
+ * 1의 재고 인수까지 함께 롤백되므로, "재고는 넘어갔는데 홀드는 없는" 상태가
+ * 남지 않는다.
+ *
+ * <p><b>두 요청이 같은 만료 좌석을 동시에 노려도 1을 통과하는 것은 하나뿐이다.</b>
+ * 둘 다 같은 {@code version}을 읽었다면 뒤늦은 쪽의 UPDATE는 0행이 되어 충돌로
+ * 재시도한다. 그래서 2와 3은 항상 단독으로 실행된다 — 이것이 이 전략에서 U-2가
+ * 발동하지 않아야 하는 이유이며, 발동한다면 앱 방어가 샌 것이다(7.6).
  */
 @Component
 @ConditionalOnProperty(name = "holdfast.strategy", havingValue = "optimistic")
@@ -175,17 +201,30 @@ public class OptimisticSeatHoldStrategy implements SeatHoldStrategy {
 
             // 3) 만료 홀드 정리. erd.md 4.1: 조건부 UPDATE가 성공한 <b>뒤</b>에 수행한다.
             //    seat_inventory 다음 seat_hold 순서를 지켜야 전역 락 순서(5.1)가 유지된다.
-            if (takingOverExpired && seatHoldRepository.releaseExpired(command.sessionId(), seatId) == 0) {
-                // 만료 행을 다른 요청이 먼저 정리했다. 그쪽 INSERT가 진행 중일 수
-                // 있으므로 충돌로 보고 재시도한다(erd.md 4.1의 optimistic 행).
-                //
-                // pessimistic은 같은 상황에서 그대로 진행한다 — 행 락이 이미
-                // 직렬화해 동시 발견이 불가능하기 때문이다. 여기는 락이 없다.
-                ErrorCode giveUp = giveUpIfExhausted(attempt, command.sessionId(), seatId);
-                if (giveUp != null) {
-                    return giveUp;
+            //
+            //    **이 순서가 U-2 때문에 강제된다.** 재고 행을 넘겨받아도
+            //    seat_hold의 만료 행이 status='HELD'로 남아 있으면 U-2 부분 인덱스가
+            //    아래 INSERT를 막는다. 정리가 그 행을 RELEASED로 빼줘야 자리가 난다.
+            if (takingOverExpired) {
+                int cleaned = seatHoldRepository.releaseExpired(command.sessionId(), seatId);
+                if (cleaned == 0) {
+                    // **여기서 재시도하지 않는다.** erd.md 4.1의 optimistic 행은
+                    // rowsAffected = 0을 충돌로 보라고 하지만, 그 규칙은 정리가
+                    // 유일한 직렬화 지점인 경우를 전제한다. 이 전략에서는 바로 위
+                    // version 조건부 UPDATE가 이미 배타성을 확보했다 — 같은
+                    // version으로 넘겨받는 데 성공한 요청은 하나뿐이다.
+                    //
+                    // 그리고 여기서 재시도하면 **자기 자신을 거절한다.** 재시도는
+                    // 재고 행을 다시 읽는데, 그 행에는 방금 내가 쓴 hold_id와
+                    // 미래의 held_until이 들어 있어(자기 트랜잭션의 쓰기는 보인다)
+                    // 만료가 아닌 남의 홀드로 판정된다 → SEAT_HELD_BY_OTHER.
+                    //
+                    // 0이 나오는 것은 정리할 만료 행이 애초에 없었다는 뜻이므로
+                    // U-2도 비어 있다. 그대로 INSERT한다.
+                    log.debug("만료 홀드 정리 rowsAffected=0 — 정리할 행이 없다. "
+                            + "version 조건부 UPDATE가 배타성을 확보했으므로 진행한다. "
+                            + "sessionId={} seatId={}", command.sessionId(), seatId);
                 }
-                continue;
             }
 
             // 4) 홀드 행 INSERT. U-2가 최후 방어선으로 걸려 있다.

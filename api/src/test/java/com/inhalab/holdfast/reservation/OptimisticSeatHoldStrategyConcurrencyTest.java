@@ -344,6 +344,136 @@ class OptimisticSeatHoldStrategyConcurrencyTest {
     }
 
     /**
+     * 만료된 홀드를 남겨 둔다. 재고 행과 {@code seat_hold} 행 모두 만료 상태로
+     * 두어 실제 TTL 경과 상황과 같게 만든다 — 두 {@code held_until}은 홀드
+     * 트랜잭션의 같은 {@code now()}에서 계산되므로 실제로도 함께 만료된다.
+     */
+    private void seedExpiredHold(String staleHoldId) {
+        jdbc.update("""
+                INSERT INTO seat_hold (session_id, seat_id, hold_id, user_id, held_until, status)
+                VALUES (?, ?, ?, ?, now() - interval '1 minute', 'HELD')
+                """, SESSION_ID, SEAT_ID, staleHoldId, 99L);
+        jdbc.update("""
+                UPDATE seat_inventory
+                   SET status = 'HELD', hold_id = ?, held_until = now() - interval '1 minute',
+                       version = version + 1
+                 WHERE session_id = ? AND seat_id = ?
+                """, staleHoldId, SESSION_ID, SEAT_ID);
+    }
+
+    @Test
+    @DisplayName("만료된 홀드가 있으면 넘겨받는다 — 재고 인수와 홀드 정리가 함께 일어난다")
+    void takesOverExpiredHold() {
+        String staleHoldId = UUID.randomUUID().toString();
+        seedExpiredHold(staleHoldId);
+        double violationsBefore = constraintViolations();
+
+        String newHoldId = UUID.randomUUID().toString();
+        seatHoldService.hold(SESSION_ID, 1L, List.of(SEAT_ID), newHoldId);
+
+        String staleStatus = jdbc.queryForObject(
+                "SELECT status FROM seat_hold WHERE hold_id = ?", String.class, staleHoldId);
+        Integer activeHolds = jdbc.queryForObject("""
+                SELECT count(*) FROM seat_hold
+                 WHERE session_id = ? AND seat_id = ? AND status = 'HELD'
+                """, Integer.class, SESSION_ID, SEAT_ID);
+        String inventoryHoldId = jdbc.queryForObject(
+                "SELECT hold_id FROM seat_inventory WHERE session_id = ? AND seat_id = ?",
+                String.class, SESSION_ID, SEAT_ID);
+
+        System.out.printf("[optimistic 만료인수] 옛 홀드 %s · 활성 홀드 %d건 · 재고 hold_id 일치 %s · 제약위반 %.0f%n",
+                staleStatus, activeHolds, newHoldId.equals(inventoryHoldId), constraintViolations() - violationsBefore);
+
+        // 정리가 없으면 여기서 U-2가 INSERT를 막는다. 만료됐어도 status='HELD'면
+        // 부분 인덱스가 자리를 차지하고 있기 때문이다.
+        assertThat(staleStatus)
+                .as("만료된 홀드는 RELEASED로 정리돼야 한다 — 안 그러면 U-2가 새 INSERT를 막는다")
+                .isEqualTo("RELEASED");
+        assertThat(activeHolds).as("활성 홀드는 새 것 하나뿐이어야 한다").isEqualTo(1);
+        assertThat(inventoryHoldId).as("재고 행도 새 홀드를 가리켜야 한다").isEqualTo(newHoldId);
+        assertThat(constraintViolations() - violationsBefore)
+                .as("제약 위반 없이 넘겨받아야 한다")
+                .isZero();
+    }
+
+    @Test
+    @DisplayName("만료 홀드를 여러 스레드가 동시에 넘겨받으려 해도 하나만 성공한다")
+    void concurrentTakeoverOfExpiredHoldLetsOnlyOneWin() throws Exception {
+        String staleHoldId = UUID.randomUUID().toString();
+        seedExpiredHold(staleHoldId);
+        double violationsBefore = constraintViolations();
+
+        ExecutorService pool = Executors.newFixedThreadPool(THREADS);
+        CountDownLatch startGate = new CountDownLatch(1);
+        CountDownLatch finished = new CountDownLatch(THREADS);
+        AtomicInteger succeeded = new AtomicInteger();
+        AtomicInteger rejected = new AtomicInteger();
+        AtomicInteger retryExhausted = new AtomicInteger();
+        AtomicInteger constraintViolation = new AtomicInteger();
+        AtomicInteger failed = new AtomicInteger();
+
+        for (int i = 1; i <= THREADS; i++) {
+            long userId = i;
+            pool.submit(() -> {
+                try {
+                    startGate.await();
+                    seatHoldService.hold(SESSION_ID, userId, List.of(SEAT_ID), UUID.randomUUID().toString());
+                    succeeded.incrementAndGet();
+                } catch (ApiException e) {
+                    if (e.getCode() == ErrorCode.RETRY_EXHAUSTED) {
+                        retryExhausted.incrementAndGet();
+                    } else {
+                        rejected.incrementAndGet();
+                    }
+                } catch (DataIntegrityViolationException e) {
+                    constraintViolation.incrementAndGet();
+                } catch (Exception e) {
+                    failed.incrementAndGet();
+                } finally {
+                    finished.countDown();
+                }
+            });
+        }
+
+        startGate.countDown();
+        assertThat(finished.await(60, TimeUnit.SECONDS)).isTrue();
+        pool.shutdown();
+
+        Integer activeHolds = jdbc.queryForObject("""
+                SELECT count(*) FROM seat_hold
+                 WHERE session_id = ? AND seat_id = ? AND status = 'HELD'
+                """, Integer.class, SESSION_ID, SEAT_ID);
+
+        System.out.printf(
+                "[optimistic 만료인수 경합] 스레드 %d · 성공 %d · 정상거절 %d · 재시도소진 %d · 제약위반 %d · 예외 %d "
+                        + "→ 활성 홀드 %d건, 제약위반 메트릭 %.0f%n",
+                THREADS, succeeded.get(), rejected.get(), retryExhausted.get(),
+                constraintViolation.get(), failed.get(), activeHolds,
+                constraintViolations() - violationsBefore);
+
+        assertThat(failed.get()).as("예기치 못한 예외는 없어야 한다").isZero();
+
+        // 재고 인수(version 조건부 UPDATE)가 배타성을 확보하므로, 정리와 INSERT는
+        // 항상 단독으로 실행된다. U-2가 발동하면 그 전제가 깨진 것이다.
+        assertThat(constraintViolation.get())
+                .as("U-2 제약 위반은 0이어야 한다 — version 조건부 UPDATE가 배타성을 확보한다")
+                .isZero();
+        assertThat(constraintViolations() - violationsBefore)
+                .as("앱 메트릭도 0이어야 한다")
+                .isZero();
+
+        assertThat(succeeded.get())
+                .as("만료 좌석을 넘겨받는 데 성공한 스레드는 정확히 하나여야 한다")
+                .isEqualTo(1);
+        assertThat(activeHolds).as("활성 홀드는 1건이어야 한다").isEqualTo(1);
+
+        Integer staleStillHeld = jdbc.queryForObject(
+                "SELECT count(*) FROM seat_hold WHERE hold_id = ? AND status = 'HELD'",
+                Integer.class, staleHoldId);
+        assertThat(staleStillHeld).as("옛 만료 홀드는 남아 있으면 안 된다").isZero();
+    }
+
+    /**
      * 7.7.2의 "실패 모드 — 재시도 상한이 낮으면 무엇이 드러나는가".
      *
      * <p>상한을 0으로 낮추면 <b>충돌한 요청이 한 번도 다시 시도하지 않고</b>
