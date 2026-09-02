@@ -129,6 +129,18 @@ class UniqueSeatHoldStrategyConcurrencyTest {
             jdbc.update("INSERT INTO user_session_quota (session_id, user_id, held_count) VALUES (?, ?, 0)",
                     SESSION_ID, (long) i);
         }
+
+        // **인덱스 존재를 매 테스트마다 보장한다.** 실패 모드 테스트가 U-2를
+        // 지우므로, 복구를 그 테스트의 finally에만 맡기면 순서에 의존하게 된다.
+        // 실제로 그렇게 만들었다가 두 테스트가 함께 깨졌다 — 복구가 중복 행
+        // 때문에 실패하면서 다음 테스트가 인덱스 없이 돌았고, 제약 위반 0에
+        // 초과 홀드 12건이라는 엉뚱한 결과가 나왔다.
+        //
+        // 바로 위 TRUNCATE가 seat_hold를 비우므로 여기서는 항상 성공한다.
+        jdbc.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS ux_seat_hold_active
+                  ON seat_hold (session_id, seat_id) WHERE status = 'HELD'
+                """);
     }
 
     /** 30스레드가 좌석 1석을 동시에 홀드한다. 결과를 종류별로 센다. */
@@ -375,6 +387,10 @@ class UniqueSeatHoldStrategyConcurrencyTest {
                     .as("두 스레드 이상이 '내가 좌석을 잡았다'고 믿어야 한다 — none과 같은 상태다")
                     .isGreaterThan(1);
         } finally {
+            // **중복 행을 먼저 지운다.** 이 테스트가 만든 초과 홀드가 남아 있으면
+            // 유니크 인덱스를 다시 만들 수 없어 복구가 실패한다. seed()도 매
+            // 테스트 앞에서 인덱스를 보장하므로 이중으로 막는다.
+            jdbc.execute("DELETE FROM seat_hold");
             jdbc.execute("""
                     CREATE UNIQUE INDEX IF NOT EXISTS ux_seat_hold_active
                       ON seat_hold (session_id, seat_id) WHERE status = 'HELD'
