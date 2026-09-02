@@ -48,10 +48,25 @@ import java.util.Optional;
  * 마른다. {@code lock_timeout} 1초(7.3)가 그 줄의 길이를 끊는 유일한 장치다.
  * 상한이 없으면 측정 대상이 락 경합에서 커넥션 고갈로 바뀐다.
  *
- * <p>7.5의 사전 가설이 여기에 걸려 있다 — Redis 분산락이 p95에서 이 전략을
- * 앞선다면, Redis가 빨라서가 아니라 <b>대기 구간에 커넥션을 쥐지 않기</b>
- * 때문이다. 그래서 이 전략의 커넥션 풀 대기(`hikaricp.connections.pending`)를
- * 반드시 함께 기록한다.
+ * <p><b>7.5의 사전 가설이 여기에 걸려 있었고, 검증 불가로 판정됐다.</b> 가설은
+ * "Redis 분산락이 p95에서 이 전략을 앞선다 — Redis가 빨라서가 아니라 대기 구간에
+ * 커넥션을 쥐지 않기 때문"이었다. 검증하려면 이 전략이 <b>실제로 대기해야</b>
+ * 하는데, 그런 구간이 만들어지지 않았다.
+ *
+ * <p>실측에서 이 전략이 {@code none}보다 더 점유한 커넥션 시간은 회당
+ * <b>0.010ms</b>였다(5.340 vs 5.330ms). 락 포기도 경합도와 무관하게 0에
+ * 수렴했다(7.6.1) — 재초기화 버스트가 지나면 좌석이 전부 {@code SOLD}가 되어
+ * 아무도 행 락을 쥐지 않으므로 {@code FOR UPDATE}가 즉시 성공한다.
+ * <b>기다림이 없으면 대기 중 점유도 없다.</b>
+ *
+ * <p>그래도 커넥션 풀 대기({@code hikaricp.connections.pending})는 회차마다
+ * 기록한다(7.4.2). 이 전략의 p95를 읽으려면 필요하기 때문이다 — p95는 락 비용이
+ * 아니라 <b>커넥션 획득 대기</b>를 따라간다
+ * ({@code results/p95-inversion-investigation.md}).
+ *
+ * <p>위 "커넥션 풀이 먼저 마른다"는 서술은 <b>측정된 사실이 아니라 이 전략의
+ * 구조가 갖는 위험</b>이다. 임계 구역이 더 긴 응용에서는 실제로 그렇게 되고,
+ * {@code lock_timeout} 1초가 그때 줄의 길이를 끊는다.
  */
 @Component
 @ConditionalOnProperty(name = "holdfast.strategy", havingValue = "pessimistic")

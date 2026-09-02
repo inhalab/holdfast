@@ -2,40 +2,59 @@
 
 동시성 설계서(`docs/concurrency-spec.md`) 7장의 측정을 실행하는 환경이다.
 
-**예약 API는 아직 구현되지 않았다.** 지금 목표는 API가 생겼을 때 바로 돌릴 수 있는
-구조를 만들고, 특히 **집계 로직을 미리 확정하는 것**이다. 급하게 만들면 정상 거절과
-오류의 분리가 가장 먼저 흐려진다.
+**M3까지 60회를 이 하네스로 쟀다** — 5전략 × 경합도 3단계 × 3회 + 세션마다
+`none` 대조군 3회(`concurrency-spec.md` 7.6). 데드락 회피 검증(7.2.1)과 지속
+경합 시나리오(7.2.2)도 여기서 돈다.
 
-지금 실제로 돌아가는 것은 스모크 테스트뿐이고, 그것으로 k6 실행 환경과 집계
-파이프라인이 도는지 확인한다.
+**이 하네스의 핵심은 부하 생성이 아니라 집계다.** 정상 거절과 오류의 분리가
+흐려지면 "실패율 40%" 같은 무의미한 숫자가 나오고, 그 뒤의 모든 비교가 무너진다.
+`lib/classify.js`가 그 분리를 담당한다.
 
 ## 구성
 
 ```
 scenarios/
-  smoke.js          지금 돌릴 수 있는 유일한 시나리오. /api/status·/api/health를
-                    reservation.js와 같은 집계 경로에 통과시킨다
-  reservation.js    본 측정 시나리오. 계약(openapi.yaml)에 맞춰 미리 써 둔 것
-  deadlock.js       데드락 회피 검증 (7.2.1). 3석을 뒤섞어 보낸다
+  reservation.js       본 측정 시나리오 (7.6의 60회가 이것)
+  smoke.js             /api/status·/api/health를 reservation.js와 같은 집계
+                       경로에 통과시킨다. 실행 환경·집계 파이프라인 확인용
+  deadlock.js          데드락 회피 검증 (7.2.1). 3석을 뒤섞어 보낸다
+  sustained.js         지속 경합 시나리오 (7.2.2). 좌석 1석에 계속 겨루게 해
+                       4.5.1을 시험한다 (7.5.1)
   lib/
-    classify.js     **응답 → 집계 버킷 분류. 측정 해석의 핵심**
-    metrics.js      7.1 지표 중 k6가 정본인 것들의 커스텀 메트릭
-    config.js       7.2 경합도 3단계, 7.4 워밍업·반복
-    api.js          openapi.yaml 계약에 맞춘 호출 래퍼
-    summary.js      결과 요약 렌더러 (원격 import 없음)
+    classify.js        **응답 → 집계 버킷 분류. 측정 해석의 핵심**
+    metrics.js         7.1 지표 중 k6가 정본인 것들의 커스텀 메트릭
+    config.js          7.2 경합도 3단계, 7.4 워밍업·반복
+    api.js             openapi.yaml 계약에 맞춘 호출 래퍼
+    summary.js         결과 요약 렌더러 (원격 import 없음)
 sql/
-  seed.sql          7.4-1 시드 초기화
-  u2-create.sql     U-2 생성 (none 제외 4개 전략)
-  u2-drop.sql       U-2 삭제 (none 전용)
-  verify.sql        **초과 예약 검증 — 출처가 k6가 아니라 DB다**
+  seed.sql             7.4-1 시드 초기화
+  reset.sql            **본 측정 시작 시 재초기화 (7.4.1).** 행 단위 DML이며
+                       대상 좌석을 먼저 FOR UPDATE로 잠근다 — 이유는 아래
+  u2-create.sql        U-2 생성 (none 제외 4개 전략)
+  u2-drop.sql          U-2 삭제 (none 전용)
+  verify.sql           **초과 예약 검증 (V-1~V-5) — 출처가 k6가 아니라 DB다**
+  verify-sustained.sql V-6 점유 구간 중첩 (지속 경합 전용)
 scripts/
-  run.sh            측정 프로토콜 실행기 (시드 → 워밍업·측정 → 검증, 3회 반복)
-  run-deadlock.sh   데드락 회피 검증 실행기 (판정: 데드락 0건)
-  seed.sh           시드 초기화
-  verify.sh         DB 검증 쿼리 실행
-  summarize.mjs     7.6 기록 양식 표 출력 (3회 중앙값)
-results/            실행 결과 JSON (gitignore 대상)
+  run.sh               측정 프로토콜 실행기 (시드 → 워밍업 → 재초기화 → 측정
+                       → 메트릭 캡처 → 검증, 3회 반복)
+  run-deadlock.sh      데드락 회피 검증 실행기 (판정: 데드락 0건)
+  run-sustained.sh     지속 경합 시나리오 실행기
+  seed.sh              시드 초기화
+  verify.sh            DB 검증 쿼리 실행
+  metrics-snapshot.mjs **회차 직후 Actuator 스냅샷 (7.4.2).** 커넥션 풀 +
+                       앱 커스텀 메트릭(재시도·소진·제약 위반)
+  summarize.mjs        7.6 기록 양식 표 출력 (3회 중앙값)
+results/               실행 결과 JSON·검증 출력 (gitignore 대상)
 ```
+
+**`reset.sql`이 `seed.sql`과 별개인 이유는 7.4.1에 있다.** 본 측정 시작 시점에는
+앱 트랜잭션이 이미 돌고 있으므로 `TRUNCATE`가 데드락을 내고, 삭제와 재고 초기화
+사이의 창으로 진행 중이던 홀드가 살아남아 좌석이 다시 팔린다. 측정 두 벌을 그렇게
+버렸다(`docs/results/discarded-measurements.md` 2·3번).
+
+**`metrics-snapshot.mjs`를 회차마다 자동으로 부르는 이유도 사고에서 나왔다.**
+전략을 바꿔 앱을 다시 띄우면 Actuator 카운터가 초기화되는데, 손으로 뜨다가 세 번
+놓쳤다. 전략 전환 전에 마지막 스냅샷이 확보돼야 한다(7.4.2).
 
 ## 실행
 
@@ -43,10 +62,10 @@ results/            실행 결과 JSON (gitignore 대상)
 # 1) 앱 기동 (앱 2대 + DB + Redis + nginx)
 docker compose up -d
 
-# 2) 스모크 — 지금 돌릴 수 있는 것
+# 2) 스모크 — 실행 환경·집계 파이프라인 확인
 load-test/scripts/run.sh smoke
 
-# 3) 본 측정 (예약 API 구현 후) — 전략 1개 × 3회 반복
+# 3) 본 측정 — 전략 1개 × 3회 반복
 load-test/scripts/run.sh high pessimistic
 
 # 4) 7.6 기록 양식 표로 요약
@@ -54,6 +73,9 @@ node load-test/scripts/summarize.mjs --scenario high
 
 # 5) 데드락 회피 검증 (성능 측정이 아니다. 판정은 데드락 0건)
 load-test/scripts/run-deadlock.sh pessimistic high
+
+# 6) 지속 경합 (성능 측정이 아니다. 판정은 제약 위반과 V-6)
+load-test/scripts/run-sustained.sh redis
 ```
 
 ### 개발 확인용과 최종 측정용을 구분한다 (7.4)
@@ -73,6 +95,7 @@ DURATION_SEC=120 load-test/scripts/run.sh high pessimistic   # 120초 (최종 �
 
 **기본값이 30초인 이유는 전체 실행 시간이다.** 5전략 × 3회 × 3시나리오 = 45회에
 회차마다 워밍업 30초가 붙어, 120초로 전부 돌리면 두 시간을 넘는다. 30초면 45분이다.
+(실제로는 세션마다 `none` 대조군을 함께 돌려 60회가 됐다 — 7.4.2.)
 
 **개발 확인용 실행의 숫자는 7.6 기록 양식에 싣지 않는다.** `run.sh`가 실행 시작 때
 알려주고, `summarize.mjs`도 개발 확인용 실행이 섞이면 경고한다.
@@ -143,9 +166,13 @@ SELECT deadlocks FROM pg_stat_database WHERE datname = current_database();
 
 1. **시드 초기화** — `seed.sh`. 매 회차마다 같은 상태에서 시작한다(7.3)
 2. **워밍업 30초 — 집계에서 제외** — 커스텀 메트릭에 기록하지 않는 방식으로 제외한다
-3. **본 측정**
-4. **전략당 3회 반복, 중앙값** — `summarize.mjs`가 계산한다
-5. 원본 결과 JSON은 `results/`에 남는다
+3. **본 측정 시작 시 시드 재초기화** — `reset.sql`. 워밍업이 좌석을 소진하므로
+   본 측정이 매진 상태에서 시작하지 않게 한다(7.4.1)
+4. **본 측정**
+5. **회차 직후 메트릭·검증 캡처** — `metrics-snapshot.mjs`와 `verify.sh` 출력을
+   `results/`에 파일로 남긴다(7.4.2)
+6. **전략당 3회 반복, 중앙값** — `summarize.mjs`가 계산한다
+7. 원본 결과 JSON은 `results/`에 남는다
 
 ### 워밍업을 어떻게 제외하나
 
@@ -187,9 +214,9 @@ VU 램프업은 워밍업 **안에서** 끝낸다. 본 측정은 목표 VU가 �
 | 지표 | 출처 | 실행 방법 |
 |---|---|---|
 | 초과 예약 건수 | DB 검증 쿼리 | `scripts/verify.sh` |
-| 낙관적 재시도 횟수 | 앱 커스텀 메트릭 | Actuator (앱 구현 후) |
-| 제약 위반 횟수 | 앱 커스텀 메트릭 | Actuator (앱 구현 후) |
-| 커넥션 풀 대기 | `hikaricp.connections.pending` `.acquire` | Actuator |
+| 낙관적 재시도 횟수 | 앱 커스텀 메트릭 | `scripts/metrics-snapshot.mjs` (회차마다 자동) |
+| 제약 위반 횟수 | 앱 커스텀 메트릭 | `scripts/metrics-snapshot.mjs` (회차마다 자동) |
+| 커넥션 풀 대기 | `hikaricp.connections.pending` `.acquire` | `scripts/metrics-snapshot.mjs` |
 
 **초과 예약을 k6가 셀 수 없는 이유**는 k6가 자기가 받은 응답만 알기 때문이다.
 서버가 두 요청 모두에 201을 돌려주면 k6는 성공 2건으로 셀 뿐, 그것이 같은
@@ -205,8 +232,8 @@ VU 램프업은 워밍업 **안에서** 끝낸다. 본 측정은 목표 VU가 �
 `load-test/.gitignore` 양쪽에 규칙이 있다 — 루트만 봐도, `load-test/`만 떼어 봐도
 규칙이 유효하도록 둘 다 둔다.
 
-**채택한 확정 측정본만 `docs/results/`로 옮겨 커밋한다.** 7.4-5가 말하는 "원본 결과
-JSON을 `docs/results/`에 커밋"이 이것이다. 자동 생성물 전부를 커밋하지는 않는다.
+**채택한 확정 측정본만 `docs/results/`로 옮겨 커밋한다.** 위 프로토콜 7번이 말하는
+"원본 결과 JSON"의 처리가 이것이다. 자동 생성물 전부를 커밋하지는 않는다.
 
 ```
 load-test/results/*.json    실행할 때마다 쌓이는 원본. gitignore 대상
