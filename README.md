@@ -31,12 +31,13 @@
 
 아래는 **고경합 시나리오(좌석 10석 / VU 500)** 요약이다. 3회 실행의 중앙값이다.
 저경합·극단 시나리오와 전체 지표는 [동시성 설계서](docs/concurrency-spec.md) 7절,
-베이스라인 측정의 근거와 해석은 [M2 측정 결과](docs/results/m2-none-baseline.md)에 있다.
+측정 근거와 해석은 [베이스라인](docs/results/m2-none-baseline.md)과
+[비관적 락](docs/results/m2-pessimistic.md)에 있다.
 
 | 전략 | 초과 확정 | 초과 홀드 | p95 | 처리량 | 정상 거절(409) | 제약 위반 |
 |---|---|---|---|---|---|---|
 | 락 없음 (baseline) | **4석** ✗ | 0 ※ | 40ms | 488 TPS | 99.95% | — |
-| 비관적 락 | | | | | | |
+| 비관적 락 | **0** ✓ | 0 | 32ms | 491 TPS | 99.97% | **0** |
 | 낙관적 락 | | | | | | |
 | DB 유니크 제약 | | | | | | |
 | Redis 분산락 | | | | | | |
@@ -54,6 +55,11 @@
 **※ 초과 홀드 0은 겹친 홀드가 없었다는 뜻이 아니다.** 이 값은 활성 홀드만 세는데
 시나리오가 홀드 직후 확정해 그 창이 밀리초 단위다. 상태를 무시하고 세면 10석 중
 5석에 홀드가 겹쳤다([측정 결과 4.3](docs/results/m2-none-baseline.md)).
+
+**두 전략의 p95를 직접 비교하지 마라.** `pessimistic`이 40ms → 32ms로 낮게
+나왔지만 락을 걸어서 빨라진 것이 아니다. 이 시나리오의 p95는 락 비용이 아니라
+커넥션 대기열 길이를 재고 있다 —
+[p95 역전 조사](docs/results/p95-inversion-investigation.md).
 
 **정상 거절은 실패가 아니다.** 좌석이 이미 팔려 409를 반환한 것은 시스템이
 제대로 동작한 결과이므로 오류율과 분리해 집계한다.
@@ -78,12 +84,13 @@ docs/        설계 명세, ERD, 측정 결과
 ```bash
 docker compose up -d                    # 앱 2대 + DB + Redis + nginx
 load-test/scripts/run.sh smoke          # k6 실행 환경·집계 파이프라인 확인
-load-test/scripts/run.sh high pessimistic   # 본 측정 (예약 API 구현 후)
+DURATION_SEC=120 load-test/scripts/run.sh high pessimistic   # 본 측정
 node load-test/scripts/summarize.mjs --scenario high   # 7.6 기록 양식 표
 ```
 
-**예약 API는 아직 구현되지 않았다.** 지금 돌릴 수 있는 것은 스모크 테스트뿐이고,
-나머지는 API가 생겼을 때 그대로 돌도록 계약에 맞춰 미리 써 둔 것이다.
+전략을 바꿔 측정할 때는 `HOLDFAST_STRATEGY`를 넘겨 앱 2대를 다시 띄운다.
+시드 스크립트가 `none`일 때만 U-2 인덱스를 지우므로, 나머지 전략은 최후
+방어선이 걸린 상태로 측정된다.
 
 ## 문서
 
