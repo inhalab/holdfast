@@ -73,6 +73,15 @@ public class ApiExceptionHandler {
      * <p>제약 이름을 태그로 붙인다. {@code unique} 전략에서 U-2 위반은 정상
      * 동작이고(4.4) 다른 전략에서는 앱 락이 샜다는 신호라, 어느 제약이
      * 걸렸는지가 해석을 가른다.
+     *
+     * <p><b>같은 카운터가 전략에 따라 정반대의 의미를 갖는다.</b>
+     * {@code unique}에서는 0이 아닌 것이 정상이고 오히려 <b>0이면 이상하다</b> —
+     * 경합이 없었거나 U-2가 걸려 있지 않다는 뜻이다. 나머지 세 전략에서는
+     * 0이 아니면 앱 락이 샌 것이다. 7.6 표를 읽을 때 이 차이를 놓치면 안 된다.
+     *
+     * <p><b>이 값이 의미를 가지려면 좌석을 동시에 노린 정상 경합만 반영해야
+     * 한다</b>(erd.md 4.1). 측정 절차가 만든 위반이 섞인 사례가 실제로 있었다
+     * ({@code docs/results/discarded-measurements.md} 3번).
      */
     private final Counter.Builder violationCounter = Counter.builder("holdfast.constraint.violations")
             .description("유니크 제약 위반 횟수. 앱 레벨 락이 샜는지의 지표 (7.1, 7.6)");

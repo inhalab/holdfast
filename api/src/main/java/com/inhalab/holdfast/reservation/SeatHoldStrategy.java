@@ -12,7 +12,7 @@ package com.inhalab.holdfast.reservation;
  *   <tr><td>{@code none}</td><td>베이스라인 (락 없음) — {@link NoneSeatHoldStrategy}</td></tr>
  *   <tr><td>{@code pessimistic}</td><td>비관적 락 ({@code FOR UPDATE}) — {@link PessimisticSeatHoldStrategy}</td></tr>
  *   <tr><td>{@code optimistic}</td><td>낙관적 락 (version 조건부 UPDATE) — {@link OptimisticSeatHoldStrategy}</td></tr>
- *   <tr><td>{@code unique}</td><td>DB 유니크 제약 (미구현)</td></tr>
+ *   <tr><td>{@code unique}</td><td>DB 유니크 제약 (앱 락 없음) — {@link UniqueSeatHoldStrategy}</td></tr>
  *   <tr><td>{@code redis}</td><td>Redis 분산락 (미구현)</td></tr>
  * </table>
  *
