@@ -2,6 +2,8 @@ package com.inhalab.holdfast.api;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.springframework.beans.factory.ObjectProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
@@ -77,8 +79,22 @@ public class ApiExceptionHandler {
 
     private final MeterRegistry meterRegistry;
 
-    public ApiExceptionHandler(MeterRegistry meterRegistry) {
-        this.meterRegistry = meterRegistry;
+    /**
+     * <b>{@code MeterRegistry}를 필수 의존성으로 받지 않는다.</b>
+     *
+     * <p>이 클래스는 {@code @RestControllerAdvice}라 {@code @WebMvcTest} 슬라이스
+     * 테스트에 자동으로 포함되는데, 그 슬라이스는 메트릭 자동설정을 로드하지
+     * 않아 {@code MeterRegistry} 빈이 없다. 생성자에서 요구하면 오류 처리와
+     * 무관한 웹 슬라이스 테스트가 전부 컨텍스트 로딩에서 깨진다
+     * ({@code SeatMapPageControllerTest}가 그렇게 깨졌다).
+     *
+     * <p>제약 위반 카운터는 이 클래스의 <b>부수 관심사</b>다. 본래 책임인 예외
+     * 매핑은 레지스트리 없이도 온전히 동작해야 하므로, 없으면 아무 데도 보내지
+     * 않는 레지스트리로 대체한다. 운영에서는 Actuator가 실제 레지스트리를
+     * 제공한다.
+     */
+    public ApiExceptionHandler(ObjectProvider<MeterRegistry> meterRegistry) {
+        this.meterRegistry = meterRegistry.getIfAvailable(SimpleMeterRegistry::new);
     }
 
     /**
