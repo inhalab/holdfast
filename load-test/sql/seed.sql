@@ -7,9 +7,9 @@
 --   psql -v seats=10 -v users=500 -v session_id=1 -v seat_id_base=1 \
 --        -v max_per_user=4 -v strategy=pessimistic -f seed.sql
 --
--- 스키마는 docs/erd.md의 확정본을 따른다. **엔티티가 아직 구현되지 않았으므로
--- 이 스크립트는 테이블이 생긴 뒤에야 돈다.** 지금은 계약을 미리 고정해 두는 것이
--- 목적이고, 테이블이 없으면 scripts/seed.sh가 그 사실을 명확히 알려준다.
+-- 스키마는 docs/erd.md의 확정본을 따르며, 테이블은 Flyway 마이그레이션
+-- (V1__init_schema.sql)이 만든다. 테이블이 없으면 scripts/seed.sh가 그 사실을
+-- 명확히 알려준다.
 
 \set ON_ERROR_STOP on
 

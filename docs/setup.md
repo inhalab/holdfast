@@ -112,5 +112,9 @@ docker compose down -v    # DB 데이터(볼륨)까지 삭제
 ## 다음 단계
 
 1. ~~좌석재고·예약 엔티티 정의 → `JPA_DDL_AUTO=validate` + Flyway 전환~~ 완료
-2. 락 전략 4종 구현
-3. k6 부하 테스트로 베이스라인 실패 재현 → 전략별 비교 측정
+2. ~~락 전략 4종 구현~~ 완료 — `none` 포함 5개
+3. ~~k6 부하 테스트로 베이스라인 실패 재현 → 전략별 비교 측정~~ 완료 — 60회
+4. M4: Mock PG, QR 티켓·검표, 알림 Outbox, 관리자 최소 화면
+
+전략별 측정 결과는 [`docs/results/m3-conclusion.md`](results/m3-conclusion.md)에
+있다.

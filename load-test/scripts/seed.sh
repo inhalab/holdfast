@@ -53,15 +53,18 @@ psql_run() {
   docker compose exec -T "$DB_SERVICE" psql -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 "$@"
 }
 
-# 테이블이 아직 없으면 여기서 멈추고 이유를 분명히 알린다.
-# 예약 API·엔티티는 아직 구현되지 않았고, 스키마가 생겨야 시드가 돈다.
+# 테이블이 없으면 여기서 멈추고 이유를 분명히 알린다. 스키마는 Flyway가
+# 올리므로, 없다는 것은 앱이 안 떴거나 마이그레이션이 실패했다는 뜻이다.
 if ! psql_run -tAc "SELECT to_regclass('public.seat_inventory') IS NOT NULL" | grep -q '^t$'; then
   cat >&2 <<'MSG'
 [seed] seat_inventory 테이블이 없다. 시드를 건너뛴다.
 
-  예약 API와 JPA 엔티티가 아직 구현되지 않아 스키마가 만들어지지 않은 상태다.
-  엔티티가 생기고 스키마가 올라오면 이 스크립트가 그대로 돈다.
-  지금 확인할 수 있는 것은 스모크 테스트뿐이다:
+  Flyway 마이그레이션이 올라오지 않은 상태다. 앱이 떴는지, 마이그레이션이
+  실패하지 않았는지 먼저 확인한다:
+
+    docker compose up -d && docker compose logs app1 | grep -i flyway
+
+  스키마 없이도 도는 것은 스모크 테스트뿐이다:
 
     load-test/scripts/run.sh smoke
 MSG
