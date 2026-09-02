@@ -4,4 +4,5 @@
 # 원본 JSON은 results/에 남기고, 채택한 확정 측정본만 docs/results/로 옮겨
 # 커밋한다 (concurrency-spec 7.4-5).
 results/*.json
+results/*.txt
 !results/.gitkeep

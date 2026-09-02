@@ -28,6 +28,7 @@ crash.log
 # 원본 JSON은 load-test/results/에 남기고, 채택한 확정 측정본만
 # docs/results/로 옮겨 커밋한다 (concurrency-spec 7.4-5, load-test/README).
 load-test/results/*.json
+load-test/results/*.txt
 !load-test/results/.gitkeep
 
 # --- IDE / OS ---
