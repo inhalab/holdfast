@@ -221,7 +221,16 @@ public interface SeatInventoryRepository extends JpaRepository<SeatInventory, Lo
      *   <li>{@code pessimistic} — 같은 행을 이미 {@link #findForUpdate}로 잡고
      *       있다. <b>안전성이 WHERE 절이 아니라 행 락에서 나온다</b>(4.2). 락을
      *       쥔 채 읽은 상태가 커밋 전까지 바뀌지 않으므로 조건이 필요 없다.</li>
+     *   <li>{@code unique} — 바로 앞의 {@code seat_hold} INSERT가 U-2로 이미
+     *       승자를 결정했다. <b>안전성이 유니크 제약에서 나온다</b>(4.4). 진
+     *       요청은 여기까지 오지 못하고 제약 위반으로 트랜잭션째 되돌아간다.</li>
      * </ul>
+     *
+     * <p><b>셋의 공통점은 "이 UPDATE가 판정하지 않는다"이고, 차이는 무엇이
+     * 배타성을 보장하느냐다</b> — 아무것도(none) / 행 락(pessimistic) /
+     * 유니크 제약(unique). {@code optimistic}만 이 메서드를 쓰지 않는다.
+     * 그쪽은 판정을 UPDATE 안에 넣어야 하므로
+     * {@link #takeHeldIfVersionMatches}가 따로 있다.
      *
      * <p><b>반환 타입이 {@code void}인 것도 의도다.</b> {@code int}로 두면
      * {@code rowsAffected}로 분기하고 싶어지는데, 그 판정은 조건부 UPDATE

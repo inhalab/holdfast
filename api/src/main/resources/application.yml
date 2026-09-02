@@ -80,12 +80,14 @@ holdfast:
   # 락 전략 스위치(concurrency-spec.md 4절). none/pessimistic/optimistic/unique/redis.
   # k6 시나리오는 고정하고 이 값만 바꿔 측정한다.
   #
-  # 현재 구현된 것은 none, pessimistic, optimistic이다. 나머지를 넣으면
+  # 현재 구현된 것은 none, pessimistic, optimistic, unique다. redis를 넣으면
   # SeatHoldStrategy 빈이 없어 기동에 실패한다 — 측정 도중 "구현되지 않은 전략을 쟀다"가 되는
   # 것보다 기동 시점에 드러나는 편이 낫다.
   #
-  # 주의: none일 때만 seed.sh가 U-2 인덱스를 지운다. pessimistic은 U-2를 걸고
-  # 측정해야 제약 위반 카운터가 "앱 락이 샜다"를 의미한다(7.6).
+  # 주의: none일 때만 seed.sh가 U-2 인덱스를 지운다. 나머지 전략은 U-2를 걸고
+  # 측정해야 제약 위반 카운터가 의미를 갖는다(7.6). 그 의미는 전략마다 다르다 —
+  # pessimistic·optimistic·redis에서 0이 아니면 앱 락이 샌 것이고,
+  # unique에서는 0이 아닌 것이 정상 동작이다(4.4).
   #
   # 기본값이 none인 것은 M2가 베이스라인(실패 재현) 단계이기 때문이다.
   # none은 초과 예약을 막지 않는다 — 그것이 이 전략의 목적이다(4.1).
