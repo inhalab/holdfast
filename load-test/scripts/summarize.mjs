@@ -306,6 +306,17 @@ if (commits.length > 1) {
   }
   console.log('> 측정 대상 코드가 그 사이 바뀌었는지 확인하고, 바뀌었다면 폐기한다.');
 }
+// 이미지가 갈리면 커밋보다 더 직접적인 문제다 — 실제로 돌아간 바이너리가 다르다.
+const images = [...new Set(all.map((r) => r.row.image).filter(Boolean))];
+if (images.length > 1) {
+  console.log(`> ⚠ **이 세션은 앱 이미지 ${images.length}개에 걸쳐 있다** — ${images.join(', ')}`);
+  console.log('> 커밋이 같아도 다른 바이너리를 잰 것이다. 전략 간 비교가 성립하지 않는다(7.3).');
+}
+const stale = all.some((r) => r.row.imageStale === 'yes');
+if (stale) {
+  console.log('> ℹ 앱 이미지가 HEAD 커밋보다 오래됐다 — 트리가 아니라 그 이미지를 잰 값이다(7.3).');
+}
+
 const dirty = [...new Set(all.filter((r) => r.row.dirty === true).map((r) => r.row.strategy))];
 if (dirty.length > 0) {
   console.log(`> ⚠ **커밋되지 않은 변경으로 잰 실행이 있다** — ${dirty.join(', ')}`);

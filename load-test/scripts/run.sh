@@ -58,12 +58,43 @@ export MEASURE_SESSION
 # (--build 없이 up -d 하면 이미지는 그대로다) 이 값은 "그때 트리가 무엇이었나"의
 # 기록이지 "이미지가 무엇으로 빌드됐나"의 보증이 아니다. 재측정 전에
 # docker compose up -d --build로 맞추는 것이 전제다.
-MEASURE_COMMIT="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+# **`git -C`를 쓰지 않는다.** 위에서 MSYS_NO_PATHCONV=1을 걸어 두어 Windows git이
+# `/e/Project/...` 같은 MSYS 경로를 해석하지 못한다 — 실제로 해시가 조용히
+# unknown으로 찍혔다. 스크립트가 이미 $ROOT로 cd 해 두었으므로 그냥 부른다.
+MEASURE_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 MEASURE_DIRTY=no
-if [ -n "$(git -C "$ROOT" status --porcelain 2>/dev/null)" ]; then
+if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
   MEASURE_DIRTY=yes
 fi
 export MEASURE_COMMIT MEASURE_DIRTY
+
+# **실제로 잰 것은 트리가 아니라 이미지다.** 위 해시는 "그때 트리가 무엇이었나"의
+# 기록일 뿐이고, 앱은 --build 없이 up -d 하면 예전에 빌드된 이미지로 계속 돈다.
+# 7.8.2가 정확히 그 상태였다 — 트리는 #93까지 가 있었는데 이미지는 15:18
+# 빌드본이었고, "무엇을 잰 것인가"를 사람이 사후에 역추적해야 했다.
+#
+# **오래된 이미지가 곧 잘못은 아니다.** 같은 조건을 유지하려고 일부러 다시
+# 빌드하지 않는 경우가 있다(7.3). 모르고 그런 것과 알고 그런 것이 다를 뿐이라
+# 눈에 보이게만 한다.
+#
+# 실행 중인 컨테이너에서 읽는다 — `docker compose config --images app1`은 서비스
+# 이름을 필터로 받지 않고 첫 이미지를 돌려준다(실제로 redis가 나왔다).
+APP_IMAGE_ID="$(docker inspect "$(docker compose ps -q app1 2>/dev/null)" \
+  --format '{{.Image}}' 2>/dev/null || echo '')"
+MEASURE_IMAGE="$(printf %s "${APP_IMAGE_ID}" | cut -c8-19)"
+[ -n "$MEASURE_IMAGE" ] || MEASURE_IMAGE=unknown
+MEASURE_IMAGE_BUILT="$(docker image inspect "${APP_IMAGE_ID:-holdfast-app1}" \
+  --format '{{.Created}}' 2>/dev/null || echo unknown)"
+MEASURE_IMAGE_STALE=unknown
+if [ "$MEASURE_IMAGE_BUILT" != "unknown" ]; then
+  head_epoch="$(git log -1 --format=%ct 2>/dev/null || echo 0)"
+  img_epoch="$(date -d "$MEASURE_IMAGE_BUILT" +%s 2>/dev/null || echo 0)"
+  if [ "$img_epoch" -gt 0 ] && [ "$head_epoch" -gt 0 ]; then
+    if [ "$img_epoch" -lt "$head_epoch" ]; then MEASURE_IMAGE_STALE=yes;
+    else MEASURE_IMAGE_STALE=no; fi
+  fi
+fi
+export MEASURE_IMAGE MEASURE_IMAGE_BUILT MEASURE_IMAGE_STALE
 
 # docker compose run은 -e 옵션이 서비스명(k6) 앞에 와야 한다.
 #   run [옵션...] <서비스> <커맨드...>
@@ -72,7 +103,13 @@ k6_run() {
   local script="$1"
   shift
   docker compose -f docker-compose.yml -f docker-compose.k6.yml \
-    --profile load run --rm -e "MEASURE_SESSION=$MEASURE_SESSION"     -e "MEASURE_COMMIT=$MEASURE_COMMIT" -e "MEASURE_DIRTY=$MEASURE_DIRTY"     "$@" k6 run "$script"
+    --profile load run --rm \
+    -e "MEASURE_SESSION=$MEASURE_SESSION" \
+    -e "MEASURE_COMMIT=$MEASURE_COMMIT" \
+    -e "MEASURE_DIRTY=$MEASURE_DIRTY" \
+    -e "MEASURE_IMAGE=$MEASURE_IMAGE" \
+    -e "MEASURE_IMAGE_STALE=$MEASURE_IMAGE_STALE" \
+    "$@" k6 run "$script"
 }
 
 if [ "${1:-}" = "smoke" ]; then
@@ -168,12 +205,17 @@ preflight() {
 preflight
 
 echo "[run] 측정 세션 = $MEASURE_SESSION"
+echo "[run]   결과 파일명에 들어간다. 여러 전략을 한 묶음으로 재려면 루프 밖에서"
+echo "[run]   MEASURE_SESSION을 고정하라 — 그러지 않으면 전략마다 세션이 갈린다."
 echo "[run] 측정 대상 커밋 = $MEASURE_COMMIT (작업 트리 변경 있음: $MEASURE_DIRTY)"
+echo "[run] 측정 대상 이미지 = $MEASURE_IMAGE (빌드 $MEASURE_IMAGE_BUILT)"
+if [ "$MEASURE_IMAGE_STALE" = "yes" ]; then
+  echo "[run]   ※ 이미지가 HEAD 커밋보다 오래됐다. 트리가 아니라 이 이미지를 잰다."
+  echo "[run]     의도한 것이면 그대로 두고, 아니면 docker compose up -d --build."
+fi
 if [ "$MEASURE_DIRTY" = "yes" ]; then
   echo "[run]   !! 커밋되지 않은 변경이 있다. 이 해시만으로는 재현되지 않는다."
 fi
-echo "[run]   결과 파일명에 들어간다. 여러 전략을 한 묶음으로 재려면 루프 밖에서"
-echo "[run]   MEASURE_SESSION을 고정하라 — 그러지 않으면 전략마다 세션이 갈린다."
 
 # 기준선. 1회차의 델타를 내려면 첫 실행 **전** 값이 있어야 한다.
 snapshot_metrics "run0"

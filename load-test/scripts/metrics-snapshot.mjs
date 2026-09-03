@@ -164,6 +164,8 @@ if (args.out) {
     // 값이 들어가지만 이쪽에도 남긴다 — 스냅샷만 따로 보게 되는 경우가 있다.
     commit: process.env.MEASURE_COMMIT ?? null,
     dirty: process.env.MEASURE_DIRTY === 'yes',
+    image: process.env.MEASURE_IMAGE ?? null,
+    imageStale: process.env.MEASURE_IMAGE_STALE ?? null,
     run: args.run ?? null,
     snapshots,
   }, null, 2));

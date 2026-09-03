@@ -31,6 +31,9 @@ export function extractRow(data, cfg) {
     // 이름은 바뀌지만 "무엇을 잰 것인가"는 값과 함께 다녀야 한다.
     commit: cfg.measureCommit,
     dirty: cfg.measureDirty === true,
+    // 실제로 잰 이미지. 커밋은 트리의 기록이고 이것이 앱의 기록이다.
+    image: cfg.measureImage,
+    imageStale: cfg.measureImageStale,
     run: cfg.run,
     vus: cfg.vus,
     seats: cfg.seats,

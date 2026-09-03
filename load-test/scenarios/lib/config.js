@@ -102,6 +102,13 @@ export function loadConfig() {
   const measureCommit = __ENV.MEASURE_COMMIT || 'unknown';
   const measureDirty = __ENV.MEASURE_DIRTY === 'yes';
 
+  // **실제로 잰 것은 트리가 아니라 이미지다.** 앱은 --build 없이 up -d 하면
+  // 예전 이미지로 계속 도므로, 커밋 해시만으로는 무엇을 쟀는지 확정되지 않는다.
+  // imageStale은 "이미지가 HEAD 커밋보다 오래됐다"는 뜻이며, 같은 조건을
+  // 유지하려고 일부러 그렇게 두는 경우가 있어 오류가 아니라 사실 기록이다.
+  const measureImage = __ENV.MEASURE_IMAGE || 'unknown';
+  const measureImageStale = __ENV.MEASURE_IMAGE_STALE || 'unknown';
+
   // 좌석 ID는 시드가 만든 연속 구간을 쓴다(sql/seed.sql).
   const seatIdBase = intEnv('SEAT_ID_BASE', 1);
   const sessionId = intEnv('SESSION_ID', 1);
@@ -127,6 +134,8 @@ export function loadConfig() {
     measureSession,
     measureCommit,
     measureDirty,
+    measureImage,
+    measureImageStale,
     sessionId,
     seatIdBase,
     seatsPerHold,
