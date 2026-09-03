@@ -24,6 +24,19 @@
     let countdownTimer = null;
     let lastEtag = null;                     // 폴링 조건부 요청용
 
+    // 내 홀드가 만료된 좌석. **다시 고를 수 있어야 한다.**
+    //
+    // 만료 정리는 "누군가 그 좌석에 홀드를 시도할 때" 일어나고(lazy 검증,
+    // concurrency-spec 3절 — 청소 스케줄러는 M4에도 만들지 않는다), 재고
+    // 상태는 그때까지 HELD로 남는다. 그런데 HELD 좌석의 클릭을 막으면
+    // 시도 자체가 일어나지 않아 좌석이 화면에서 영영 회색으로 굳는다.
+    //
+    // 폴링 응답에는 heldUntil이 없어(openapi: 매초 바뀌면 ETag가 무의미해진다)
+    // 클라이언트가 남의 홀드의 만료 여부는 알 수 없다. 하지만 **내 홀드의
+    // 만료는 안다** — 그 좌석만 다시 열어 준다. 실제로 아직 살아 있으면
+    // 홀드 요청이 409로 거절되고 그 사유가 화면에 나온다.
+    const expiredMine = new Set();
+
     // openapi: "holdId는 클라이언트가 보관한다"는 페이지 새로고침에도 유효해야
     // 한다. 서버 세션이 아니라 이 브라우저의 localStorage에 두므로 concurrency-spec
     // 0.4(서버 세션 금지)와 충돌하지 않는다.
@@ -131,14 +144,19 @@
 
     // --- 서버 status fragment 교체 후, 내 선택/내 홀드 표시를 다시 덧입힌다 ---
 
+    /** 이 좌석을 고를 수 있는가. 만료된 내 홀드의 좌석도 포함한다. */
+    function isSelectable(el) {
+        if (!el) return false;
+        return el.dataset.status === "AVAILABLE" || expiredMine.has(Number(el.dataset.seatId));
+    }
+
     function applyOverlay() {
         const g = grid();
         if (!g) return;
 
-        // 남이 가져가 더 이상 AVAILABLE이 아닌 선택 좌석은 선택에서 제거
+        // 남이 가져가 더 이상 고를 수 없게 된 좌석은 선택에서 제거
         for (const id of [...selected]) {
-            const el = seatEl(id);
-            if (!el || el.dataset.status !== "AVAILABLE") {
+            if (!isSelectable(seatEl(id))) {
                 selected.delete(id);
             }
         }
@@ -146,6 +164,9 @@
             const id = Number(el.dataset.seatId);
             el.classList.toggle("is-selected", selected.has(id));
             el.classList.toggle("is-held-mine", !!hold && hold.seatIds.has(id));
+            // 만료된 내 좌석은 회색이지만 다시 고를 수 있다는 것을 보여준다.
+            el.classList.toggle("is-expired-mine", expiredMine.has(id));
+            if (expiredMine.has(id)) el.disabled = false;
         });
         renderSelection();
     }
@@ -173,6 +194,10 @@
             el.classList.remove("is-available", "is-held", "is-sold");
             el.classList.add(STATUS_CLASS[status] || "is-held");
             el.disabled = status !== "AVAILABLE";
+
+            // 서버가 회수했거나(AVAILABLE) 남에게 팔린(SOLD) 좌석은 더 이상
+            // "만료된 내 좌석"이 아니다. HELD로 남아 있는 동안만 열어 둔다.
+            if (status !== "HELD") expiredMine.delete(Number(id));
         });
         applyOverlay();
     }
@@ -236,6 +261,8 @@
             seatIds: new Set(data.seatIds),
             expiresAt: Date.now() + Number(data.expiresInSeconds) * 1000,
         };
+        // 다시 잡는 데 성공했으면 "만료된 내 좌석"이 아니다.
+        for (const id of hold.seatIds) expiredMine.delete(id);
         saveHold();
         showHoldPanel();
     }
@@ -279,7 +306,10 @@
         const remainMs = hold.expiresAt - Date.now();
         if (remainMs <= 0) {
             countdownEl.textContent = "00:00";
-            showMessage("선점이 만료되었습니다.", "warn");
+            // 만료된 좌석을 기억해 둔다. 재고는 아직 HELD이지만(lazy 검증)
+            // 다시 고를 수 있어야 한다 — expiredMine 선언부 참고.
+            for (const id of hold.seatIds) expiredMine.add(id);
+            showMessage("선점이 만료되었습니다. 같은 좌석을 다시 선택할 수 있습니다.", "warn");
             leaveHold();
             return;
         }
@@ -360,7 +390,9 @@
     document.addEventListener("click", (e) => {
         const btn = e.target.closest(".seat");
         if (!btn || !grid() || !grid().contains(btn)) return;
-        if (btn.dataset.status !== "AVAILABLE") return; // HELD/SOLD 무시
+        // HELD/SOLD는 무시한다. 단 만료된 내 홀드의 좌석은 다시 고를 수 있다
+        // (expiredMine 선언부의 설명 참고).
+        if (!isSelectable(btn)) return;
         toggleSelect(Number(btn.dataset.seatId));
     });
 
