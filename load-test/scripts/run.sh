@@ -45,6 +45,26 @@ export MSYS_NO_PATHCONV=1
 MEASURE_SESSION="${MEASURE_SESSION:-$(date +%Y%m%d-%H%M)}"
 export MEASURE_SESSION
 
+# **측정 대상 커밋.** 어느 코드를 잰 것인지 결과에 남긴다(7.3 고정 변수).
+#
+# 이것이 없으면 나중에 결과 해석이 흔들린다. 실제로 7.8 확장 측정 40분 사이에
+# main에 세 번 머지가 일어났고, 그때는 "무엇을 잰 것인가"를 컨테이너 이미지
+# 빌드 시각으로 역추적해야 했다.
+#
+# **dirty 여부를 함께 남기는 이유는 해시만으로 재현되지 않기 때문이다.**
+# 커밋되지 않은 변경으로 잰 결과는 그 해시를 체크아웃해도 같은 코드가 아니다.
+#
+# 앱은 이미지로 도는데 이 값은 작업 트리에서 읽는다. 둘이 어긋날 수 있으므로
+# (--build 없이 up -d 하면 이미지는 그대로다) 이 값은 "그때 트리가 무엇이었나"의
+# 기록이지 "이미지가 무엇으로 빌드됐나"의 보증이 아니다. 재측정 전에
+# docker compose up -d --build로 맞추는 것이 전제다.
+MEASURE_COMMIT="$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+MEASURE_DIRTY=no
+if [ -n "$(git -C "$ROOT" status --porcelain 2>/dev/null)" ]; then
+  MEASURE_DIRTY=yes
+fi
+export MEASURE_COMMIT MEASURE_DIRTY
+
 # docker compose run은 -e 옵션이 서비스명(k6) 앞에 와야 한다.
 #   run [옵션...] <서비스> <커맨드...>
 # 첫 인자로 스크립트 경로를 받고, 나머지 인자는 -e 플래그로 그대로 넘긴다.
@@ -52,7 +72,7 @@ k6_run() {
   local script="$1"
   shift
   docker compose -f docker-compose.yml -f docker-compose.k6.yml \
-    --profile load run --rm -e "MEASURE_SESSION=$MEASURE_SESSION" "$@" k6 run "$script"
+    --profile load run --rm -e "MEASURE_SESSION=$MEASURE_SESSION"     -e "MEASURE_COMMIT=$MEASURE_COMMIT" -e "MEASURE_DIRTY=$MEASURE_DIRTY"     "$@" k6 run "$script"
 }
 
 if [ "${1:-}" = "smoke" ]; then
@@ -148,6 +168,10 @@ preflight() {
 preflight
 
 echo "[run] 측정 세션 = $MEASURE_SESSION"
+echo "[run] 측정 대상 커밋 = $MEASURE_COMMIT (작업 트리 변경 있음: $MEASURE_DIRTY)"
+if [ "$MEASURE_DIRTY" = "yes" ]; then
+  echo "[run]   !! 커밋되지 않은 변경이 있다. 이 해시만으로는 재현되지 않는다."
+fi
 echo "[run]   결과 파일명에 들어간다. 여러 전략을 한 묶음으로 재려면 루프 밖에서"
 echo "[run]   MEASURE_SESSION을 고정하라 — 그러지 않으면 전략마다 세션이 갈린다."
 

@@ -27,6 +27,10 @@ export function extractRow(data, cfg) {
     // 측정 세션 태그. summarize.mjs가 세션을 가를 때 **파일명이 아니라 이 값**을
     // 본다 — 파일은 이름이 바뀌어도 내용은 자기가 어느 묶음인지 알고 있어야 한다.
     session: cfg.measureSession,
+    // 측정 대상 커밋(7.3). 파일명이 아니라 결과 안에 둔다 — 파일은 옮겨지고
+    // 이름은 바뀌지만 "무엇을 잰 것인가"는 값과 함께 다녀야 한다.
+    commit: cfg.measureCommit,
+    dirty: cfg.measureDirty === true,
     run: cfg.run,
     vus: cfg.vus,
     seats: cfg.seats,

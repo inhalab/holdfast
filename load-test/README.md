@@ -321,6 +321,22 @@ for s in none pessimistic optimistic unique redis; do
 done
 ```
 
+### 측정 대상 커밋도 함께 남는다
+
+`run.sh`가 시작할 때 커밋 해시와 작업 트리 dirty 여부를 찍고, k6 결과의
+`row.commit`·`row.dirty`와 메트릭 스냅샷에 남긴다(7.3).
+
+```
+[run] 측정 대상 커밋 = a1b2c3d (작업 트리 변경 있음: no)
+```
+
+**한 세션 안에서 해시가 갈리면 `summarize.mjs`가 경고한다.** 세션을 쪼개지는
+않는다 — 어느 전략이 어느 해시였는지 보여주고 폐기 여부는 사람이 정한다.
+
+**앱은 이미지로 돌므로 `--build` 없이 `up -d`하면 이미지는 그대로다.** 이 값은
+"그때 트리가 무엇이었나"의 기록이지 이미지의 보증이 아니다. 측정 전에
+`docker compose up -d --build`로 맞춘다.
+
 **`summarize.mjs`는 지정이 없으면 가장 최근 세션만 읽는다.**
 
 ```bash

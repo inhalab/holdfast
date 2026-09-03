@@ -95,6 +95,13 @@ export function loadConfig() {
   // 이쪽은 "언제 잰 묶음인가"이고 저쪽은 "어느 회차를 재는가"다.
   const measureSession = __ENV.MEASURE_SESSION || 'adhoc';
 
+  // **측정 대상 커밋.** 7.3 고정 변수 — "같은 이미지 2대"와 같은 성격이다.
+  // 어느 코드를 잰 것인지 결과 자체가 들고 있어야 나중에 해석이 흔들리지 않는다.
+  // dirty는 "커밋되지 않은 변경이 있었다"는 뜻이며, 그 경우 해시만으로는
+  // 재현되지 않는다.
+  const measureCommit = __ENV.MEASURE_COMMIT || 'unknown';
+  const measureDirty = __ENV.MEASURE_DIRTY === 'yes';
+
   // 좌석 ID는 시드가 만든 연속 구간을 쓴다(sql/seed.sql).
   const seatIdBase = intEnv('SEAT_ID_BASE', 1);
   const sessionId = intEnv('SESSION_ID', 1);
@@ -118,6 +125,8 @@ export function loadConfig() {
     isFinalRun,
     rampSec,
     measureSession,
+    measureCommit,
+    measureDirty,
     sessionId,
     seatIdBase,
     seatsPerHold,

@@ -160,6 +160,10 @@ if (args.out) {
     capturedAt: new Date().toISOString(),
     strategy: args.strategy ?? null,
     scenario: args.scenario ?? null,
+    // 측정 대상 커밋(7.3). run.sh가 환경변수로 넘긴다. k6 결과 JSON에도 같은
+    // 값이 들어가지만 이쪽에도 남긴다 — 스냅샷만 따로 보게 되는 경우가 있다.
+    commit: process.env.MEASURE_COMMIT ?? null,
+    dirty: process.env.MEASURE_DIRTY === 'yes',
     run: args.run ?? null,
     snapshots,
   }, null, 2));
