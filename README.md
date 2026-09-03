@@ -102,7 +102,7 @@ docs/        설계 명세, ERD, 측정 결과
 docker compose up -d                    # 앱 2대 + DB + Redis + nginx
 load-test/scripts/run.sh smoke          # k6 실행 환경·집계 파이프라인 확인
 DURATION_SEC=120 load-test/scripts/run.sh high pessimistic   # 본 측정
-node load-test/scripts/summarize.mjs --scenario high   # 7.6 기록 양식 표
+load-test/scripts/summarize.mjs --scenario high        # 7.6 기록 양식 표
 ```
 
 전략을 바꿔 측정할 때는 `HOLDFAST_STRATEGY`를 넘겨 앱 2대를 다시 띄운다.

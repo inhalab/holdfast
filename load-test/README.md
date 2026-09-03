@@ -44,6 +44,7 @@ scripts/
   metrics-snapshot.mjs **회차 직후 Actuator 스냅샷 (7.4.2).** 커넥션 풀 +
                        앱 커스텀 메트릭(재시도·소진·제약 위반)
   summarize.mjs        7.6 기록 양식 표 출력 (3회 중앙값)
+                       두 .mjs는 shebang으로 직접 실행한다 — Windows 주의 참조
 results/               실행 결과 JSON·검증 출력 (gitignore 대상)
 ```
 
@@ -68,8 +69,8 @@ load-test/scripts/run.sh smoke
 # 3) 본 측정 — 전략 1개 × 3회 반복
 load-test/scripts/run.sh high pessimistic
 
-# 4) 7.6 기록 양식 표로 요약
-node load-test/scripts/summarize.mjs --scenario high
+# 4) 7.6 기록 양식 표로 요약 (node를 붙이지 않는다 — Windows 주의 참조)
+load-test/scripts/summarize.mjs --scenario high
 
 # 5) 데드락 회피 검증 (성능 측정이 아니다. 판정은 데드락 0건)
 load-test/scripts/run-deadlock.sh pessimistic high
@@ -110,6 +111,32 @@ Git Bash는 `/scenarios/smoke.js` 같은 인자를 Windows 경로(`C:/Program Fi
 MSYS_NO_PATHCONV=1 docker compose -f docker-compose.yml -f docker-compose.k6.yml \
   --profile load run --rm k6 run /scenarios/smoke.js
 ```
+
+**`node …` 출력을 파일로 넘기면 `stdin is not a tty`로 실패한다.** 스크립트의
+문제가 아니라 Git Bash가 `node`를 가로채기 때문이다.
+
+```bash
+$ node load-test/scripts/summarize.mjs --scenario high > 7.6.md
+stdin is not a tty          # 표는 안 나오고 파일은 0바이트로 남는다
+```
+
+Git for Windows의 `/etc/profile.d/aliases.sh`가 mintty(`TERM=xterm*`)에서
+`node`를 **`winpty node.exe`로 별칭 처리한다.** `winpty`는 Win32 콘솔이 필요한
+프로그램을 대화형으로 쓰려고 붙인 것인데, 표준 입출력이 터미널이 아니면 거부한다.
+그래서 **화면으로 볼 때는 멀쩡하고 리다이렉트하거나 파이프할 때만** 터진다.
+
+**해결: 스크립트를 직접 실행한다.** shebang(`#!/usr/bin/env node`)이 PATH에서
+`node`를 찾으므로 셸 별칭을 지나지 않는다.
+
+```bash
+load-test/scripts/summarize.mjs --scenario high > 7.6.md
+load-test/scripts/metrics-snapshot.mjs --strategy pessimistic
+```
+
+`node`를 꼭 앞에 붙여야 하면 별칭을 우회하는 형태 아무거나 쓴다 —
+`command node …`, `\node …`, `env node …`. `run.sh`가 내부에서
+`env -u MSYS_NO_PATHCONV node`로 부르는 덕에 측정 실행 자체는 이 문제를 겪지
+않았고, 그래서 결과를 옮길 때에만 드러난다.
 
 ## 경합도 3단계 (7.2)
 

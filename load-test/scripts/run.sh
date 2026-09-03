@@ -131,4 +131,7 @@ done
 
 echo
 echo "[run] 완료. 요약:"
-echo "  node load-test/scripts/summarize.mjs --strategy $STRATEGY --scenario $SCENARIO"
+# node를 앞에 붙이지 않는다. Git Bash가 mintty에서 node를 winpty로 별칭 처리해,
+# 이 명령을 그대로 복사해 파일로 리다이렉트하면 stdin is not a tty로 실패한다
+# (load-test/README.md의 Windows 주의). shebang 직접 실행은 별칭을 지나지 않는다.
+echo "  load-test/scripts/summarize.mjs --strategy $STRATEGY --scenario $SCENARIO"
