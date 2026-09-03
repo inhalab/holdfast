@@ -84,6 +84,17 @@ export function loadConfig() {
     throw new Error(`RAMP_SEC(${rampSec})는 WARMUP_SEC(${warmupSec})보다 작아야 한다`);
   }
 
+  // **측정 세션 태그.** run.sh가 실행 시작 때 한 번 만들어 회차마다 넘긴다.
+  //
+  // 이것이 없으면 재측정이 같은 이름으로 이전 측정을 덮는다. 실제로 그렇게
+  // 잃었다 — 7.8 확장 측정이 optimistic·unique·redis의 M3 고경합 원본을
+  // 덮었고(docs/results/discarded-measurements.md 4번), 그 폐기분을 격리한
+  // 뒤에도 다음 재측정이 같은 일을 반복할 상태였다.
+  //
+  // DB의 SESSION_ID(event_session 행)와 다른 것이다. 이름이 비슷하니 주의한다 —
+  // 이쪽은 "언제 잰 묶음인가"이고 저쪽은 "어느 회차를 재는가"다.
+  const measureSession = __ENV.MEASURE_SESSION || 'adhoc';
+
   // 좌석 ID는 시드가 만든 연속 구간을 쓴다(sql/seed.sql).
   const seatIdBase = intEnv('SEAT_ID_BASE', 1);
   const sessionId = intEnv('SESSION_ID', 1);
@@ -106,6 +117,7 @@ export function loadConfig() {
     durationSec,
     isFinalRun,
     rampSec,
+    measureSession,
     sessionId,
     seatIdBase,
     seatsPerHold,
@@ -129,6 +141,13 @@ export function stagesFor(cfg) {
   ];
 }
 
+/**
+ * 결과 파일 경로. **측정 세션 태그가 이름에 들어간다.**
+ *
+ * 세션을 빼면 재측정이 같은 이름으로 이전 묶음을 덮는다. 태그는 정렬하면
+ * 시간순이 되는 형식(YYYYMMDD-HHMM)이라 `summarize.mjs`가 최신 세션을
+ * 문자열 비교만으로 고를 수 있다.
+ */
 export function resultPath(cfg) {
-  return `/results/${cfg.strategy}-${cfg.scenario}-run${cfg.run}.json`;
+  return `/results/${cfg.strategy}-${cfg.scenario}-${cfg.measureSession}-run${cfg.run}.json`;
 }

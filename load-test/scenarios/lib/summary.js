@@ -24,6 +24,9 @@ export function extractRow(data, cfg) {
   return {
     strategy: cfg.strategy,
     scenario: cfg.scenario,
+    // 측정 세션 태그. summarize.mjs가 세션을 가를 때 **파일명이 아니라 이 값**을
+    // 본다 — 파일은 이름이 바뀌어도 내용은 자기가 어느 묶음인지 알고 있어야 한다.
+    session: cfg.measureSession,
     run: cfg.run,
     vus: cfg.vus,
     seats: cfg.seats,

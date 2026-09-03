@@ -1121,6 +1121,11 @@ UPDATE가 좌석을 `AVAILABLE`로 되돌린다. 살아남은 예약이 `CONFIRM
 
 이 파일들은 원본이므로 커밋하지 않는다. 채택본만 `docs/results/`로 옮긴다.
 
+**파일명에는 측정 세션 태그가 들어간다** — `{전략}-{시나리오}-{세션}-run{회차}`.
+없으면 재측정이 이전 묶음을 같은 이름으로 덮고, 실제로 7.8 확장 측정이 M3의
+고경합 원본을 그렇게 잃었다([`results/discarded-measurements.md`](results/discarded-measurements.md) 4번).
+`summarize.mjs`는 지정이 없으면 **가장 최근 세션만** 읽는다.
+
 **이 조사의 전말은 [`results/p95-inversion-investigation.md`](results/p95-inversion-investigation.md)에 있다.**
 작업량 가설을 세우고 성공 건수와 코드 경로로 반증한 기록이며, "락을 걸었더니
 빨라졌다"로 읽히지 않게 하는 것이 그 문서의 목적이다.

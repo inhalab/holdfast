@@ -1,7 +1,19 @@
 #!/usr/bin/env node
 // summarize.mjs — 측정 결과를 설계서 7.6 기록 양식 표로 출력한다.
 //
-//   node load-test/scripts/summarize.mjs [--scenario high] [--strategy pessimistic]
+//   load-test/scripts/summarize.mjs [--scenario high] [--strategy pessimistic]
+//                                    [--session 20260903-1745 | --session all]
+//
+// ## 측정 세션
+//
+// 결과 파일명과 row.session에 측정 세션 태그가 들어간다. **지정하지 않으면
+// 가장 최근 세션만 읽는다** — 재측정한 값과 예전 값이 한 중앙값에 섞이는 것을
+// 막기 위해서다. 실제로 그렇게 섞여 폐기분과 M3 원본이 함께 집힌 적이 있다
+// (docs/results/discarded-measurements.md 4번).
+//
+// 세션 태그는 정렬하면 시간순이 되는 형식(YYYYMMDD-HHMM)이라 최신 판정이
+// 문자열 비교로 끝난다. 태그가 없는 옛 파일은 `(이전)`으로 묶이며, 진짜 세션
+// 태그보다 항상 낮게 정렬돼 새 세션이 하나라도 있으면 밀려난다.
 //
 // 7.4: 전략당 3회 반복 후 **중앙값**을 채택한다. 평균이 아니라 중앙값인 이유는
 // GC 일시정지 같은 단발 이상치가 평균을 끌고 가기 때문이다.
@@ -52,9 +64,18 @@ function median(xs) {
   return v.length % 2 ? v[mid] : (v[mid - 1] + v[mid]) / 2;
 }
 
+/** 세션 태그가 없는 옛 결과의 묶음 이름. 어떤 실제 태그보다도 낮게 정렬된다. */
+const LEGACY_SESSION = '(이전)';
+
+function sessionOf(row) {
+  return row.session || LEGACY_SESSION;
+}
+
 function loadRuns(scenario, strategy) {
   if (!existsSync(RESULTS_DIR)) return [];
   return readdirSync(RESULTS_DIR)
+    // **최상위만 읽는다.** 재귀하지 않으므로 results/discarded/ 에 격리해 둔
+    // 폐기분은 잡히지 않는다 — 치워 둔 것을 다시 집으면 의미가 없다.
     .filter((f) => f.endsWith('.json') && f !== 'smoke-summary.json')
     .map((f) => {
       try { return { file: f, ...JSON.parse(readFileSync(join(RESULTS_DIR, f), 'utf8')) }; }
@@ -63,6 +84,19 @@ function loadRuns(scenario, strategy) {
     .filter((r) => r && r.row)
     .filter((r) => (!scenario || r.row.scenario === scenario))
     .filter((r) => (!strategy || r.row.strategy === strategy));
+}
+
+/**
+ * 세션을 고른다. 지정이 없으면 **가장 최근 세션 하나**만 남긴다.
+ *
+ * `--session all`이면 전부 남긴다 — 세션 간 비교를 손으로 할 때 쓰고,
+ * 이때 나오는 중앙값은 여러 묶음이 섞인 값이라 기록 양식에 싣지 않는다.
+ */
+function selectSession(runs, requested) {
+  const available = [...new Set(runs.map((r) => sessionOf(r.row)))].sort();
+  if (requested === 'all') return { runs, picked: 'all', available };
+  const picked = requested || available[available.length - 1];
+  return { runs: runs.filter((r) => sessionOf(r.row) === picked), picked, available };
 }
 
 function fmtMs(v) { return v === null ? '?' : `${Math.round(v)}ms`; }
@@ -217,13 +251,29 @@ function renderSustained(rows) {
 }
 
 const args = parseArgs(process.argv);
-const all = loadRuns(args.scenario, args.strategy);
+const loaded = loadRuns(args.scenario, args.strategy);
 
-if (all.length === 0) {
+if (loaded.length === 0) {
   console.log('결과 파일이 없다. 먼저 측정을 실행한다:');
   console.log('  load-test/scripts/run.sh high pessimistic');
   process.exit(0);
 }
+
+const { runs: all, picked, available } = selectSession(loaded, args.session);
+
+if (all.length === 0) {
+  console.log(`세션 ${picked} 의 결과가 없다. 있는 세션: ${available.join(', ')}`);
+  process.exit(1);
+}
+
+// **어느 묶음을 읽었는지 먼저 밝힌다.** 표만 보면 그 숫자가 어느 측정의 것인지
+// 알 수 없고, 그것을 모른 채 기록 양식에 옮기는 것이 이 기능을 만든 이유다.
+console.log(`<!-- 측정 세션: ${picked}${available.length > 1 ? ` (전체: ${available.join(', ')}) ` : ' '}-->`);
+if (picked === 'all' && available.length > 1) {
+  console.log('> ⚠ `--session all` — 여러 측정 묶음이 한 중앙값에 섞여 있다.');
+  console.log('> **7.6 기록 양식에 싣지 않는다.** 세션을 지정해 다시 뽑는다.');
+}
+console.log();
 
 const scenarios = args.scenario ? [args.scenario] : [...new Set(all.map((r) => r.row.scenario))];
 for (const sc of scenarios) {
