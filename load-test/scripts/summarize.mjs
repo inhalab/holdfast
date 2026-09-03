@@ -92,10 +92,20 @@ function loadRuns(scenario, strategy) {
  * `--session all`이면 전부 남긴다 — 세션 간 비교를 손으로 할 때 쓰고,
  * 이때 나오는 중앙값은 여러 묶음이 섞인 값이라 기록 양식에 싣지 않는다.
  */
+/** run.sh가 만드는 태그 형식. 이 모양인 것만 "최신" 후보로 본다. */
+const SESSION_TAG = /^\d{8}-\d{4}$/;
+
 function selectSession(runs, requested) {
   const available = [...new Set(runs.map((r) => sessionOf(r.row)))].sort();
   if (requested === 'all') return { runs, picked: 'all', available };
-  const picked = requested || available[available.length - 1];
+
+  // **최신을 고를 때는 형식에 맞는 태그만 본다.** 단순 문자열 최대값으로 고르면
+  // 손으로 붙인 태그가 진짜 측정을 가린다 — 실제로 임시 실행에 쓴 `TESTONLY`가
+  // `2026...`보다 크게 정렬돼 기본 선택을 가로챈 적이 있다. 형식에 맞는 것이
+  // 하나도 없을 때만 전체에서 고른다.
+  const dated = available.filter((s) => SESSION_TAG.test(s));
+  const pool = dated.length > 0 ? dated : available;
+  const picked = requested || pool[pool.length - 1];
   return { runs: runs.filter((r) => sessionOf(r.row) === picked), picked, available };
 }
 
@@ -272,6 +282,45 @@ console.log(`<!-- 측정 세션: ${picked}${available.length > 1 ? ` (전체: ${
 if (picked === 'all' && available.length > 1) {
   console.log('> ⚠ `--session all` — 여러 측정 묶음이 한 중앙값에 섞여 있다.');
   console.log('> **7.6 기록 양식에 싣지 않는다.** 세션을 지정해 다시 뽑는다.');
+}
+
+// **한 세션 안에서 커밋이 갈리면 경고하되 세션을 쪼개지 않는다**(7.3).
+//
+// 세션은 "한 묶음으로 재려고 한 의도"의 라벨이고, 7.4.2의 대조군은 그 의도된
+// 묶음 안에서만 뜻이 있다. 해시가 다르다고 자동으로 쪼개면 대조군이 어느
+// 조각에 속하는지가 임의로 정해진다 — `none` 대조군만 다른 조각으로 떨어지면
+// 나머지 넷은 대조군 없는 묶음이 된다.
+//
+// 더 나쁜 것은 자동 분할이 오염을 감춘다는 점이다. 쪼개진 두 묶음이 각각
+// 깨끗해 보이지만 실제로는 서로 비교할 수 없는 값이다. 그래서 표는 그대로
+// 내되 어느 전략이 어느 해시였는지 보여주고, 폐기 여부는 사람이 정한다 —
+// "숫자 하나만 보고 판정하지 않는다"(discarded-measurements.md).
+const commits = [...new Set(all.map((r) => r.row.commit ?? '(기록 없음)'))];
+if (commits.length > 1) {
+  console.log(`> ⚠ **이 세션은 커밋 ${commits.length}개에 걸쳐 있다** — ${commits.join(', ')}`);
+  console.log('> 전략마다 다른 코드를 잰 것이므로 **전략 간 비교가 성립하지 않을 수 있다**(7.3).');
+  for (const c of commits) {
+    const who = [...new Set(all.filter((r) => (r.row.commit ?? '(기록 없음)') === c)
+                               .map((r) => r.row.strategy))];
+    console.log(`>   - \`${c}\` — ${who.join(', ')}`);
+  }
+  console.log('> 측정 대상 코드가 그 사이 바뀌었는지 확인하고, 바뀌었다면 폐기한다.');
+}
+// 이미지가 갈리면 커밋보다 더 직접적인 문제다 — 실제로 돌아간 바이너리가 다르다.
+const images = [...new Set(all.map((r) => r.row.image).filter(Boolean))];
+if (images.length > 1) {
+  console.log(`> ⚠ **이 세션은 앱 이미지 ${images.length}개에 걸쳐 있다** — ${images.join(', ')}`);
+  console.log('> 커밋이 같아도 다른 바이너리를 잰 것이다. 전략 간 비교가 성립하지 않는다(7.3).');
+}
+const stale = all.some((r) => r.row.imageStale === 'yes');
+if (stale) {
+  console.log('> ℹ 앱 이미지가 HEAD 커밋보다 오래됐다 — 트리가 아니라 그 이미지를 잰 값이다(7.3).');
+}
+
+const dirty = [...new Set(all.filter((r) => r.row.dirty === true).map((r) => r.row.strategy))];
+if (dirty.length > 0) {
+  console.log(`> ⚠ **커밋되지 않은 변경으로 잰 실행이 있다** — ${dirty.join(', ')}`);
+  console.log('> 해시만으로는 재현되지 않는다(7.3).');
 }
 console.log();
 
