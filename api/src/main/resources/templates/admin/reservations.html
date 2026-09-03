@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>관리자 — 예약 현황</title>
+    <link rel="stylesheet" th:href="@{/css/reservation.css}">
+</head>
+<body>
+<main class="page admin-page">
+    <h1>예약 현황</h1>
+    <p class="meta">조회 전용 화면이다. 회차·좌석배치 등록은 시드 스크립트로 한다(이슈 #82).</p>
+
+    <section class="card">
+        <h2>회차별 좌석 현황</h2>
+        <table class="admin-table" th:if="${not #maps.isEmpty(seatSummary)}">
+            <thead>
+                <tr>
+                    <th>회차</th>
+                    <th>AVAILABLE</th>
+                    <th>HELD</th>
+                    <th>SOLD</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="entry : ${seatSummary}">
+                    <td th:text="${entry.key}">1</td>
+                    <td th:text="${entry.value.get('AVAILABLE')} ?: 0">0</td>
+                    <td th:text="${entry.value.get('HELD')} ?: 0">0</td>
+                    <td th:text="${entry.value.get('SOLD')} ?: 0">0</td>
+                </tr>
+            </tbody>
+        </table>
+        <p th:if="${#maps.isEmpty(seatSummary)}">좌석 데이터가 없다.</p>
+    </section>
+
+    <section class="card">
+        <h2>예약 목록 <span class="meta">(최근 200건)</span></h2>
+        <table class="admin-table" th:if="${not #lists.isEmpty(reservations)}">
+            <thead>
+                <tr>
+                    <th>예약번호</th>
+                    <th>회차</th>
+                    <th>사용자</th>
+                    <th>상태</th>
+                    <th>좌석</th>
+                    <th>금액</th>
+                    <th>생성</th>
+                    <th>확정</th>
+                    <th>취소</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="r : ${reservations}">
+                    <td th:text="${r.reservationId}">1</td>
+                    <td th:text="${r.sessionId}">1</td>
+                    <td th:text="${r.userId}">1</td>
+                    <td><span class="status-badge" th:classappend="${r.status}" th:text="${r.status}">CONFIRMED</span></td>
+                    <td>
+                        <ul class="seat-chip-list">
+                            <li th:each="seat : ${r.seats}" th:text="${seat.zoneName} + ' ' + ${seat.seatNo}">A구역 A-1</li>
+                        </ul>
+                    </td>
+                    <td th:text="${r.totalAmount}">0</td>
+                    <td th:text="${r.createdAt}">-</td>
+                    <td th:text="${r.confirmedAt} ?: '-'">-</td>
+                    <td th:text="${r.cancelledAt} ?: '-'">-</td>
+                </tr>
+            </tbody>
+        </table>
+        <p th:if="${#lists.isEmpty(reservations)}">예약이 없다.</p>
+    </section>
+</main>
+</body>
+</html>

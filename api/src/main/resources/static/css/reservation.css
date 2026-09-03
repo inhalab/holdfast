@@ -106,3 +106,11 @@ body {
 
 .link-back { display: inline-block; margin-top: 8px; color: #2f6feb; text-decoration: none; }
 .link-back:hover { text-decoration: underline; }
+
+/* --- 관리자 표 (이슈 #82) --- */
+.admin-page { max-width: 960px; }
+.admin-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.admin-table th, .admin-table td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--card-border); }
+.admin-table th { color: #666; font-weight: 600; }
+.admin-table .seat-chip-list { gap: 4px; }
+.admin-table .seat-chip-list li { padding: 1px 6px; font-size: 11px; }
