@@ -58,6 +58,10 @@ import static org.assertj.core.api.Assertions.assertThat;
         "holdfast.strategy=optimistic",
         // 7.3 고정 변수를 그대로 쓴다. none 테스트는 경합 재현을 위해 풀을
         // 스레드 수보다 넉넉히(40) 잡지만, 측정 조건과 같은 30으로 둔다.
+        // 알림 Outbox 워커를 끈다(이슈 #78). 배경에서 1초마다 도는 워커가
+        // 확정으로 생긴 outbox 행을 집고 있으면 seed()의 TRUNCATE가 그 락을
+        // 기다린다. 이 테스트가 보는 것은 좌석 경합이지 알림이 아니다.
+        "holdfast.outbox.scheduler.enabled=false",
         "spring.datasource.hikari.maximum-pool-size=30",
         // 4.3의 시작값 그대로. 실패 모드 테스트만 이 값을 따로 낮춘다.
         "holdfast.optimistic.max-retries=3",

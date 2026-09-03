@@ -115,6 +115,40 @@ holdfast:
     outcome: ${MOCK_PG_OUTCOME:approve}
     # outcome=random일 때 승인이 나올 비율
     approve-ratio: ${MOCK_PG_APPROVE_RATIO:0.8}
+  # 알림 발송 Mock(REQ-05, 이슈 #78). 실제 발송은 design-spec 4.3 제외 항목이다.
+  #
+  # 기본값이 send인 이유는 Mock PG와 같다(7.3) — 부하 측정에 실패를 섞으면
+  # 재시도 부하가 확정 부하와 뒤엉켜 무엇을 재는지 흐려진다.
+  notification:
+    # send / fail / random
+    outcome: ${NOTIFICATION_OUTCOME:send}
+    # outcome=random일 때 실패가 나올 비율
+    fail-ratio: ${NOTIFICATION_FAIL_RATIO:0.0}
+  # 알림 Outbox 워커(REQ-05, 이슈 #78).
+  #
+  # **앱 2대에서 동시에 돈다.** 인스턴스 단위로 배제하지 않고 행 단위로 경쟁시킨다 —
+  # 근거는 OutboxWorker javadoc에 있다. 중복 발송은 클레임의 조건부 UPDATE가 막는다.
+  #
+  # 재시도 값이 optimistic(4.3)과 다른 이유는 기다리는 대상이 다르기 때문이다.
+  # 4.3은 같은 행을 다투는 다른 요청을 기다리므로 경합 창이 서브밀리초이고,
+  # 백오프가 곧 스레드 점유라 2ms로 짧다. 여기서는 회복되지 않은 외부 시스템을
+  # 기다리고, 실패한 행을 놓아준 뒤 next_retry_at만 적으므로 기다리는 동안
+  # 아무 자원도 쥐지 않는다. 1초를 쉬어도 워커는 그 사이 다른 행을 처리한다.
+  outbox:
+    scheduler:
+      # false면 워커는 그대로 두고 자동 실행만 멈춘다. 경합 테스트가 쓴다.
+      enabled: ${OUTBOX_SCHEDULER_ENABLED:true}
+    # 이전 사이클이 끝난 뒤부터 센다(fixedDelay). 겹쳐 쌓이지 않게 한다.
+    poll-interval-ms: ${OUTBOX_POLL_INTERVAL_MS:1000}
+    batch-size: ${OUTBOX_BATCH_SIZE:50}
+    # 최초 시도는 포함되지 않는다 — 5면 최대 6번 시도한다.
+    max-retries: ${OUTBOX_MAX_RETRIES:5}
+    backoff-base-ms: ${OUTBOX_BACKOFF_BASE_MS:1000}
+    backoff-max-ms: ${OUTBOX_BACKOFF_MAX_MS:60000}
+    # SENDING인 채로 이만큼 지나면 집은 워커가 죽은 것으로 보고 되찾는다.
+    # **발송 최대 소요 시간보다 넉넉해야 한다** — 짧으면 살아 있는 워커가
+    # 발송하는 동안 남이 같은 행을 가져가 중복 발송이 난다.
+    claim-timeout-seconds: ${OUTBOX_CLAIM_TIMEOUT_SECONDS:30}
 
 management:
   endpoints:
