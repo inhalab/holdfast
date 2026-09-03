@@ -5,6 +5,7 @@ import com.inhalab.holdfast.api.ErrorCode;
 import com.inhalab.holdfast.reservation.Reservation;
 import com.inhalab.holdfast.reservation.ReservationRepository;
 import com.inhalab.holdfast.reservation.ReservationService;
+import com.inhalab.holdfast.ticket.TicketService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,15 +44,18 @@ public class PaymentService {
     private final ReservationRepository reservationRepository;
     private final ReservationService reservationService;
     private final MockPaymentGateway gateway;
+    private final TicketService ticketService;
 
     public PaymentService(PaymentRepository paymentRepository,
                           ReservationRepository reservationRepository,
                           ReservationService reservationService,
-                          MockPaymentGateway gateway) {
+                          MockPaymentGateway gateway,
+                          TicketService ticketService) {
         this.paymentRepository = paymentRepository;
         this.reservationRepository = reservationRepository;
         this.reservationService = reservationService;
         this.gateway = gateway;
+        this.ticketService = ticketService;
     }
 
     /**
@@ -95,6 +99,9 @@ public class PaymentService {
             reservationStatus = confirmed.getStatus();
             payment.setStatus(PaymentStatus.APPROVED.name());
             payment.setApprovedAt(Instant.now());
+            // 발권(#80)은 확정과 같은 트랜잭션에서 일어난다 — 이유는
+            // TicketService#issueTickets 문서에 있다.
+            ticketService.issueTickets(confirmed.getId());
         } else {
             payment.setStatus(PaymentStatus.DECLINED.name());
         }
