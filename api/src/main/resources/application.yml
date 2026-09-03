@@ -101,6 +101,20 @@ holdfast:
   # 기본값이 none인 것은 M2가 베이스라인(실패 재현) 단계이기 때문이다.
   # none은 초과 예약을 막지 않는다 — 그것이 이 전략의 목적이다(4.1).
   strategy: ${HOLDFAST_STRATEGY:none}
+  # Mock PG(state-transitions.md 5.2 주입 파라미터).
+  #
+  # **기본값 approve는 concurrency-spec 7.3 고정 변수다.** 락 전략 비교 시나리오에
+  # 결제 거절·지연이 섞이면 어느 지연이 락 대기이고 어느 것이 결제인지 구분할 수
+  # 없게 되어 측정이 오염된다. 측정 시 이 값을 바꾸지 않는다.
+  #
+  # 5.2절의 delay-ms·delay-jitter-ms·callback-delay-ms와 outcome의 timeout·fail은
+  # 최소 완결 범위 밖이라(#79, #66) 아직 없다. 선언만 해두면 "주입했는데 아무 일도
+  # 안 일어나는" 상태가 되어 나중에 값이 먹은 줄 알고 잘못 읽게 된다.
+  mock-pg:
+    # approve / decline / random
+    outcome: ${MOCK_PG_OUTCOME:approve}
+    # outcome=random일 때 승인이 나올 비율
+    approve-ratio: ${MOCK_PG_APPROVE_RATIO:0.8}
 
 management:
   endpoints:

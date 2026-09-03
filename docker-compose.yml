@@ -66,6 +66,11 @@ services:
       # 현재 구현된 것은 none(베이스라인)뿐이다.
       # 주의: none으로 측정할 때는 seed.sh가 U-2 인덱스를 지운다(erd.md 3.1).
       HOLDFAST_STRATEGY: ${HOLDFAST_STRATEGY:-none}
+      # Mock PG 주입(state-transitions.md 5.2). 앱 2대가 반드시 같아야 한다 —
+      # 한쪽만 decline이면 어느 인스턴스가 받았는지에 따라 결과가 갈린다.
+      # 기본 approve는 7.3 고정 변수다. 락 측정 중에는 바꾸지 않는다.
+      MOCK_PG_OUTCOME: ${MOCK_PG_OUTCOME:-approve}
+      MOCK_PG_APPROVE_RATIO: ${MOCK_PG_APPROVE_RATIO:-0.8}
       REDIS_HOST: redis
       REDIS_PORT: 6379
     depends_on:
@@ -93,6 +98,11 @@ services:
       DB_NAME: holdfast
       JPA_DDL_AUTO: validate
       HOLDFAST_STRATEGY: ${HOLDFAST_STRATEGY:-none}
+      # Mock PG 주입(state-transitions.md 5.2). 앱 2대가 반드시 같아야 한다 —
+      # 한쪽만 decline이면 어느 인스턴스가 받았는지에 따라 결과가 갈린다.
+      # 기본 approve는 7.3 고정 변수다. 락 측정 중에는 바꾸지 않는다.
+      MOCK_PG_OUTCOME: ${MOCK_PG_OUTCOME:-approve}
+      MOCK_PG_APPROVE_RATIO: ${MOCK_PG_APPROVE_RATIO:-0.8}
       REDIS_HOST: redis
       REDIS_PORT: 6379
     depends_on:

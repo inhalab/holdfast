@@ -42,6 +42,8 @@ tags:
     description: 좌석 선점과 해제
   - name: reservations
     description: 예약 확정·조회·취소
+  - name: payments
+    description: Mock PG 결제
 
 paths:
   /api/sessions/{sessionId}/seats:
@@ -283,6 +285,56 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CancelResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/payments:
+    post:
+      tags: [payments]
+      operationId: payReservation
+      summary: 결제 시도 (Mock PG)
+      description: |
+        선점한 좌석에 대해 결제를 시도한다. **승인되면 예약이 확정된다** —
+        확정은 `POST /api/reservations`와 같은 경로를 그대로 쓰므로 락 전략과
+        만료 판정이 동일하게 적용된다(concurrency-spec 3절).
+
+        상태 기계의 정본은 `docs/state-transitions.md` 5절이다.
+
+        **거절(`DECLINED`)도 201이다.** 결제 거절은 오류가 아니라 결과이며,
+        409로 내보내면 k6의 409율(좌석 경합 지표)에 좌석과 무관한 건수가 섞인다
+        (concurrency-spec 7.1의 지표 분리).
+
+        재시도는 **새 결제 행**을 만든다. 기존 행이 `REQUESTED`로 되돌아가지
+        않는다(state-transitions 5절).
+
+        ## 최소 완결 범위
+
+        현재 도달하는 상태는 `APPROVED`와 `DECLINED`뿐이다(이슈 #79).
+        `TIMEOUT`·`FAILED`와 지연·콜백 주입(`callback-delay-ms` 등)은 여유
+        항목이라 아직 구현되지 않았다. `PaymentStatus` 열거형은 다섯 값을
+        유지한다 — 나중에 계약을 고치지 않기 위해서다.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+        - $ref: '#/components/parameters/UserIdHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentCreateRequest'
+      responses:
+        '201':
+          description: 결제 시도가 종결됐다. 승인·거절 여부는 `status`로 구분한다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
         '400':
           $ref: '#/components/responses/BadRequest'
         '404':
@@ -723,6 +775,71 @@ components:
           type: string
           format: uuid
           description: 확정할 선점의 식별자.
+
+    PaymentCreateRequest:
+      type: object
+      required: [holdId]
+      properties:
+        holdId:
+          type: string
+          format: uuid
+          description: |
+            결제할 선점의 식별자. 확정과 같은 식별자를 쓴다 — 예약 행은 홀드
+            시점에 생기지만 `reservationId`는 확정 응답에서만 노출되므로
+            (api-spec.md 1.2), 결제 시점에 클라이언트가 들고 있는 것은 `holdId`다.
+
+    PaymentStatus:
+      type: string
+      description: |
+        결제 시도 상태 (state-transitions.md 5절).
+
+        - REQUESTED — Mock PG 호출 직후. 응답에는 나오지 않는다(종결 후 반환)
+        - APPROVED — 승인. 이 전이가 예약을 확정시킨다
+        - DECLINED — 거절. 예약은 HELD로 남는다
+        - TIMEOUT — 승인 여부를 **모르는** 상태. **여유 항목, 아직 도달하지 않는다**
+        - FAILED — 승인이 없었음이 **확실한** 상태. **여유 항목, 아직 도달하지 않는다**
+
+        `CANCELLED`는 없다 — 결제 취소는 `reservation.status`가 담당하고,
+        `payment` 행은 한 번 종결되면 바뀌지 않는 이력이다(erd.md 4절).
+      enum: [REQUESTED, APPROVED, DECLINED, TIMEOUT, FAILED]
+
+    Payment:
+      type: object
+      description: 결제 시도 결과. 예약당 N건이며 재시도마다 새 행이 생긴다.
+      required: [paymentId, pgTxId, status, reservationId, reservationStatus, amount, serverTime]
+      properties:
+        paymentId:
+          type: integer
+          format: int64
+        pgTxId:
+          type: string
+          description: |
+            PG 거래 ID. U-8 유니크 제약이 걸려 있으며 콜백 멱등키다
+            (concurrency-spec 6절). 실제 PG라면 PG가 발급하지만 Mock에서는
+            서버가 만든다.
+        status:
+          $ref: '#/components/schemas/PaymentStatus'
+        reservationId:
+          type: integer
+          format: int64
+        reservationStatus:
+          type: string
+          description: |
+            결제 후의 예약 상태. 승인이면 `CONFIRMED`, 거절이면 `HELD` 그대로다.
+          enum: [HELD, PENDING_PAYMENT, CONFIRMED, CANCELLED, EXPIRED]
+        amount:
+          type: integer
+          format: int64
+          description: |
+            결제 금액. 요금 정책이 요구사항 추적표에 없어 0으로 고정한다
+            (`Reservation.totalAmount`와 같은 이유).
+        approvedAt:
+          type: [string, 'null']
+          format: date-time
+          description: 승인 시각. 거절이면 null이다.
+        serverTime:
+          type: string
+          format: date-time
 
     Reservation:
       type: object
