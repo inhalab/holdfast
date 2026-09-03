@@ -1,0 +1,108 @@
+/*
+ * 예약 확인·티켓·검표 화면 최소 스타일 (이슈 #81, design-spec 5.3: UI에
+ * 시간 쏟지 말 것). seatmap.css와 같은 팔레트를 쓴다.
+ */
+
+:root {
+    --ok: #1e7d3a;
+    --warn: #b3261e;
+    --card-bg: #fff;
+    --card-border: #e3e5e9;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font: 14px/1.5 system-ui, "Segoe UI", sans-serif;
+    color: #1c1c1c;
+    background: #f7f8fa;
+}
+
+.page { max-width: 640px; margin: 0 auto; padding: 24px 20px; }
+
+.page h1 { font-size: 20px; margin: 0 0 4px; }
+.page .meta { color: #666; margin: 0 0 20px; }
+
+.card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 16px 18px;
+    margin-bottom: 16px;
+}
+.card h2 { font-size: 15px; margin: 0 0 10px; }
+
+.status-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+}
+.status-badge.CONFIRMED { background: var(--ok); }
+.status-badge.HELD { background: #b0b0b0; }
+.status-badge.CANCELLED, .status-badge.EXPIRED { background: var(--warn); }
+
+.seat-chip-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.seat-chip-list li { background: #eef1f6; border-radius: 4px; padding: 3px 8px; font-size: 13px; }
+
+/* --- 티켓 --- */
+.ticket-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.ticket {
+    border: 1px dashed var(--card-border);
+    border-radius: 6px;
+    padding: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+.ticket-seat { font-weight: 600; }
+.ticket-token {
+    font-family: ui-monospace, "Courier New", monospace;
+    font-size: 12px;
+    background: #f0f2f5;
+    padding: 4px 8px;
+    border-radius: 4px;
+    word-break: break-all;
+}
+.ticket-status {
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    color: #fff;
+    white-space: nowrap;
+}
+.ticket-status.ISSUED { background: #2f6feb; }
+.ticket-status.USED { background: #6b6b6b; }
+.ticket-status.VOID { background: var(--warn); }
+
+/* --- 검표 --- */
+.scan-form { display: flex; gap: 8px; margin-bottom: 16px; }
+.scan-form input {
+    flex: 1;
+    font: inherit;
+    padding: 8px 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+}
+.scan-form button {
+    font: inherit;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    background: #2f6feb;
+    color: #fff;
+    cursor: pointer;
+}
+.scan-form button:disabled { background: #b7c4dd; cursor: not-allowed; }
+
+.scan-result { padding: 14px; border-radius: 8px; font-size: 15px; }
+.scan-result.ok { background: #e6f4ea; color: var(--ok); }
+.scan-result.warn { background: #fbe9e7; color: var(--warn); }
+.scan-result .result-code { font-weight: 700; display: block; margin-bottom: 4px; }
+
+.link-back { display: inline-block; margin-top: 8px; color: #2f6feb; text-decoration: none; }
+.link-back:hover { text-decoration: underline; }

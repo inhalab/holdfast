@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>검표</title>
+    <link rel="stylesheet" th:href="@{/css/reservation.css}">
+</head>
+<body>
+<main class="page">
+    <h1>검표</h1>
+    <p class="meta">QR 토큰을 입력하고 스캔하세요. 실제 카메라 스캔 대신 값을 직접 입력합니다.</p>
+
+    <section class="card">
+        <div class="scan-form">
+            <input type="text" id="token-input" placeholder="QR 토큰 (예: 3f2504e0-...)" autofocus>
+            <button type="button" id="scan-btn">스캔</button>
+        </div>
+        <div id="result"></div>
+    </section>
+</main>
+
+<script th:src="@{/js/scan.js}"></script>
+</body>
+</html>
