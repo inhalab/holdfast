@@ -42,6 +42,10 @@ import static org.assertj.core.api.Assertions.assertThat;
         "holdfast.strategy=none",
         // 스레드가 커넥션을 기다리며 줄 서면 동시에 조회하는 구간이 줄어든다.
         // 경합을 재현하려는 테스트이므로 풀을 스레드 수보다 넉넉히 잡는다.
+        // 알림 Outbox 워커를 끈다(이슈 #78). 배경에서 1초마다 도는 워커가
+        // 확정으로 생긴 outbox 행을 집고 있으면 seed()의 TRUNCATE가 그 락을
+        // 기다린다. 이 테스트가 보는 것은 좌석 경합이지 알림이 아니다.
+        "holdfast.outbox.scheduler.enabled=false",
         "spring.datasource.hikari.maximum-pool-size=40"
 })
 @Testcontainers

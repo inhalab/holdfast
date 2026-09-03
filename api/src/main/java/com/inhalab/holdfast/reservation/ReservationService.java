@@ -32,19 +32,22 @@ public class ReservationService {
     private final SeatHoldRepository seatHoldRepository;
     private final SeatInventoryRepository seatInventoryRepository;
     private final UserSessionQuotaRepository userSessionQuotaRepository;
+    private final ConfirmationNotifier confirmationNotifier;
 
     public ReservationService(SeatHoldStrategy strategy,
                               ReservationRepository reservationRepository,
                               ReservationSeatRepository reservationSeatRepository,
                               SeatHoldRepository seatHoldRepository,
                               SeatInventoryRepository seatInventoryRepository,
-                              UserSessionQuotaRepository userSessionQuotaRepository) {
+                              UserSessionQuotaRepository userSessionQuotaRepository,
+                              ConfirmationNotifier confirmationNotifier) {
         this.strategy = strategy;
         this.reservationRepository = reservationRepository;
         this.reservationSeatRepository = reservationSeatRepository;
         this.seatHoldRepository = seatHoldRepository;
         this.seatInventoryRepository = seatInventoryRepository;
         this.userSessionQuotaRepository = userSessionQuotaRepository;
+        this.confirmationNotifier = confirmationNotifier;
     }
 
     /**
@@ -55,6 +58,18 @@ public class ReservationService {
      * 동시에 일어나도 단일 SQL 문 안에서 원자적으로 해소된다. 조회로 만료를 먼저
      * 확인한 뒤 확정하면 그 사이에 만료가 일어날 수 있고, 그것이 이 프로젝트에서
      * 가장 자주 터지는 경합이다.
+     *
+     * <p><b>알림 큐 등록도 이 트랜잭션 안이다</b>({@link ConfirmationNotifier},
+     * REQ-05). 확정이 롤백되면 알림 행도 함께 사라진다 — Outbox 패턴의 전제가
+     * 그 원자성이고, 확정 경로가 둘이므로({@code POST /api/reservations}와
+     * {@code POST /api/payments}) 지점을 여기 하나로 둔다.
+     *
+     * <p><b>임계 구역이 그만큼 길어진다.</b> INSERT 한 문장이지만 이 구간은
+     * M3 결론의 근거("임계 구역이 서브밀리초라 락 대기가 응답시간을 지배할
+     * 구간이 없다", 7.7.1)가 나온 자리다. 그래서 M4에서 고경합 5전략을 다시 재
+     * 무엇이 달라지는지 기록한다 — 결함 때문이 아니라 조건이 바뀌었기 때문이며,
+     * 7.7.1이 남긴 "더 긴 임계 구역을 갖는 응용에서는 결론이 달라질 수 있다"를
+     * 실제로 시험하는 셈이다.
      */
     @Transactional
     public Reservation confirm(String holdId, long userId) {
@@ -88,8 +103,16 @@ public class ReservationService {
         seatHoldRepository.confirmHeld(holdId);
 
         reservation.setStatus("CONFIRMED");
-        reservation.setConfirmedAt(Instant.now());
-        return reservationRepository.save(reservation);
+        Instant confirmedAt = Instant.now();
+        reservation.setConfirmedAt(confirmedAt);
+        Reservation saved = reservationRepository.save(reservation);
+
+        // 알림을 큐에 넣는다. 발송은 하지 않는다 — 워커의 일이다(REQ-05).
+        // 이 호출이 던지면 확정까지 함께 롤백된다. 그것이 의도다.
+        confirmationNotifier.notifyConfirmed(
+                saved.getId(), sessionId, userId, confirmedAt);
+
+        return saved;
     }
 
     /**

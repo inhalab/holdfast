@@ -17,7 +17,7 @@
 | 대응 엔드포인트 | `docs/api-spec.md` 1절 기준. 클라이언트가 이 요구사항을 만족시키기 위해 호출하는 API |
 | 검증 방법 | `docs/concurrency-spec.md` 8절 기준. **실제로 존재하는 검증만 적는다** — 아래 2절 참조 |
 | 검수 기준 | 정량 목표가 있는 요구사항만 채운다. 없으면 `—` |
-| 상태 | M3 종료 시점. **충족** / **부분** / **구현·미검증** / **미구현** |
+| 상태 | **충족** / **부분** / **구현·미검증** / **미구현**. M3 종료 시점 기준이며, M4에서 갱신된 항목은 그 근거를 함께 적는다 |
 
 ---
 
@@ -29,7 +29,7 @@
 | REQ-02 | 실시간 잔여 좌석 검증 및 표시 | 국립 SFR-001, SFR-006 | `program`, `event_session`, `seat_inventory` | `GET /api/sessions/{id}/seats`, `GET /api/sessions/{id}/seats/status` | `SeatMapPageControllerTest`(렌더) | — | **부분** — 조회 API·`ETag`/304·htmx fragment는 구현됐고 렌더 테스트가 있다. **폴링 부하는 측정에 넣지 않았다**(`api-spec.md` 8.1) |
 | REQ-03 | 중복 예약 방지 / 1인 최대 매수 제한 | 국립 SFR-001 | `seat_hold`, `user_session_quota`, `reservation`, `idempotency_record` | `POST /api/holds`, `POST /api/reservations` (둘 다 `Idempotency-Key` 필수) | 부하 측정 + DB 검증 V-3 | — | **충족(부하 측정 기준)** — 60회 전부 V-3 0. 전용 단위 경합 테스트는 없다(REQ-11 참조) |
 | REQ-04 | 예약·결제 상태 정합성 검증 | 국립 SFR-002 | `reservation`, `payment`, `idempotency_record` | `POST /api/reservations`, `GET /api/reservations/{id}`, `POST /api/reservations/{id}/cancel` | DB 검증 V-4(재고-예약 불일치)가 예약 축만 덮는다 | — | **부분** — 예약 축은 60회 전부 V-4 0. **결제 축은 미검증**이다. Mock PG가 M4 항목이라 `payment` 행이 생기지 않는다(`design-spec.md` 6절) |
-| REQ-05 | 알림 발송 재시도 및 중복 발송 방지 | 국립 SFR-003 | `outbox` | 없음 — Outbox는 서버 내부 워커이며 외부 API가 아니다 (`api-spec.md` 7절) | 없음 | — | **미구현** — M4 항목. 스키마와 U-12만 있다 |
+| REQ-05 | 알림 발송 재시도 및 중복 발송 방지 | 국립 SFR-003 | `outbox` | 없음 — Outbox는 서버 내부 워커이며 외부 API가 아니다 (`api-spec.md` 7절) | 단위 경합 테스트 `OutboxConcurrencyTest` — 워커 8개 동시 실행 / 재시도 / 상한 소진 / 확정 트랜잭션과의 원자성 | **중복 발송 0건** | **충족** — 알림 200건이 정확히 한 번씩 발송된다. 확정 시 INSERT는 확정과 같은 트랜잭션이며 롤백으로 확인한다(이슈 #78, `concurrency-spec.md` 6.1) |
 | REQ-06 | 회차별 입장 가능시간 검증 및 검표 처리 | 국립 SFR-004 | `event_session`, `ticket_scan` | 없음 — 검표 엔드포인트는 별도 계약 (`api-spec.md` 7절, 4개월차 작업) | 없음 | — | **미구현** — M4 항목. 스키마와 U-11만 있다 |
 | REQ-07 | QR 모바일 티켓 발급 | 궁능 SFR-03 | `ticket` | 없음 — 발급 엔드포인트는 별도 계약 (`api-spec.md` 7절, 4개월차 작업) | 없음 | — | **미구현** — M4 항목. 스키마와 U-9·U-10만 있다 |
 | REQ-08 | 예약 오픈 일시 설정 | 궁능 SFR-05 | `event_session` | `GET /api/sessions/{id}/seats` (`reserveOpensAt` 필드), `POST /api/holds` (`RESERVATION_NOT_OPEN` 거절) | 없음 | — | **구현·미검증** — `SeatHoldService`가 `RESERVATION_NOT_OPEN`을 던지고 `classify.js`가 정상 거절로 분류하지만, 오픈 전 시각을 만들어 확인하는 테스트가 없다 |
@@ -49,24 +49,25 @@
 부하 측정" 세 계층을 나눠 적었고 이 표가 그것을 그대로 옮겼는데, 실제로 만든 것은
 **Testcontainers로 진짜 Postgres·Redis를 띄우는 단위 경합 테스트** 하나다. 둘을
 나눠 적으면 없는 계층이 있는 것처럼 읽히고, **아직 아무도 검증하지 않은
-요구사항이 검증된 것처럼 보인다.** REQ-05·06·07은 코드가 아예 없는데도 "통합
-테스트"라고 적혀 있었다.
+요구사항이 검증된 것처럼 보인다.** REQ-05·06·07은 그 시점에 코드가 아예 없는데도
+"통합 테스트"라고 적혀 있었다. (REQ-05는 이후 이슈 #78로 구현·검증됐다.)
 
-현재 존재하는 검증 수단은 넷이다.
+현재 존재하는 검증 수단은 다섯이다.
 
 | 수단 | 대상 | 어디에 |
 |---|---|---|
 | 단위 경합 테스트 5종 | 전략별 N스레드 동시 홀드·확정 | `api/src/test/.../*SeatHoldStrategyConcurrencyTest` |
 | 화면 렌더 테스트 | 좌석맵 페이지 | `SeatMapPageControllerTest` |
+| 단위 경합 테스트 (알림) | 워커 동시 실행·재시도·상한·확정과의 원자성 | `api/src/test/.../OutboxConcurrencyTest` |
 | 부하 측정 | 홀드·확정 경로, 앱 2대 | `load-test/scenarios/reservation.js`, 60회 |
 | DB 검증 쿼리 | V-1~V-6 | `load-test/sql/verify.sql` |
 
 **검증되지 않은 것은 그렇게 적는다.** "미구현"과 "구현했지만 검증 수단이 없음"은
 다르며, 뒤엣것(REQ-08)이 더 위험하다 — 동작한다고 믿고 넘어가기 쉽다.
 
-**M4에서 메울 것은 두 가지다.** 첫째, 기능 자체가 없는 REQ-05·06·07(그리고
-REQ-04의 결제 축). 둘째, **기능은 있는데 검증이 없는 REQ-08과, 부하 측정에만
-기대고 있는 REQ-03·11이다.** V-3이 60회 내내 0인 것은 강한 증거지만, 상한을
+**M4에서 메울 것은 두 가지다.** 첫째, 기능 자체가 없는 REQ-06·07(그리고 REQ-04의
+결제 축). 둘째, **기능은 있는데 검증이 없는 REQ-08과, 부하 측정에만 기대고 있는
+REQ-03·11이다.** V-3이 60회 내내 0인 것은 강한 증거지만, 상한을
 실제로 겨루는 단위 테스트가 있어야 회귀를 잡는다.
 
 ---

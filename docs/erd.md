@@ -152,10 +152,11 @@ erDiagram
         bigint id PK
         bigint reservation_id FK
         varchar notification_type "알림 종류"
-        varchar status "PENDING/SENT/FAILED"
+        varchar status "PENDING/SENDING/SENT/FAILED"
         int retry_count
         text payload
         timestamptz next_retry_at
+        timestamptz claimed_at "워커가 집은 시각"
         timestamptz created_at
         timestamptz sent_at
     }
@@ -472,7 +473,15 @@ ticket         : ISSUED → USED
                  ISSUED → VOID
 ```
 
-`outbox`는 `SELECT ... FOR UPDATE SKIP LOCKED`로 집는다(`concurrency-spec.md` 6절).
+`outbox`는 `SELECT ... FOR UPDATE SKIP LOCKED`를 감싼 조건부 UPDATE로 집는다
+(`concurrency-spec.md` 6절·6.1절). `status`의 `SENDING`과 `claimed_at`은 그
+클레임을 표시하는 값이며 V2 마이그레이션에서 추가됐다 — 발송이 외부 호출이라
+클레임과 같은 트랜잭션에 둘 수 없기 때문이다. `claimed_at`이 충분히 오래되면
+집은 워커가 죽은 것으로 보고 다른 워커가 되찾는다. `seat_inventory.held_until`이
+만료된 점유를 다음 요청에 넘기는 것과 같은 구조다(4.3).
+
+M3에서 좌석 점유에 쓴 조건부 UPDATE + `rowsAffected` 판정이 여기에 그대로
+재사용된다. 두 도메인의 대조는 `concurrency-spec.md` 6.1절에 있다.
 앱 2대가 같은 행을 잡지 않으면서 한쪽이 죽어도 다른 쪽이 이어받는다.
 
 ---
