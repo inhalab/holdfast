@@ -51,7 +51,11 @@ const METRICS = [
   { name: 'hikaricp.connections.usage', stats: ['COUNT', 'TOTAL_TIME', 'MAX'] },
   { name: 'holdfast.optimistic.retries', stats: ['COUNT'], optional: true },
   { name: 'holdfast.optimistic.retry-exhausted', stats: ['COUNT'], optional: true },
-  { name: 'holdfast.constraint.violations', stats: ['COUNT'] },
+  // **제약 이름별로도 받는다.** 앱은 constraint 태그를 붙여 세는데
+  // (ApiExceptionHandler), 태그 없이 조회하면 Actuator가 전부 합쳐 하나로 준다.
+  // 그러면 "제약 위반 N건"이 어느 제약인지 알 수 없다 — U-2(앱 락이 샜다)와
+  // U-13(멱등키 경합)은 뜻이 정반대인데 같은 칸에 들어간다(7.6 해석 주의).
+  { name: 'holdfast.constraint.violations', stats: ['COUNT'], byTag: 'constraint' },
 ];
 
 function parseArgs(argv) {
@@ -62,8 +66,9 @@ function parseArgs(argv) {
   return out;
 }
 
-async function fetchMetric(base, name) {
-  const res = await fetch(`${base}/actuator/metrics/${name}`);
+async function fetchMetric(base, name, tag) {
+  const url = `${base}/actuator/metrics/${name}` + (tag ? `?tag=${encodeURIComponent(tag)}` : '');
+  const res = await fetch(url);
   // 404는 "앱은 살아 있는데 그 미터가 아직 없다"는 뜻이다. Micrometer 카운터는
   // 처음 증가할 때 등록되는 경우가 있어, 한 번도 발생하지 않은 사건은 404가 된다.
   if (res.status === 404) return null;
@@ -84,11 +89,25 @@ async function snapshot(instance) {
       if (body === null) {
         // 미등록. optional이면 "해당 없음", 아니면 "아직 한 번도 발생하지 않음"이다.
         values[metric.name] = metric.optional ? null : 0;
+        // 분해 칸도 같은 모양으로 남긴다. 키가 있다 없다 하면 읽는 쪽이
+        // "안 쟀음"과 "쟀는데 비었음"을 구분할 수 없다.
+        if (metric.byTag) values[`${metric.name}.by-${metric.byTag}`] = {};
         continue;
       }
       const picked = {};
       for (const s of metric.stats) picked[s] = stat(body.measurements, s);
       values[metric.name] = metric.stats.length === 1 ? picked[metric.stats[0]] : picked;
+
+      // 태그별 분해. availableTags가 알려주는 값마다 한 번씩 더 물어 본다.
+      if (metric.byTag) {
+        const tagValues = body.availableTags?.find((t) => t.tag === metric.byTag)?.values ?? [];
+        const breakdown = {};
+        for (const v of tagValues) {
+          const tagged = await fetchMetric(instance.base, metric.name, `${metric.byTag}:${v}`);
+          breakdown[v] = tagged === null ? null : stat(tagged.measurements, metric.stats[0]);
+        }
+        values[`${metric.name}.by-${metric.byTag}`] = breakdown;
+      }
     } catch (e) {
       reachable = false;
       values[metric.name] = null;

@@ -101,6 +101,28 @@ DURATION_SEC=120 load-test/scripts/run.sh high pessimistic   # 120초 (최종 �
 **개발 확인용 실행의 숫자는 7.6 기록 양식에 싣지 않는다.** `run.sh`가 실행 시작 때
 알려주고, `summarize.mjs`도 개발 확인용 실행이 섞이면 경고한다.
 
+### `Started`는 "응답할 준비가 됐다"가 아니다
+
+`docker compose up -d`가 `Started`를 돌려준 직후에 부하를 걸면 502를 맞는다.
+컨테이너가 뜬 것과 Spring Boot가 요청을 받을 수 있게 된 것은 다르다.
+
+```
+docker compose up -d app1 app2      # Started — 컨테이너는 떴다
+                                    # ↓ 5~6초
+Started HoldfastApplication in 5.691 seconds   # 이제부터 응답한다
+```
+
+그 사이 nginx 로그는 이렇게 남는다 — `Connection refused` →
+`no live upstreams` → `Connection refused` 반복.
+
+**`run.sh`의 사전 점검이 이 창을 최대 90초까지 기다린다**(7.4.0). 그래서
+`run.sh`를 쓰면 문제가 없다. 직접 k6를 돌리거나 헬스 체크를 한 번만 하는
+스크립트를 쓸 때 주의한다.
+
+기다림에 상한이 있는 이유는 사전 점검의 목적 그 자체다 — 죽은 스택 앞에서
+무한정 서 있으면 40분을 아끼려던 장치가 시간을 더 버리게 된다.
+`PREFLIGHT_TIMEOUT_SEC`으로 바꾼다.
+
 ### Windows / Git Bash 주의
 
 Git Bash는 `/scenarios/smoke.js` 같은 인자를 Windows 경로(`C:/Program Files/Git/...`)로
