@@ -56,12 +56,22 @@
         try { localStorage.removeItem(HOLD_STORAGE_KEY); } catch (e) { /* no-op */ }
     }
 
+    /**
+     * 저장된 홀드를 읽는다. 이미 만료됐으면 버리되, **그 좌석은
+     * expiredMine에 남긴다** — 그러지 않으면 만료 후 새로고침한 사용자에게는
+     * 좌석이 다시 회색으로 굳는다(이 파일의 expiredMine 설명 참고).
+     */
     function loadSavedHold() {
         try {
             const raw = localStorage.getItem(HOLD_STORAGE_KEY);
             if (!raw) return null;
             const parsed = JSON.parse(raw);
-            if (!parsed || !parsed.holdId || parsed.expiresAt <= Date.now()) {
+            if (!parsed || !parsed.holdId) {
+                localStorage.removeItem(HOLD_STORAGE_KEY);
+                return null;
+            }
+            if (parsed.expiresAt <= Date.now()) {
+                for (const id of parsed.seatIds || []) expiredMine.add(Number(id));
                 localStorage.removeItem(HOLD_STORAGE_KEY);
                 return null;
             }
