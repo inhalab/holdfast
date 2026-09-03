@@ -105,15 +105,44 @@ snapshot_metrics() {  # $1 = run 라벨
 # **127.0.0.1을 쓴다. localhost가 아니다.** nginx 이미지의 BusyBox wget은
 # localhost를 ::1로 먼저 푸는데 그쪽은 연결이 거부돼, 스택이 멀쩡한데도 점검이
 # 실패한다. 측정을 막는 오탐은 측정을 그냥 돌리는 것만큼 나쁘다.
+# **한 번만 보고 포기하지 않는다.** docker compose가 "Started"를 돌려주는 시점과
+# 앱이 실제로 응답하는 시점이 다르다 — Spring Boot 기동에 5~6초가 걸리고
+# (기동 로그의 "Started HoldfastApplication in 5.7 seconds") 그동안 nginx는
+# 업스트림에 붙지 못해 502를 낸다. 실제로 그 창에 점검이 걸려 멈췄다.
+#
+# **상한을 두는 이유는 이 장치의 목적 그 자체다.** 무한 대기하면 죽은 스택 앞에서
+# 조용히 서 있게 되어, 40분을 버리지 않으려던 것이 시간을 무한정 버리는 것으로
+# 바뀐다. 90초는 관측된 기동 시간의 15배가 넘고 한 세션(약 40분)의 4%다 —
+# 정상 기동을 놓치지 않을 만큼 넉넉하고, 잘못됐을 때 빨리 알려줄 만큼 짧다.
+PREFLIGHT_TIMEOUT_SEC="${PREFLIGHT_TIMEOUT_SEC:-90}"
+PREFLIGHT_INTERVAL_SEC=3
+
 preflight() {
-  echo "[run] 사전 점검 — nginx를 통해 앱이 응답하는지 확인한다 (7.4-0)"
-  if ! docker compose exec -T nginx         wget -q -O- --timeout=5 http://127.0.0.1:80/api/health >/dev/null 2>&1; then
-    echo "[run] !! 사전 점검 실패 — nginx를 통한 /api/health가 응답하지 않는다." >&2
-    echo "[run]    측정을 시작하지 않는다. 컨테이너 상태를 확인하라:" >&2
-    echo "[run]      docker compose ps -a" >&2
-    echo "[run]      docker compose up -d" >&2
-    exit 1
-  fi
+  echo "[run] 사전 점검 — nginx를 통해 앱이 응답하는지 확인한다 (7.4.0)"
+  local waited=0
+  while true; do
+    if docker compose exec -T nginx          wget -q -O- --timeout=5 http://127.0.0.1:80/api/health >/dev/null 2>&1; then
+      if [ "$waited" -gt 0 ]; then
+        echo "[run]   ${waited}초 만에 응답 — 기동 중이었다."
+      fi
+      return 0
+    fi
+    if [ "$waited" -ge "$PREFLIGHT_TIMEOUT_SEC" ]; then
+      break
+    fi
+    if [ "$waited" = "0" ]; then
+      echo "[run]   아직 응답하지 않는다. ${PREFLIGHT_TIMEOUT_SEC}초까지 기다린다."
+    fi
+    sleep "$PREFLIGHT_INTERVAL_SEC"
+    waited=$((waited + PREFLIGHT_INTERVAL_SEC))
+  done
+
+  echo "[run] !! 사전 점검 실패 — ${PREFLIGHT_TIMEOUT_SEC}초 동안 nginx를 통한" >&2
+  echo "[run]    /api/health가 응답하지 않았다. 측정을 시작하지 않는다." >&2
+  echo "[run]    컨테이너 상태와 앱 로그를 확인하라:" >&2
+  echo "[run]      docker compose ps -a" >&2
+  echo "[run]      docker compose logs --tail 50 app1 nginx" >&2
+  exit 1
 }
 
 preflight
