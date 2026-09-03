@@ -64,6 +64,13 @@
 ([p95 역전 조사](docs/results/p95-inversion-investigation.md),
 [지속 경합 조사](docs/results/sustained-lock-wait-investigation.md)).
 
+**이 문장은 M4에서 한 번 뒤집혔다가 되돌아왔다.** 알림 Outbox가 확정 트랜잭션에
+INSERT를 더해 임계 구역이 길어지자 `pessimistic`이 대조군 대비 27% 느려 보였고
+"이제는 구분된다"고 적었다. **`none`을 아무것도 바꾸지 않고 여섯 번 재 보니 그
+값이 2.28배 흔들렸다** — 판정하려던 차이가 잡음 안에 있었다. 판정을 회수했고,
+그 과정을 [폐기 기록](docs/results/discarded-measurements.md) C절에 남겼다.
+**한 번 반증을 시도받고 살아남은 문장이다.**
+
 **정상 거절은 실패가 아니다.** 좌석이 이미 팔려 409를 반환한 것은 시스템이
 제대로 동작한 결과이므로 오류율과 분리해 집계한다.
 
