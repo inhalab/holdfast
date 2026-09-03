@@ -93,6 +93,23 @@ load-test/   k6 시나리오
 docs/        설계 명세, ERD, 측정 결과
 ```
 
+## 데모 실행
+
+화면에서 `좌석 선택 → 선점 → 결제 → QR 발급 → 검표`를 끝까지 돌려 보는 방법이다.
+
+```bash
+HOLDFAST_STRATEGY=pessimistic HOLD_TTL_SECONDS=300 docker compose up -d --build
+docker compose exec -T db psql -U holdfast -d holdfast < infra/demo-seed.sql
+```
+
+- 좌석맵 <http://localhost:8080/sessions/1> — 선점하고 결제하면 예약 확인 화면으로 넘어간다
+- 검표 <http://localhost:8080/scan> — 예약 확인 화면의 QR 토큰을 붙여넣는다
+
+**부하 측정용 시드(`load-test/sql/seed.sql`)로는 이 흐름이 돌지 않는다.** 그쪽은
+검표를 하지 않으므로 입장 가능 시간이 내일로 잡혀 있고, 기본값인 `none` 전략은
+만료된 홀드를 회수하지 않는다(그것이 베이스라인의 정의다). 두 시드의 차이는
+[`infra/demo-seed.sql`](infra/demo-seed.sql) 머리말에 적어 두었다.
+
 ## 부하 테스트
 
 측정 실행 환경과 집계 로직은 [`load-test/`](load-test/)에 있다. 자세한 내용은

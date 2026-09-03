@@ -66,6 +66,14 @@ body {
    보여야 하므로, 같은 특이도의 .is-held보다 뒤에 둔다(CSS 캐스케이드 순서). */
 .seat.is-held-mine  { background: var(--held-mine); }
 
+/* 만료된 내 홀드. 재고는 아직 HELD라 회색이지만 다시 고를 수 있다 —
+   점선 테두리로 "굳은 좌석"과 구분한다(seatmap.js expiredMine). */
+.seat.is-expired-mine {
+    background: var(--held);
+    border: 1px dashed var(--selected);
+    cursor: pointer;
+}
+
 /* 범례 스와치도 같은 색을 쓴다 */
 .swatch.is-available { background: var(--available); }
 .swatch.is-selected  { background: var(--selected); }
