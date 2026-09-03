@@ -289,7 +289,12 @@
         countdownEl.textContent = mm + ":" + ss;
     }
 
-    // --- 해제 (DELETE /api/holds/{holdId}) · 확정 (POST /api/reservations) ---
+    // --- 해제 (DELETE /api/holds/{holdId}) · 결제 (POST /api/payments) ---
+    //
+    // 확정은 결제를 거친다(M4 최소 완결 흐름: 선택→선점→확정→결제→QR→검표,
+    // 이슈 #81). POST /api/reservations를 직접 부르지 않는다 — 그 경로는
+    // k6 측정 하네스가 쓰는 경로로 그대로 남겨둔다(#79 PaymentService 문서).
+    // 결제가 승인되면 그 안에서 확정과 티켓 발급까지 한 트랜잭션에 끝난다.
 
     async function releaseHold() {
         if (!hold) return;
@@ -315,27 +320,36 @@
     async function confirmReservation() {
         if (!hold) return;
         confirmBtn.disabled = true;
-        showMessage("예약 확정 중…");
+        showMessage("결제 처리 중…");
         try {
-            const res = await fetch("/api/reservations", {
+            const res = await fetch("/api/payments", {
                 method: "POST",
                 headers: stateHeaders(newIdempotencyKey()),
                 body: JSON.stringify({ holdId: hold.holdId }),
             });
             if (res.status === 201) {
                 const data = await res.json();
-                showMessage("예약이 확정되었습니다. 예약번호 " + data.reservationId, "ok");
-                leaveHold();
+                if (data.status === "APPROVED") {
+                    // 결제 승인 시 확정·티켓 발급까지 이미 끝났다. 예약 확인
+                    // 화면(#81)으로 이동해 티켓을 보여준다.
+                    clearSavedHold();
+                    window.location.href = "/reservations/" + data.reservationId;
+                    return;
+                }
+                // DECLINED — 예약은 HELD로 남는다. 홀드는 그대로 유지되므로
+                // 사용자가 다시 결제를 시도하거나 선점을 해제할 수 있다.
+                showMessage("결제가 거절되었습니다. 다시 시도하거나 선점을 해제하세요.", "warn");
+                confirmBtn.disabled = false;
             } else if (res.status === 409) {
                 const problem = await res.json();
-                showMessage((problem && problem.detail) || "확정할 수 없습니다.", "warn");
+                showMessage((problem && problem.detail) || "결제할 수 없습니다.", "warn");
                 confirmBtn.disabled = false;
             } else {
-                showMessage("확정에 실패했습니다. (" + res.status + ")", "warn");
+                showMessage("결제에 실패했습니다. (" + res.status + ")", "warn");
                 confirmBtn.disabled = false;
             }
         } catch (e) {
-            showMessage("네트워크 오류로 확정하지 못했습니다.", "warn");
+            showMessage("네트워크 오류로 결제하지 못했습니다.", "warn");
             confirmBtn.disabled = false;
         }
     }

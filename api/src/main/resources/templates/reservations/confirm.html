@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="'예약 ' + ${reservation.id} + ' 확인'">예약 확인</title>
+    <link rel="stylesheet" th:href="@{/css/reservation.css}">
+</head>
+<body>
+<main class="page">
+    <h1>예약 확인</h1>
+    <p class="meta">예약번호 <strong th:text="${reservation.id}">1</strong></p>
+
+    <section class="card">
+        <h2>예약 상태</h2>
+        <p>
+            <span class="status-badge" th:classappend="${reservation.status}" th:text="${reservation.status}">CONFIRMED</span>
+        </p>
+        <ul class="seat-chip-list">
+            <li th:each="seat : ${seats}" th:text="${seat.zoneName} + ' ' + ${seat.seatNo}">A구역 A-1</li>
+        </ul>
+    </section>
+
+    <section class="card">
+        <h2>티켓</h2>
+        <ul class="ticket-list" th:if="${not #lists.isEmpty(tickets)}">
+            <li class="ticket" th:each="ticket : ${tickets}">
+                <div>
+                    <div class="ticket-seat" th:text="${ticket.zoneName} + ' ' + ${ticket.seatNo}">A구역 A-1</div>
+                    <div class="ticket-token" th:text="${ticket.qrToken}">00000000-0000-0000-0000-000000000000</div>
+                </div>
+                <span class="ticket-status" th:classappend="${ticket.status}" th:text="${ticket.status}">ISSUED</span>
+            </li>
+        </ul>
+        <p th:if="${#lists.isEmpty(tickets)}">발급된 티켓이 없습니다. 결제가 아직 승인되지 않았습니다.</p>
+    </section>
+
+    <a class="link-back" th:href="@{/scan}">검표 화면으로</a>
+</main>
+</body>
+</html>
