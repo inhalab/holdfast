@@ -26,9 +26,12 @@ crash.log
 
 # --- 부하 테스트 결과 ---
 # 원본 JSON은 load-test/results/에 남기고, 채택한 확정 측정본만
-# docs/results/로 옮겨 커밋한다 (concurrency-spec 7.4-5, load-test/README).
-load-test/results/*.json
-load-test/results/*.txt
+# docs/results/로 옮겨 커밋한다 (concurrency-spec 7.4-7, load-test/README).
+#
+# **하위 디렉토리까지 통째로 무시한다.** 예전 규칙은 *.json / *.txt 두 줄이라
+# results/discarded/... 처럼 한 단계 아래로 내려간 파일이 걸리지 않았다.
+# 폐기분을 격리하면서 그것이 커밋 대상으로 잡히는 것을 확인하고 고쳤다.
+load-test/results/*
 !load-test/results/.gitkeep
 
 # --- IDE / OS ---

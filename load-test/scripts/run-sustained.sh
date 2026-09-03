@@ -21,6 +21,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 export MSYS_NO_PATHCONV=1
 
+# 측정 세션 태그. run.sh와 같은 이유로 결과 파일명에 들어간다 —
+# 없으면 재실행이 이전 결과를 같은 이름으로 덮는다
+# (docs/results/discarded-measurements.md 4번).
+MEASURE_SESSION="${MEASURE_SESSION:-$(date +%Y%m%d-%H%M)}"
+export MEASURE_SESSION
+
+
 STRATEGY="${1:?전략을 지정한다: none|pessimistic|optimistic|unique|redis}"
 SCENARIO=sustained
 REPEATS="${REPEATS:-3}"
@@ -62,7 +69,7 @@ for run in $(seq 1 "$REPEATS"); do
   done
 
   docker compose -f docker-compose.yml -f docker-compose.k6.yml \
-    --profile load run --rm \
+    --profile load run --rm -e "MEASURE_SESSION=$MEASURE_SESSION" \
     -e "SCENARIO=$SCENARIO" -e "STRATEGY=$STRATEGY" -e "RUN=$run" \
     -e "WARMUP_SEC=$WARMUP_SEC" -e "DURATION_SEC=$DURATION_SEC" \
     -e "SUSTAINED_SEATS=$SEATS" -e "SUSTAINED_SLEEP_MS=$SLEEP_MS" \

@@ -191,6 +191,10 @@ SELECT deadlocks FROM pg_stat_database WHERE datname = current_database();
 
 `scripts/run.sh`가 순서를 강제한다.
 
+0. **사전 점검** — nginx를 통과하는 `/api/health`가 응답하는지 본다(7.4.0).
+   응답하지 않으면 부하를 시작하지 않고, 1회차 성공이 0건이면 남은 회차를
+   돌리지 않는다. **이 단계가 없어서 확장 측정 15회를 통째로 버렸다**
+   (`docs/results/discarded-measurements.md` 4번)
 1. **시드 초기화** — `seed.sh`. 매 회차마다 같은 상태에서 시작한다(7.3)
 2. **워밍업 30초 — 집계에서 제외** — 커스텀 메트릭에 기록하지 않는 방식으로 제외한다
 3. **본 측정 시작 시 시드 재초기화** — `reset.sql`. 워밍업이 좌석을 소진하므로
@@ -263,9 +267,51 @@ VU 램프업은 워밍업 **안에서** 끝낸다. 본 측정은 목표 VU가 �
 "원본 결과 JSON"의 처리가 이것이다. 자동 생성물 전부를 커밋하지는 않는다.
 
 ```
-load-test/results/*.json    실행할 때마다 쌓이는 원본. gitignore 대상
-docs/results/*.json         채택한 확정 측정본. 커밋한다
+load-test/results/*.json              실행할 때마다 쌓이는 원본. gitignore 대상
+load-test/results/discarded/<태그>/   폐기한 묶음을 치워 둔 곳. 역시 커밋하지 않는다
+docs/results/*-median.json            채택한 확정 측정본. 커밋한다
 ```
+
+`.gitignore`는 `results/*`로 트리 전체를 무시한다. `*.json` 한 줄만 두면 하위
+디렉토리가 걸러지지 않아 격리해 둔 폐기분이 커밋 대상이 된다.
+
+### 파일명에 측정 세션이 들어간다
+
+```
+{전략}-{시나리오}-{세션}-run{회차}.json          k6 원본
+metrics-{전략}-{시나리오}-{세션}-run{회차}.json  Actuator 스냅샷
+verify-{전략}-{시나리오}-{세션}-run{회차}.txt    DB 검증
+```
+
+**세션 태그가 없으면 재측정이 이전 묶음을 같은 이름으로 덮는다.** 실제로
+7.8 확장 측정이 `optimistic`·`unique`·`redis`의 M3 고경합 원본을 덮었다
+(`docs/results/discarded-measurements.md` 4번).
+
+태그는 `run.sh`가 시작할 때 `YYYYMMDD-HHMM`으로 만든다. **여러 전략을 한 묶음으로
+잴 때는 루프 밖에서 고정한다** — 그러지 않으면 전략마다 세션이 갈려
+`summarize.mjs`가 마지막 하나만 잡는다.
+
+```bash
+export MEASURE_SESSION=$(date +%Y%m%d-%H%M)
+for s in none pessimistic optimistic unique redis; do
+  HOLDFAST_STRATEGY=$s docker compose up -d app1 app2
+  DURATION_SEC=120 load-test/scripts/run.sh high $s
+done
+```
+
+**`summarize.mjs`는 지정이 없으면 가장 최근 세션만 읽는다.**
+
+```bash
+load-test/scripts/summarize.mjs --scenario high                        # 최신 세션
+load-test/scripts/summarize.mjs --scenario high --session 20260903-1745
+load-test/scripts/summarize.mjs --scenario high --session all          # 전부(경고와 함께)
+```
+
+어느 세션을 읽었는지 출력 첫 줄에 주석으로 남는다. `--session all`은 여러 묶음의
+중앙값이 섞이므로 **7.6 기록 양식에 싣지 않는다**는 경고가 함께 나온다.
+
+세션 태그가 없는 옛 결과는 `(이전)`으로 묶이고, 실제 태그보다 낮게 정렬돼 새
+세션이 하나라도 있으면 기본 선택에서 밀려난다.
 
 옮기는 것은 **최종 측정용(120초) 실행만**이다. 개발 확인용 30초 실행은 표본이
 부족해 7.6 기록 양식을 채우는 데 쓰지 않는다.

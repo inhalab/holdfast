@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # run.sh — 측정 프로토콜 실행기 (설계서 7.4).
 #
+#   0. **사전 점검** — 부하 대상이 살아 있는지 확인 (7.4-0)
 #   1. 시드 초기화
 #   2. 워밍업 30초 — 집계에서 제외 (시나리오가 처리한다)
 #   3. **본 측정 시작 시 시드 재초기화** — 아래 설명
@@ -30,6 +31,20 @@ cd "$ROOT"
 # Git Bash가 /scenarios/... 를 Windows 경로로 바꾸는 것을 막는다.
 export MSYS_NO_PATHCONV=1
 
+# **측정 세션 태그.** 결과 파일명에 들어가 재측정이 이전 묶음을 덮지 않게 한다.
+#
+# 이것이 없어서 7.8 확장 측정이 optimistic·unique·redis의 M3 고경합 원본을
+# 같은 이름으로 덮었다(docs/results/discarded-measurements.md 4번).
+#
+# **전략을 바꿔 가며 여러 번 부를 때는 밖에서 고정한다.** run.sh 한 번이 곧
+# 한 세션이 아니라, 5전략을 도는 루프 전체가 한 세션이다. 고정하지 않으면
+# 전략마다 다른 태그가 붙어 summarize.mjs가 마지막 전략 하나만 잡는다.
+#
+#   export MEASURE_SESSION=$(date +%Y%m%d-%H%M)
+#   for s in none pessimistic optimistic unique redis; do ... done
+MEASURE_SESSION="${MEASURE_SESSION:-$(date +%Y%m%d-%H%M)}"
+export MEASURE_SESSION
+
 # docker compose run은 -e 옵션이 서비스명(k6) 앞에 와야 한다.
 #   run [옵션...] <서비스> <커맨드...>
 # 첫 인자로 스크립트 경로를 받고, 나머지 인자는 -e 플래그로 그대로 넘긴다.
@@ -37,7 +52,7 @@ k6_run() {
   local script="$1"
   shift
   docker compose -f docker-compose.yml -f docker-compose.k6.yml \
-    --profile load run --rm "$@" k6 run "$script"
+    --profile load run --rm -e "MEASURE_SESSION=$MEASURE_SESSION" "$@" k6 run "$script"
 }
 
 if [ "${1:-}" = "smoke" ]; then
@@ -73,8 +88,39 @@ snapshot_metrics() {  # $1 = run 라벨
   env -u MSYS_NO_PATHCONV node "$ROOT/load-test/scripts/metrics-snapshot.mjs" \
     --label "$STRATEGY/$SCENARIO $1" \
     --strategy "$STRATEGY" --scenario "$SCENARIO" --run "$1" \
-    --out "$ROOT/load-test/results/metrics-$STRATEGY-$SCENARIO-$1.json" || true
+    --out "$ROOT/load-test/results/metrics-$STRATEGY-$SCENARIO-$MEASURE_SESSION-$1.json" || true
 }
+
+# 7.4-0 사전 점검. **부하를 보낼 대상이 살아 있는지 먼저 본다.**
+#
+# 이것이 없어서 7.8 확장 측정 15회를 통째로 버렸다. nginx가 측정 1시간 45분
+# 전에 종료(255)돼 있었는데 아무도 몰랐고, 15회 전부 오류율 100% · 성공 0건 ·
+# p95 0ms로 끝났다(docs/results/discarded-measurements.md 4번). k6는
+# `http://nginx:80`으로 보내므로 그 앞단 하나가 없으면 앱이 아무리 멀쩡해도
+# 요청이 도달하지 않는다.
+#
+# 헬스 경로를 nginx **너머로** 통과시킨다. nginx만 살아 있고 업스트림이 죽은
+# 경우까지 같은 한 번으로 걸린다.
+#
+# **127.0.0.1을 쓴다. localhost가 아니다.** nginx 이미지의 BusyBox wget은
+# localhost를 ::1로 먼저 푸는데 그쪽은 연결이 거부돼, 스택이 멀쩡한데도 점검이
+# 실패한다. 측정을 막는 오탐은 측정을 그냥 돌리는 것만큼 나쁘다.
+preflight() {
+  echo "[run] 사전 점검 — nginx를 통해 앱이 응답하는지 확인한다 (7.4-0)"
+  if ! docker compose exec -T nginx         wget -q -O- --timeout=5 http://127.0.0.1:80/api/health >/dev/null 2>&1; then
+    echo "[run] !! 사전 점검 실패 — nginx를 통한 /api/health가 응답하지 않는다." >&2
+    echo "[run]    측정을 시작하지 않는다. 컨테이너 상태를 확인하라:" >&2
+    echo "[run]      docker compose ps -a" >&2
+    echo "[run]      docker compose up -d" >&2
+    exit 1
+  fi
+}
+
+preflight
+
+echo "[run] 측정 세션 = $MEASURE_SESSION"
+echo "[run]   결과 파일명에 들어간다. 여러 전략을 한 묶음으로 재려면 루프 밖에서"
+echo "[run]   MEASURE_SESSION을 고정하라 — 그러지 않으면 전략마다 세션이 갈린다."
 
 # 기준선. 1회차의 델타를 내려면 첫 실행 **전** 값이 있어야 한다.
 snapshot_metrics "run0"
@@ -123,10 +169,29 @@ for run in $(seq 1 "$REPEATS"); do
   # **콘솔로만 흘리지 않고 파일에도 남긴다.** 다음 회차의 시드가 DB를 덮으므로,
   # 여기서 받아두지 않으면 그 회차의 V-1·V-2를 되찾을 방법이 없다.
   "$ROOT/load-test/scripts/verify.sh" 2>&1 \
-    | tee "$ROOT/load-test/results/verify-$STRATEGY-$SCENARIO-run${run}.txt" || true
+    | tee "$ROOT/load-test/results/verify-$STRATEGY-$SCENARIO-$MEASURE_SESSION-run${run}.txt" || true
 
   # 7.1 Actuator 출처 지표. **전략 전환 전에 마지막 스냅샷이 확보된다.**
   snapshot_metrics "run${run}"
+
+  # 7.4-0 못 쓸 것이 분명한 실행은 계속하지 않는다.
+  #
+  # 1회차 측정 구간의 성공이 0건이면 나머지 회차도 같은 결과가 나온다. 앞의
+  # 폐기 셋은 "숫자가 그럴듯해서" 못 잡은 것이었지만, 이 경우는 시끄러운데도
+  # 40분을 더 썼다(discarded-measurements.md 4번). 사전 점검을 지나고도
+  # 성공이 0이면 측정 중에 무언가 죽은 것이므로 거기서 멈춘다.
+  if [ "$run" = "1" ]; then
+    RESULT_JSON="$ROOT/load-test/results/$STRATEGY-$SCENARIO-$MEASURE_SESSION-run1.json"
+    if [ -f "$RESULT_JSON" ] && ! env -u MSYS_NO_PATHCONV node -e '
+      const r = require(process.argv[1]).row;
+      if (!r || !r.counts) process.exit(0);          // 모양이 다르면 판단하지 않는다
+      process.exit(r.counts.success > 0 ? 0 : 1);
+    ' "$RESULT_JSON"; then
+      echo "[run] !! 1회차 측정 구간 성공 0건 — 남은 회차를 돌리지 않는다 (7.4-0)" >&2
+      echo "[run]    오류율과 컨테이너 상태를 먼저 확인하라. 이 실행은 폐기 대상이다." >&2
+      exit 1
+    fi
+  fi
 done
 
 echo
@@ -134,4 +199,4 @@ echo "[run] 완료. 요약:"
 # node를 앞에 붙이지 않는다. Git Bash가 mintty에서 node를 winpty로 별칭 처리해,
 # 이 명령을 그대로 복사해 파일로 리다이렉트하면 stdin is not a tty로 실패한다
 # (load-test/README.md의 Windows 주의). shebang 직접 실행은 별칭을 지나지 않는다.
-echo "  load-test/scripts/summarize.mjs --strategy $STRATEGY --scenario $SCENARIO"
+echo "  load-test/scripts/summarize.mjs --strategy $STRATEGY --scenario $SCENARIO --session $MEASURE_SESSION"

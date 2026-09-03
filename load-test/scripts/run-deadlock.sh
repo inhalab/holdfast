@@ -16,6 +16,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 export MSYS_NO_PATHCONV=1
 
+# 측정 세션 태그. run.sh와 같은 이유로 결과 파일명에 들어간다 —
+# 없으면 재실행이 이전 결과를 같은 이름으로 덮는다
+# (docs/results/discarded-measurements.md 4번).
+MEASURE_SESSION="${MEASURE_SESSION:-$(date +%Y%m%d-%H%M)}"
+export MEASURE_SESSION
+
+
 STRATEGY="${1:?전략을 지정한다: none|pessimistic|optimistic|unique|redis}"
 SCENARIO="${2:-high}"          # 좌석 풀. 순서가 엇갈리려면 3석보다 넉넉해야 한다
 RUN="${RUN:-1}"
@@ -47,7 +54,7 @@ fi
 echo "[deadlock] 실행 전 누적 데드락: $BEFORE"
 
 docker compose -f docker-compose.yml -f docker-compose.k6.yml \
-  --profile load run --rm \
+  --profile load run --rm -e "MEASURE_SESSION=$MEASURE_SESSION" \
   -e "SCENARIO=$SCENARIO" -e "STRATEGY=$STRATEGY" -e "RUN=$RUN" \
   -e "WARMUP_SEC=$WARMUP_SEC" -e "DURATION_SEC=$DURATION_SEC" \
   k6 run /scenarios/deadlock.js \

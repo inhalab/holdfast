@@ -2,7 +2,9 @@
 # 따로 떼어 봐도 규칙이 유효하도록 남겨 둔다.
 #
 # 원본 JSON은 results/에 남기고, 채택한 확정 측정본만 docs/results/로 옮겨
-# 커밋한다 (concurrency-spec 7.4-5).
-results/*.json
-results/*.txt
+# 커밋한다 (concurrency-spec 7.4-7).
+#
+# 하위 디렉토리까지 통째로 무시한다 — results/discarded/... 같은 격리 폴더가
+# 커밋 대상으로 잡히지 않게 한다. 루트 .gitignore에 같은 설명이 있다.
+results/*
 !results/.gitkeep

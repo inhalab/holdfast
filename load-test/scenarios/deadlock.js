@@ -96,7 +96,9 @@ function pickShuffledSeats(c, count) {
 export function handleSummary(data) {
   const row = extractRow(data, Object.assign({}, cfg, { scenario: 'deadlock' }));
   const out = {};
-  out[`/results/${cfg.strategy}-deadlock-run${cfg.run}.json`] =
+  // resultPath와 같은 규칙으로 측정 세션 태그를 넣는다(config.js). 이 시나리오는
+  // scenario 이름이 profile 키가 아니라 'deadlock'이라 경로를 직접 만든다.
+  out[`/results/${cfg.strategy}-deadlock-${cfg.measureSession}-run${cfg.run}.json`] =
     JSON.stringify({ config: cfg, seatsPerHold: SEATS_PER_HOLD, row, raw: data }, null, 2);
   out.stdout = renderText(row) +
     '\n 이 시나리오의 판정 기준은 위 숫자가 아니라 데드락 0건이다.\n' +
