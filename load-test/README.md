@@ -191,6 +191,10 @@ SELECT deadlocks FROM pg_stat_database WHERE datname = current_database();
 
 `scripts/run.sh`가 순서를 강제한다.
 
+0. **사전 점검** — nginx를 통과하는 `/api/health`가 응답하는지 본다(7.4.0).
+   응답하지 않으면 부하를 시작하지 않고, 1회차 성공이 0건이면 남은 회차를
+   돌리지 않는다. **이 단계가 없어서 확장 측정 15회를 통째로 버렸다**
+   (`docs/results/discarded-measurements.md` 4번)
 1. **시드 초기화** — `seed.sh`. 매 회차마다 같은 상태에서 시작한다(7.3)
 2. **워밍업 30초 — 집계에서 제외** — 커스텀 메트릭에 기록하지 않는 방식으로 제외한다
 3. **본 측정 시작 시 시드 재초기화** — `reset.sql`. 워밍업이 좌석을 소진하므로

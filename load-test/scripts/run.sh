@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # run.sh — 측정 프로토콜 실행기 (설계서 7.4).
 #
+#   0. **사전 점검** — 부하 대상이 살아 있는지 확인 (7.4-0)
 #   1. 시드 초기화
 #   2. 워밍업 30초 — 집계에서 제외 (시나리오가 처리한다)
 #   3. **본 측정 시작 시 시드 재초기화** — 아래 설명
@@ -76,6 +77,33 @@ snapshot_metrics() {  # $1 = run 라벨
     --out "$ROOT/load-test/results/metrics-$STRATEGY-$SCENARIO-$1.json" || true
 }
 
+# 7.4-0 사전 점검. **부하를 보낼 대상이 살아 있는지 먼저 본다.**
+#
+# 이것이 없어서 7.8 확장 측정 15회를 통째로 버렸다. nginx가 측정 1시간 45분
+# 전에 종료(255)돼 있었는데 아무도 몰랐고, 15회 전부 오류율 100% · 성공 0건 ·
+# p95 0ms로 끝났다(docs/results/discarded-measurements.md 4번). k6는
+# `http://nginx:80`으로 보내므로 그 앞단 하나가 없으면 앱이 아무리 멀쩡해도
+# 요청이 도달하지 않는다.
+#
+# 헬스 경로를 nginx **너머로** 통과시킨다. nginx만 살아 있고 업스트림이 죽은
+# 경우까지 같은 한 번으로 걸린다.
+#
+# **127.0.0.1을 쓴다. localhost가 아니다.** nginx 이미지의 BusyBox wget은
+# localhost를 ::1로 먼저 푸는데 그쪽은 연결이 거부돼, 스택이 멀쩡한데도 점검이
+# 실패한다. 측정을 막는 오탐은 측정을 그냥 돌리는 것만큼 나쁘다.
+preflight() {
+  echo "[run] 사전 점검 — nginx를 통해 앱이 응답하는지 확인한다 (7.4-0)"
+  if ! docker compose exec -T nginx         wget -q -O- --timeout=5 http://127.0.0.1:80/api/health >/dev/null 2>&1; then
+    echo "[run] !! 사전 점검 실패 — nginx를 통한 /api/health가 응답하지 않는다." >&2
+    echo "[run]    측정을 시작하지 않는다. 컨테이너 상태를 확인하라:" >&2
+    echo "[run]      docker compose ps -a" >&2
+    echo "[run]      docker compose up -d" >&2
+    exit 1
+  fi
+}
+
+preflight
+
 # 기준선. 1회차의 델타를 내려면 첫 실행 **전** 값이 있어야 한다.
 snapshot_metrics "run0"
 
@@ -127,6 +155,25 @@ for run in $(seq 1 "$REPEATS"); do
 
   # 7.1 Actuator 출처 지표. **전략 전환 전에 마지막 스냅샷이 확보된다.**
   snapshot_metrics "run${run}"
+
+  # 7.4-0 못 쓸 것이 분명한 실행은 계속하지 않는다.
+  #
+  # 1회차 측정 구간의 성공이 0건이면 나머지 회차도 같은 결과가 나온다. 앞의
+  # 폐기 셋은 "숫자가 그럴듯해서" 못 잡은 것이었지만, 이 경우는 시끄러운데도
+  # 40분을 더 썼다(discarded-measurements.md 4번). 사전 점검을 지나고도
+  # 성공이 0이면 측정 중에 무언가 죽은 것이므로 거기서 멈춘다.
+  if [ "$run" = "1" ]; then
+    RESULT_JSON="$ROOT/load-test/results/$STRATEGY-$SCENARIO-run1.json"
+    if [ -f "$RESULT_JSON" ] && ! env -u MSYS_NO_PATHCONV node -e '
+      const r = require(process.argv[1]).row;
+      if (!r || !r.counts) process.exit(0);          // 모양이 다르면 판단하지 않는다
+      process.exit(r.counts.success > 0 ? 0 : 1);
+    ' "$RESULT_JSON"; then
+      echo "[run] !! 1회차 측정 구간 성공 0건 — 남은 회차를 돌리지 않는다 (7.4-0)" >&2
+      echo "[run]    오류율과 컨테이너 상태를 먼저 확인하라. 이 실행은 폐기 대상이다." >&2
+      exit 1
+    fi
+  fi
 done
 
 echo
