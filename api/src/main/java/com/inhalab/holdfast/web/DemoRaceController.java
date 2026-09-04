@@ -48,7 +48,7 @@ import java.util.Map;
  *
  * <h2>시연 전용이다</h2>
  *
- * <p>{@code holdfast.demo.enabled=false}로 끌 수 있다. 아래 초기화와 좌석 수
+ * <p>{@code holdfast.demo.enabled=false}로 끌 수 있다. 아래 시드·초기화·좌석 수
  * 변경은 한 회차의 데이터를 지우므로 <b>로컬 시연 밖에서 켜 두지 않는다.</b>
  * 이 프로젝트는 로컬 Docker Compose가 측정·시연 환경이고(infra-decision.md 2절)
  * AWS 배포는 잘라낸 항목이라 기본값을 켬으로 둔다.
@@ -61,6 +61,8 @@ public class DemoRaceController {
     private static final long SESSION_ID = 1L;
     /** 좌석 수 상한. 화면에서 늘릴 수 있는 범위를 좁게 둔다 — 시연용이다. */
     private static final int MAX_SEATS = 10;
+    /** 사용자 풀 상한. 요청 수보다 넉넉하면 된다. */
+    private static final int MAX_USERS = 200;
 
     private final JdbcTemplate jdbc;
 
@@ -112,6 +114,9 @@ public class DemoRaceController {
         body.put("u2Present", Boolean.TRUE.equals(jdbc.queryForObject(
                 "SELECT EXISTS (SELECT 1 FROM pg_indexes WHERE tablename = 'seat_hold'"
                         + " AND indexname = 'ux_seat_hold_active')", Boolean.class)));
+        // 사용자 풀이 요청 수보다 적으면 홀드가 조용히 실패한다(CS-6 할당량 행).
+        body.put("userPool", jdbc.queryForObject(
+                "SELECT count(*) FROM user_session_quota WHERE session_id = ?", Long.class, SESSION_ID));
         return body;
     }
 
@@ -150,25 +155,89 @@ public class DemoRaceController {
         clearSession();
         jdbc.update("DELETE FROM seat_inventory WHERE session_id = ?", SESSION_ID);
 
-        for (long seatId = 1; seatId <= n; seatId++) {
-            // seat는 배치도에 속한 정적 데이터라 없을 때만 만든다.
-            jdbc.update("""
-                    INSERT INTO seat (id, zone_id, seat_no, row_index, col_index)
-                    SELECT ?, 1, 'A-' || ?, 1, ?
-                     WHERE NOT EXISTS (SELECT 1 FROM seat WHERE id = ?)
-                    """, seatId, seatId, seatId, seatId);
-            jdbc.update("""
-                    INSERT INTO seat_inventory (session_id, seat_id, status, version)
-                    VALUES (?, ?, 'AVAILABLE', 0)
-                    """, SESSION_ID, seatId);
+        createSeats(n);
+        return state();
+    }
+
+    /**
+     * <b>시연용 시드.</b> 회차·좌석·사용자 풀을 처음부터 다시 만든다.
+     *
+     * <p>시연 중에 터미널로 나가지 않기 위한 것이다. DB가 비어 있어도 이 한
+     * 번으로 화면이 돈다.
+     *
+     * <h3>측정용 {@code seed.sh}와 다른 것</h3>
+     *
+     * <p><b>U-2 인덱스를 건드리지 않는다.</b> 그 인덱스는 전략에 따라 있고
+     * 없어야 하는데(erd 3.1), 전략은 앱을 다시 띄워야 바뀌고 그때
+     * {@code seed.sh}가 이미 맞춰 놓는다. 여기서 또 손대면 <b>화면에서 만든
+     * 상태와 앱이 떠 있는 전략이 어긋난다.</b>
+     *
+     * <p>경합도 프로파일(1000석/100VU 같은 7.2의 조합)도 쓰지 않는다. 그것은
+     * 부하 측정의 변수이고, 여기서 정하는 것은 "화면으로 보여줄 좌석 몇 개"다.
+     * <b>측정은 계속 {@code seed.sh}를 쓴다.</b>
+     */
+    @PostMapping("/demo/seed")
+    @ResponseBody
+    @Transactional
+    public Map<String, Object> seed(@RequestParam(defaultValue = "1") int seats,
+                                    @RequestParam(defaultValue = "50") int users) {
+        int seatCount = Math.max(1, Math.min(MAX_SEATS, seats));
+        int userCount = Math.max(1, Math.min(MAX_USERS, users));
+
+        clearSession();
+        jdbc.update("DELETE FROM seat_inventory WHERE session_id = ?", SESSION_ID);
+        jdbc.update("DELETE FROM user_session_quota WHERE session_id = ?", SESSION_ID);
+        jdbc.update("DELETE FROM event_session WHERE id = ?", SESSION_ID);
+
+        jdbc.update("INSERT INTO program (id, name, created_at)"
+                + " VALUES (1, '시연 프로그램', now()) ON CONFLICT (id) DO NOTHING");
+        jdbc.update("INSERT INTO seat_layout (id, name, created_at)"
+                + " VALUES (1, '시연 배치도', now()) ON CONFLICT (id) DO NOTHING");
+        jdbc.update("INSERT INTO zone (id, seat_layout_id, name, sort_order)"
+                + " VALUES (1, 1, 'A', 1) ON CONFLICT (id) DO NOTHING");
+
+        // 지금 예약할 수 있고 지금 입장할 수 있는 회차. 시연 도중 시간 창에
+        // 걸리지 않도록 넉넉히 잡는다.
+        jdbc.update("INSERT INTO event_session (id, program_id, seat_layout_id, starts_at, ends_at,"
+                + " entry_opens_at, entry_closes_at, reserve_opens_at, max_per_user, status)"
+                + " VALUES (?, 1, 1, now() + interval '1 hour', now() + interval '6 hours',"
+                + " now() - interval '10 minutes', now() + interval '6 hours',"
+                + " now() - interval '1 hour', 4, 'OPEN')", SESSION_ID);
+
+        createSeats(seatCount);
+        for (long userId = 1; userId <= userCount; userId++) {
+            jdbc.update("INSERT INTO user_session_quota (session_id, user_id, held_count)"
+                    + " VALUES (?, ?, 0)", SESSION_ID, userId);
         }
         return state();
     }
 
-    /** 이 회차의 홀드·예약을 지우고 재고를 되돌린다. 좌석 자체는 남긴다. */
+    /** 좌석 {@code 1..n}과 그 재고 행을 만든다. */
+    private void createSeats(int n) {
+        for (long seatId = 1; seatId <= n; seatId++) {
+            // seat는 배치도에 속한 정적 데이터라 없을 때만 만든다.
+            jdbc.update("INSERT INTO seat (id, zone_id, seat_no, row_index, col_index)"
+                    + " SELECT ?, 1, 'A-' || ?, 1, ?"
+                    + " WHERE NOT EXISTS (SELECT 1 FROM seat WHERE id = ?)",
+                    seatId, seatId, seatId, seatId);
+            jdbc.update("INSERT INTO seat_inventory (session_id, seat_id, status, version)"
+                    + " VALUES (?, ?, 'AVAILABLE', 0)", SESSION_ID, seatId);
+        }
+    }
+
+    /** 이 회차의 홀드·예약·티켓을 지우고 재고를 되돌린다. 좌석 자체는 남긴다. */
     private void clearSession() {
-        jdbc.update("DELETE FROM reservation_seat WHERE seat_inventory_id IN"
-                + " (SELECT id FROM seat_inventory WHERE session_id = ?)", SESSION_ID);
+        jdbc.update("DELETE FROM ticket_scan WHERE ticket_id IN (SELECT t.id FROM ticket t"
+                + " JOIN reservation_seat rs ON rs.id = t.reservation_seat_id"
+                + " JOIN reservation r ON r.id = rs.reservation_id WHERE r.session_id = ?)", SESSION_ID);
+        jdbc.update("DELETE FROM ticket WHERE reservation_seat_id IN (SELECT rs.id FROM reservation_seat rs"
+                + " JOIN reservation r ON r.id = rs.reservation_id WHERE r.session_id = ?)", SESSION_ID);
+        jdbc.update("DELETE FROM payment WHERE reservation_id IN"
+                + " (SELECT id FROM reservation WHERE session_id = ?)", SESSION_ID);
+        jdbc.update("DELETE FROM outbox WHERE reservation_id IN"
+                + " (SELECT id FROM reservation WHERE session_id = ?)", SESSION_ID);
+        jdbc.update("DELETE FROM reservation_seat WHERE reservation_id IN"
+                + " (SELECT id FROM reservation WHERE session_id = ?)", SESSION_ID);
         jdbc.update("DELETE FROM reservation WHERE session_id = ?", SESSION_ID);
         jdbc.update("DELETE FROM seat_hold WHERE session_id = ?", SESSION_ID);
         jdbc.update("UPDATE seat_inventory SET status = 'AVAILABLE', hold_id = NULL,"

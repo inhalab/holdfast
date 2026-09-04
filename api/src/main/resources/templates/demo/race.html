@@ -24,9 +24,22 @@
         .note.warn { background: #fff8e1; border-left-color: #e0a800; }
         code { background: #f0f0f0; padding: 0 .25rem; }
         .changed { background: #fff3cd; }
+        nav { margin: 0 0 1rem; padding: .5rem .8rem; background: #f2f2f2; border-radius: .4rem; }
+        nav a { margin-right: 1rem; }
+        .cmd { display: flex; gap: .5rem; align-items: center; }
+        .cmd code { flex: 1; padding: .4rem .6rem; }
     </style>
 </head>
 <body>
+
+<nav>
+    <b>시연 화면</b>
+    <a href="/demo/race">동시 요청</a>
+    <a href="/sessions/1?userId=1" target="_blank">좌석맵 (사용자 1)</a>
+    <a href="/sessions/1?userId=2" target="_blank">좌석맵 (사용자 2)</a>
+    <a href="/scan" target="_blank">검표</a>
+    <a href="/admin/reservations" target="_blank">예약 현황</a>
+</nav>
 
 <h1>동시 요청 데모</h1>
 <p>
@@ -43,16 +56,26 @@
 </div>
 
 <fieldset>
+    <legend>시드 — 회차·좌석·사용자를 처음부터 만든다</legend>
+    <label>좌석 수 <input id="seedSeats" type="number" value="1" min="1" max="10" style="width:4rem"></label>
+    <label>사용자 수 <input id="seedUsers" type="number" value="50" min="1" max="200" style="width:5rem"></label>
+    <button id="runSeed">시드 실행</button>
+    <span class="dim">DB가 비어 있어도 이 한 번으로 화면이 돈다. 측정은 계속
+        <code>seed.sh</code>를 쓴다.</span>
+</fieldset>
+
+<fieldset>
     <legend>설정</legend>
     <label>좌석 수
         <input id="seatCount" type="number" value="1" min="1" max="10" style="width:4rem">
     </label>
-    <button id="applySeats">좌석 수 적용</button>
+    <button id="applySeats">좌석 수만 바꾸기</button>
     &nbsp;&nbsp;
     <label>요청 수
         <input id="count" type="number" value="20" min="2" max="60" style="width:4rem">
     </label>
     <span class="dim" id="spreadHint"></span>
+    <div class="dim" id="poolHint" style="margin-top:.4rem"></div>
 </fieldset>
 
 <fieldset>
@@ -103,9 +126,16 @@
     하나만 만들어져 <code>SeatHoldService</code>에 직접 주입되므로, 런타임 교체는
     측정 경로인 그 클래스를 고치는 일이 된다. 시연 편의로 M3가 잰 코드를 건드리지
     않는다.
-    <pre>./holdfast strategy pessimistic</pre>
+    <div class="cmd">
+        <code id="strategyCmd">./holdfast strategy pessimistic</code>
+        <select id="strategyPick">
+            <option>none</option><option selected>pessimistic</option>
+            <option>optimistic</option><option>unique</option><option>redis</option>
+        </select>
+        <button id="copyCmd">명령 복사</button>
+    </div>
     이 화면은 전환을 <b>감지해서</b> 위 배지를 자동으로 갱신한다. 터미널에서 명령을
-    치고 이 창을 그대로 두면 된다.
+    붙여넣고 이 창을 그대로 두면 된다.
     <br><br>
     <b>첫 실행은 한 번 눌러 버리고 시작하라.</b> JVM이 데워지기 전 첫 묶음은 일부
     요청이 연결 단계에서 실패한다.
@@ -162,6 +192,15 @@
       : `이번 발사로 홀드가 <b>${gained}건</b> 늘었고, <b class="ok">좌석마다 정확히 하나</b>다 — 나머지는 전부 거절됐다.`;
   }
 
+  function updatePoolHint(s) {
+    if (!s) return;
+    const n = num('count');
+    $('poolHint').innerHTML = s.userPool >= n
+      ? `사용자 풀 ${s.userPool}명 — 요청 ${n}개를 전부 다른 사용자로 보낼 수 있다.`
+      : `<b class="bad">사용자 풀이 ${s.userPool}명뿐이다.</b> 요청 ${n}개 중 뒤쪽은 ` +
+        `할당량 행이 없어 실패한다 — 시드에서 사용자 수를 늘려라.`;
+  }
+
   function updateSpreadHint() {
     const seats = num('seatCount'), n = num('count');
     const per = Math.ceil(n / seats);
@@ -199,8 +238,36 @@
     }
   }, 2000);
 
-  $('count').addEventListener('input', updateSpreadHint);
+  $('count').addEventListener('input', () => { updateSpreadHint(); refreshHints(); });
   $('seatCount').addEventListener('input', updateSpreadHint);
+
+  async function refreshHints() {
+    try { updatePoolHint(await fetchState()); } catch (e) { /* 재기동 중 */ }
+  }
+
+  $('strategyPick').addEventListener('change', () => {
+    $('strategyCmd').textContent = `./holdfast strategy ${$('strategyPick').value}`;
+  });
+  $('copyCmd').addEventListener('click', async () => {
+    await navigator.clipboard.writeText($('strategyCmd').textContent);
+    $('copyCmd').textContent = '복사했다';
+    setTimeout(() => { $('copyCmd').textContent = '명령 복사'; }, 1500);
+  });
+
+  $('runSeed').addEventListener('click', async () => {
+    const r = await fetch(
+      `/demo/seed?seats=${num('seedSeats')}&users=${num('seedUsers')}`, { method: 'POST' });
+    const s = await r.json();
+    before = null;
+    renderTable($('beforeTable'), null);
+    renderTable($('afterTable'), s);
+    $('seatCount').value = s.seatCount;
+    $('summary').textContent = `시드 완료 — 좌석 ${s.seatCount}개 · 사용자 ${s.userPool}명.`;
+    $('codes').hidden = true;
+    $('verdict').textContent = '';
+    updateSpreadHint();
+    updatePoolHint(s);
+  });
 
   $('applySeats').addEventListener('click', async () => {
     const r = await fetch(`/demo/race/seats?count=${num('seatCount')}`, { method: 'POST' });
@@ -290,6 +357,7 @@
     $('seatCount').value = s.seatCount;
     renderTable($('afterTable'), s);
     updateSpreadHint();
+    updatePoolHint(s);
   })();
 })();
 </script>
