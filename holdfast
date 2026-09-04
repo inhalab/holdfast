@@ -46,6 +46,9 @@ holdfast — 실행 진입점
   test [패턴]          cd api && ./gradlew test. 패턴을 주면 --tests로 넘긴다
   build                cd api && ./gradlew build -x test
 
+문서
+  bundle [출력파일]    판단에 필요한 문서만 zip으로 묶는다 (다른 세션에 넘길 용도)
+
 시연
   demo [전략]          기동 + 시드 + 화면 주소 안내
   strategy <이름>      전략을 바꿔 앱만 다시 띄운다 (약 13초)
@@ -169,6 +172,31 @@ EOF
     # U-2는 전략에 따라 있고 없다(erd 3.1). 시드가 그 판단을 하므로 함께 돌린다.
     "$S/seed.sh" "$DEMO_SCENARIO" "$s"
     echo "[holdfast] 전략 $s 준비됐다. 데모 화면은 자동으로 갱신된다."
+    ;;
+
+  bundle)
+    # **docs/status.md 하나로 파악할 수 있게 만든 묶음이다.**
+    #
+    # 다른 사람이나 새 AI 세션에 컨텍스트로 넣는 것이 용도라, 판단이 담긴
+    # 문서만 넣고 **부피만 큰 것은 뺀다.**
+    #
+    #   빼는 것: docs/results/*.json — k6 요약 원본 24개(216KB)다. 판정에 쓰인
+    #            숫자는 이미 m3-conclusion과 concurrency-spec 7.6의 표에 있고,
+    #            원본은 임계값·메트릭 버킷이 대부분이라 읽는 쪽에 도움이 안 된다
+    #   애초에 없는 것: load-test/results/ 는 .gitignore 대상이라 저장소에 없다
+    #
+    # **HEAD 기준이다.** git archive가 커밋된 것만 담으므로, 방금 고친 문서를
+    # 넣으려면 먼저 커밋해야 한다. 아래에서 그 사실을 확인해 알려준다.
+    out="${1:-holdfast-docs-$(date +%Y%m%d).zip}"
+
+    if ! git diff --quiet HEAD -- docs README.md 2>/dev/null; then
+      echo "[holdfast] !! docs/에 커밋되지 않은 변경이 있다. 묶음은 HEAD 기준이라 빠진다." >&2
+    fi
+
+    git archive --format=zip -o "$out" HEAD README.md 'docs/*.md' docs/openapi.yaml
+    n=$(git ls-tree -r --name-only HEAD -- README.md 'docs/*.md' docs/openapi.yaml | wc -l)
+    echo "[holdfast] $out — 문서 ${n}개"
+    echo "[holdfast] 먼저 읽을 것: docs/status.md"
     ;;
 
   race)
