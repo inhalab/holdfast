@@ -135,7 +135,7 @@ erDiagram
         bigint id PK
         bigint reservation_seat_id FK "예약좌석당 1장"
         varchar qr_token "QR 토큰"
-        varchar status "ISSUED/USED/VOID"
+        varchar status "ISSUED/USED"
         timestamptz issued_at
         timestamptz used_at
     }
@@ -470,7 +470,7 @@ reservation    : HELD → PENDING_PAYMENT → CONFIRMED → CANCELLED
                  HELD → EXPIRED
 
 ticket         : ISSUED → USED
-                 ISSUED → VOID
+                 (VOID는 두지 않는다 — state-transitions.md 4절)
 ```
 
 `outbox`는 `SELECT ... FOR UPDATE SKIP LOCKED`를 감싼 조건부 UPDATE로 집는다

@@ -10,6 +10,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PathVariable;
 
 /**
@@ -24,8 +25,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 @Controller
 public class ReservationPageController {
 
-    // 인증 미구현 — SeatMapPageController와 같은 값(openapi UserIdHeader 대신).
-    private static final long DEV_USER_ID = 1L;
+    // 인증 미구현 — SeatMapPageController와 같은 기본값(openapi UserIdHeader 대신).
+    private static final long DEFAULT_USER_ID = 1L;
 
     private final ReservationService reservationService;
     private final TicketService ticketService;
@@ -35,9 +36,21 @@ public class ReservationPageController {
         this.ticketService = ticketService;
     }
 
+    /**
+     * 예약 확인·티켓 화면.
+     *
+     * <p><b>{@code ?userId=}를 받는 이유는 좌석맵과 같다</b>
+     * ({@code SeatMapPageController#seatMap}). 여기서는 특히 필요하다 —
+     * {@code ReservationService#get}이 남의 예약을 404로 막으므로, 사용자 2로
+     * 예매한 뒤 이 화면을 열면 <b>기본값 1로는 404가 된다.</b> 시연 도중 흐름이
+     * 거기서 끊긴다.
+     */
     @GetMapping("/reservations/{reservationId}")
-    public String show(@PathVariable long reservationId, Model model) {
-        Reservation reservation = reservationService.get(reservationId, DEV_USER_ID);
+    public String show(@PathVariable long reservationId,
+                       @RequestParam(name = "userId", defaultValue = "" + DEFAULT_USER_ID)
+                       long userId,
+                       Model model) {
+        Reservation reservation = reservationService.get(reservationId, userId);
         model.addAttribute("reservation", reservation);
         model.addAttribute("seats", reservationService.seatsOf(reservationId));
         model.addAttribute("tickets", ticketService.ticketsOf(reservationId));

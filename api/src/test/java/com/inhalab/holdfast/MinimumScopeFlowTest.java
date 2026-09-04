@@ -103,13 +103,15 @@ class MinimumScopeFlowTest {
     private static final long NOT_OPEN_SESSION_ID = 2L;
     private static final long SEAT_ID = 1L;
     /**
-     * <b>1이어야 한다.</b> 인증이 아직 없어 페이지 컨트롤러들이
-     * {@code DEV_USER_ID = 1}을 하드코딩하고 있고({@code ReservationPageController}),
-     * 예약 확인 화면은 그 사용자의 예약만 보여준다(남의 예약이면 404). 다른 값을
-     * 쓰면 API 흐름은 통과하는데 화면만 404가 되어, 최소 완결선이 "화면에서
-     * 돈다"인 이상 그 자체가 흐름이 끊긴 것이다.
+     * <b>일부러 1이 아니다.</b> 페이지의 기본 사용자는 1인데(인증 미구현),
+     * 그 값으로만 테스트하면 <b>화면이 사용자를 바꿀 수 있는지</b>를 확인하지
+     * 못한다. 처음에는 1로 맞춰 통과시켰다가, 기본값에 의존하는 테스트는
+     * "화면에서 돈다"를 한 사용자에 대해서만 보증한다는 것을 알고 바꿨다.
+     *
+     * <p>페이지 호출에 {@code ?userId=}를 붙이는 것이 그래서 필요하다 — 붙이지
+     * 않으면 예약 확인 화면이 남의 예약으로 보고 404를 낸다.
      */
-    private static final long USER_ID = 1L;
+    private static final long USER_ID = 7L;
 
     @Container
     @ServiceConnection
@@ -198,10 +200,12 @@ class MinimumScopeFlowTest {
         when(gateway.decide()).thenReturn(PaymentStatus.APPROVED);
 
         // ── 좌석 선택: 화면이 좌석을 그린다 ──────────────────────────────
-        mvc.perform(get("/sessions/{id}", SESSION_ID))
+        mvc.perform(get("/sessions/{id}?userId={u}", SESSION_ID, USER_ID))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("data-seat-id")))
-                .andExpect(content().string(containsString("is-available")));
+                .andExpect(content().string(containsString("is-available")))
+                // 화면이 그 사용자로 열렸다 — JS가 이 값을 X-User-Id로 싣는다.
+                .andExpect(content().string(containsString("data-user-id=\"" + USER_ID + "\"")));
 
         assertSeatInventory("AVAILABLE");
 
@@ -241,10 +245,15 @@ class MinimumScopeFlowTest {
         assertThat(tickets.get(0).get("status").asText()).isEqualTo("ISSUED");
 
         // 예약 확인 화면이 좌석과 티켓을 함께 보여준다.
-        mvc.perform(get("/reservations/{id}", reservationId))
+        mvc.perform(get("/reservations/{id}?userId={u}", reservationId, USER_ID))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("A-1")))
                 .andExpect(content().string(containsString(qrToken)));
+
+        // **기본 사용자로 열면 404다.** 남의 예약을 보여주지 않는다는 뜻이고,
+        // 그래서 시연에서 사용자를 바꿀 수단이 필요하다(SeatMapPageController).
+        mvc.perform(get("/reservations/{id}", reservationId))
+                .andExpect(status().isNotFound());
 
         // ── 검표 ────────────────────────────────────────────────────────
         // 검표 화면이 먼저 뜬다(게이트 단말이 여는 페이지).
@@ -384,6 +393,40 @@ class MinimumScopeFlowTest {
                         .content(json(Map.of("holdId", holdId))))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("HOLD_ALREADY_CONFIRMED"));
+    }
+
+    @Test
+    @DisplayName("예약을 취소하면 그 티켓의 검표가 REJECTED_INVALID로 막힌다")
+    void scanAfterCancellationIsRejected() throws Exception {
+        when(gateway.decide()).thenReturn(PaymentStatus.APPROVED);
+        String holdId = createHold(SESSION_ID).get("holdId").asText();
+        long reservationId = pay(holdId).get("reservationId").asLong();
+        JsonNode tickets = getJson(get("/api/reservations/{id}/tickets", reservationId)
+                .header("X-User-Id", USER_ID));
+        String qrToken = tickets.get(0).get("qrToken").asText();
+
+        mvc.perform(post("/api/reservations/{id}/cancel", reservationId)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .header("X-User-Id", USER_ID))
+                .andExpect(status().isOk());
+        assertThat(one("SELECT status FROM reservation WHERE id = ?", reservationId))
+                .isEqualTo("CANCELLED");
+
+        // **티켓은 여전히 ISSUED다.** 취소 시점에 무효화하지 않는 것이 설계이며,
+        // 그래서 TicketStatus에 VOID가 없다(state-transitions 4절). 막는 것은
+        // 검표 시점의 lazy 검증이다.
+        assertThat(one("SELECT status FROM ticket WHERE qr_token = ?", qrToken)).isEqualTo("ISSUED");
+
+        JsonNode scan = scan(qrToken);
+        assertThat(scan.get("result").asText()).isEqualTo("REJECTED_INVALID");
+
+        // 거절도 이력으로 남는다 — 티켓을 특정할 수 있으므로 남길 수 있다.
+        long ticketId = jdbc.queryForObject(
+                "SELECT id FROM ticket WHERE qr_token = ?", Long.class, qrToken);
+        assertThat(count("SELECT count(*) FROM ticket_scan WHERE ticket_id = " + ticketId
+                + " AND result = 'REJECTED_INVALID'")).isEqualTo(1);
+        // 취소했으므로 좌석은 돌아온다(CS-4).
+        assertSeatInventory("AVAILABLE");
     }
 
     @Test

@@ -33,7 +33,7 @@ public class Ticket {
     @Column(name = "qr_token", nullable = false, length = 255)
     private String qrToken;
 
-    /** ISSUED / USED / VOID. */
+    /** {@link TicketStatus} 이름. ISSUED / USED — VOID는 두지 않는다. */
     @Column(name = "status", nullable = false, length = 20)
     private String status;
 

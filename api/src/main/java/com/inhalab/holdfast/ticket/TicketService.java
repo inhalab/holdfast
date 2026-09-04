@@ -67,12 +67,13 @@ public class TicketService {
      * 검표. QR 토큰 하나로 판정하며 결과는 전부 200이다 — 거절도 오류가 아닌
      * 판정이다({@link TicketScanResponse}).
      *
-     * <p><b>예약 취소를 lazy로 검증한다.</b> {@code ISSUED → VOID} 전이를
-     * 취소 시점에 미리 실행하지 않는다({@link TicketStatus} 참고) — 취소는
-     * {@code reservation/}의 트랜잭션이고, 그 안에서 이 패키지의 테이블까지
-     * 갱신하게 만들면 패키지 경계를 넘는 훅이 생긴다. 대신 검표 시점에 예약
-     * 상태를 함께 읽어 판정한다. 확정 경로가 만료를 lazy로 검증하는 것
-     * (concurrency-spec 3절)과 같은 모양이다.
+     * <p><b>예약 취소를 lazy로 검증한다.</b> 취소 시점에 티켓을 무효화하지
+     * 않는다 — 취소는 {@code reservation/}의 트랜잭션이고, 그 안에서 이 패키지의
+     * 테이블까지 갱신하게 만들면 패키지 경계를 넘는 훅이 생기며 CS-4의 임계
+     * 구역에 쓰기가 하나 늘어난다. 대신 검표 시점에 예약 상태를 함께 읽어
+     * {@code REJECTED_INVALID}로 판정한다. 확정 경로가 만료를 lazy로 검증하는
+     * 것(concurrency-spec 3절)과 같은 모양이며, <b>그래서 티켓 상태에
+     * {@code VOID}가 없다</b>({@link TicketStatus}).
      *
      * <p><b>이 메서드는 {@code @Transactional}이 아니다.</b> 판정마다
      * {@link TicketScanRecorder}의 서로 다른 최상위 트랜잭션을 호출해야

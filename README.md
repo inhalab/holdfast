@@ -146,6 +146,7 @@ load-test/scripts/summarize.mjs --scenario high        # 7.6 기록 양식 표
 
 - [M3 결론 — 다섯 전략 측정 종합](docs/results/m3-conclusion.md)
 - [폐기 기록 — 버린 측정과 회수한 전제](docs/results/discarded-measurements.md)
+- [M4 최소 완결선](docs/scope-m4.md)
 - [설계 명세 및 구현 범위](docs/design-spec.md)
 - [요구사항 추적표](docs/requirements.md)
 - [동시성 설계서](docs/concurrency-spec.md)

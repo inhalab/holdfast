@@ -77,7 +77,7 @@ body {
 }
 .ticket-status.ISSUED { background: #2f6feb; }
 .ticket-status.USED { background: #6b6b6b; }
-.ticket-status.VOID { background: var(--warn); }
+
 
 /* --- 검표 --- */
 .scan-form { display: flex; gap: 8px; margin-bottom: 16px; }
