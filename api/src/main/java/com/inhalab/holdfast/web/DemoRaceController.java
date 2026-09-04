@@ -1,6 +1,7 @@
 package com.inhalab.holdfast.web;
 
 import org.springframework.beans.factory.annotation.Value;
+import com.inhalab.holdfast.support.IdentitySequences;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Controller;
@@ -209,10 +210,18 @@ public class DemoRaceController {
             jdbc.update("INSERT INTO user_session_quota (session_id, user_id, held_count)"
                     + " VALUES (?, ?, 0)", SESSION_ID, userId);
         }
+        // 위 INSERT가 전부 id를 명시했다. 시퀀스를 데이터 뒤로 밀어 두지 않으면
+        // 관리자 등록 화면이 id=1을 다시 발급받아 500이 된다.
+        IdentitySequences.resync(jdbc);
         return state();
     }
 
-    /** 좌석 {@code 1..n}과 그 재고 행을 만든다. */
+    /**
+     * 좌석 {@code 1..n}과 그 재고 행을 만든다.
+     *
+     * <p>id를 명시하므로 끝에 시퀀스를 맞춘다 — 안 맞추면 관리자 등록 화면이
+     * duplicate key로 500을 낸다({@link IdentitySequences}).
+     */
     private void createSeats(int n) {
         for (long seatId = 1; seatId <= n; seatId++) {
             // seat는 배치도에 속한 정적 데이터라 없을 때만 만든다.
@@ -223,6 +232,7 @@ public class DemoRaceController {
             jdbc.update("INSERT INTO seat_inventory (session_id, seat_id, status, version)"
                     + " VALUES (?, ?, 'AVAILABLE', 0)", SESSION_ID, seatId);
         }
+        IdentitySequences.resync(jdbc);
     }
 
     /** 이 회차의 홀드·예약·티켓을 지우고 재고를 되돌린다. 좌석 자체는 남긴다. */

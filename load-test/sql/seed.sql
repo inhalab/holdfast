@@ -70,6 +70,42 @@ INSERT INTO user_session_quota (session_id, user_id, held_count)
 SELECT :session_id, u, 0
 FROM generate_series(1, :users) AS u;
 
+-- **시퀀스를 데이터에 맞춘다.** id를 명시해 INSERT하면 IDENTITY 시퀀스는 올라가지
+-- 않고, TRUNCATE ... RESTART IDENTITY는 시퀀스를 1로 되돌린다. 그 상태에서 앱이
+-- 자동 생성으로 INSERT하면 id=1을 다시 발급해 program_pkey에 걸린다 — 관리자
+-- 등록 화면(#101)이 실제로 그 500을 냈다.
+--
+-- **id를 명시하는 쪽은 그대로 둔다.** k6의 SESSION_ID·SEAT_ID_BASE 기본값 1과
+-- verify.sql의 -v session_id=1이 이 값을 전제하므로, 시퀀스에 맡기면 측정 절차가
+-- 바뀐다. 시드가 id를 정하고 시퀀스를 그 뒤로 밀어 두면 양쪽이 같은 테이블을
+-- 나눠 쓸 수 있다.
+--
+-- 테이블을 열거하지 않는다 — 목록에 추가하는 것을 잊는 것이 이 버그의 원인과
+-- 같은 종류다. IDENTITY 컬럼을 가진 테이블을 전부 훑는다.
+-- 근거와 다른 두 선택지는 support/IdentitySequences.java에 적었다.
+DO $$
+DECLARE
+    r   record;
+    seq text;
+    mx  bigint;
+BEGIN
+    FOR r IN
+        SELECT c.table_name, c.column_name
+          FROM information_schema.columns c
+          JOIN information_schema.tables t
+            ON t.table_schema = c.table_schema AND t.table_name = c.table_name
+         WHERE c.table_schema = current_schema()
+           AND t.table_type = 'BASE TABLE'
+           AND c.is_identity = 'YES'
+    LOOP
+        seq := pg_get_serial_sequence(quote_ident(r.table_name), r.column_name);
+        CONTINUE WHEN seq IS NULL;
+        EXECUTE format('SELECT max(%I) FROM %I', r.column_name, r.table_name) INTO mx;
+        PERFORM setval(seq, COALESCE(mx, 1), mx IS NOT NULL);
+    END LOOP;
+END
+$$;
+
 COMMIT;
 
 -- U-2(활성 홀드 중복 차단)는 **여기서 만들지 않는다.**
