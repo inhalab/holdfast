@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${program.name} + ' — 회차 관리'">회차 관리</title>
+    <link rel="stylesheet" th:href="@{/css/reservation.css}">
+</head>
+<body>
+<main class="page admin-page">
+    <h1 th:text="${program.name}">데모 공연</h1>
+    <p class="meta">모든 시각은 <span th:text="${zone}">Asia/Seoul</span> 기준입니다.</p>
+
+    <section class="card">
+        <h2>프로그램 수정</h2>
+        <form method="post" th:action="@{/admin/programs/{id}(id=${program.id})}" class="admin-form">
+            <label>이름 <input type="text" name="name" th:value="${program.name}" required></label>
+            <label>설명 <input type="text" name="description" th:value="${program.description}"></label>
+            <button type="submit">저장</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>회차 등록</h2>
+        <p class="meta">
+            회차를 만들면 <strong>좌석재고와 할당량 행이 함께 생성</strong>됩니다.
+            좌석재고를 미리 만드는 것이 좌석 단위 락의 전제입니다.
+        </p>
+        <form method="post" th:action="@{/admin/programs/{id}/sessions(id=${program.id})}" class="admin-form">
+            <label>좌석배치도
+                <select name="seatLayoutId" required>
+                    <option th:each="l : ${layouts}"
+                            th:value="${l.id}"
+                            th:text="${l.name} + ' (좌석 ' + ${l.seatCount} + '석)'">배치도</option>
+                </select>
+            </label>
+            <label>시작 <input type="datetime-local" name="startsAt" required></label>
+            <label>종료 <input type="datetime-local" name="endsAt" required></label>
+            <label>입장 시작 <input type="datetime-local" name="entryOpensAt" required></label>
+            <label>입장 종료 <input type="datetime-local" name="entryClosesAt" required></label>
+            <label>예약 오픈 <input type="datetime-local" name="reserveOpensAt" required></label>
+            <label>1인 최대 매수 <input type="number" name="maxPerUser" value="4" min="1" required></label>
+            <label>상태
+                <select name="status">
+                    <option value="OPEN">OPEN</option>
+                    <option value="SCHEDULED">SCHEDULED</option>
+                    <option value="CLOSED">CLOSED</option>
+                </select>
+            </label>
+            <label>사용자 풀 크기 <input type="number" name="userPoolSize" value="100" min="1" required></label>
+            <button type="submit">회차 등록</button>
+        </form>
+        <p class="meta">
+            <strong>사용자 풀 크기</strong>는 미리 만들어 둘 <code>user_session_quota</code> 행 수입니다.
+            회원 기능이 없어 "누구의 행을 만들지"가 정해지지 않으므로 사용자 1..N을 만듭니다
+            — 이 행이 없으면 홀드가 실패합니다.
+        </p>
+    </section>
+
+    <section class="card">
+        <h2>회차 목록</h2>
+        <p class="meta" th:if="${#lists.isEmpty(sessions)}">등록된 회차가 없습니다.</p>
+
+        <form th:each="s : ${sessions}" method="post"
+              th:action="@{/admin/sessions/{id}(id=${s.id})}" class="admin-form session-row">
+            <input type="hidden" name="programId" th:value="${program.id}">
+            <strong>#<span th:text="${s.id}">1</span></strong>
+            <span class="meta">배치도 <span th:text="${s.seatLayoutId}">1</span> (변경 불가)</span>
+            <label>시작 <input type="datetime-local" name="startsAt" th:value="${s.startsAt}" required></label>
+            <label>종료 <input type="datetime-local" name="endsAt" th:value="${s.endsAt}" required></label>
+            <label>입장 시작 <input type="datetime-local" name="entryOpensAt" th:value="${s.entryOpensAt}" required></label>
+            <label>입장 종료 <input type="datetime-local" name="entryClosesAt" th:value="${s.entryClosesAt}" required></label>
+            <label>예약 오픈 <input type="datetime-local" name="reserveOpensAt" th:value="${s.reserveOpensAt}" required></label>
+            <label>최대 매수 <input type="number" name="maxPerUser" th:value="${s.maxPerUser}" min="1" required></label>
+            <label>상태
+                <select name="status">
+                    <option value="OPEN" th:selected="${s.status == 'OPEN'}">OPEN</option>
+                    <option value="SCHEDULED" th:selected="${s.status == 'SCHEDULED'}">SCHEDULED</option>
+                    <option value="CLOSED" th:selected="${s.status == 'CLOSED'}">CLOSED</option>
+                </select>
+            </label>
+            <button type="submit">저장</button>
+            <a class="link-back" th:href="@{/sessions/{id}(id=${s.id})}">좌석맵 →</a>
+        </form>
+        <p class="meta" th:if="${not #lists.isEmpty(sessions)}">
+            <strong>좌석배치도는 등록 후 바꿀 수 없습니다.</strong> 바꾸면 이미 만든 좌석재고가
+            다른 배치도의 좌석을 가리키게 되고, 판매된 좌석이 있으면 되돌릴 수 없습니다.
+        </p>
+    </section>
+
+    <a class="link-back" th:href="@{/admin/programs}">← 프로그램 목록</a>
+</main>
+</body>
+</html>
