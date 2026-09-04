@@ -24,6 +24,9 @@ body {
 
 .seatmap { max-width: 1000px; margin: 0 auto; padding: 20px; }
 
+.link-back { display: inline-block; margin-bottom: 6px; color: #2f6feb; text-decoration: none; font-size: 13px; }
+.link-back:hover { text-decoration: underline; }
+
 .page-head h1 { margin: 0 0 4px; font-size: 20px; }
 .page-head .meta { margin: 0 0 12px; color: #666; }
 
@@ -190,4 +193,39 @@ button.secondary { background: #fff; border-color: #ccc; color: #333; }
     /* 결제·해제가 한 줄에 안 들어가면 접히되, 각자는 누를 만한 크기를 지킨다. */
     .actions { flex-wrap: wrap; }
     .actions button { flex: 1 1 auto; }
+}
+
+/* --- 모든 화면의 바닥 (이슈 A·B·D) --- */
+
+/*
+ * 좌석맵·검표는 나가는 링크가 하나도 없어 뒤로가기 말고는 빠져나올 수 없었다.
+ * 동시성 데모(/demo/race)는 이 프로젝트의 핵심 화면인데 어디서도 링크되지
+ * 않아 주소를 직접 쳐야 했다. 둘 다 여기서 해결한다.
+ */
+.page-foot {
+    max-width: 960px;
+    margin: 28px auto 0;
+    padding: 12px 20px 24px;
+    border-top: 1px solid #e3e5e9;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+    font-size: 12px;
+}
+.foot-links { display: flex; flex-wrap: wrap; gap: 14px; }
+.foot-links a { color: #2f6feb; text-decoration: none; }
+.foot-links a:hover { text-decoration: underline; }
+
+/*
+ * 이 요청을 처리한 앱 인스턴스. 새로고침하면 app1/app2가 번갈아 찍히는 것이
+ * 로드밸런싱의 가장 짧은 증거다 — 구성도에만 있던 사실을 화면으로 옮긴다.
+ */
+.instance-badge {
+    font-family: ui-monospace, "Courier New", monospace;
+    color: #666;
+    background: #eef1f6;
+    border-radius: 4px;
+    padding: 2px 8px;
 }

@@ -23,6 +23,10 @@
                data-sale-state=${saleState}">
 
     <header class="page-head">
+        <!-- 들어온 길로 되돌아가는 링크. programId를 못 읽었으면 프로그램 목록으로 보낸다. -->
+        <a class="link-back" th:if="${programId != null}"
+           th:href="@{/programs/{id}(id=${programId})}">← 회차 목록</a>
+        <a class="link-back" th:if="${programId == null}" th:href="@{/programs}">← 프로그램 목록</a>
         <h1 th:text="'회차 ' + ${seatMap.sessionId} + ' 좌석 선택'">좌석 선택</h1>
         <p class="meta">
             <span th:text="'상태 ' + ${seatMap.sessionStatus}">상태 OPEN</span>
@@ -103,6 +107,7 @@
         </aside>
     </div>
 </main>
+<footer th:replace="~{fragments/page-foot :: foot}"></footer>
 
 <script th:src="@{/js/seatmap.js}"></script>
 </body>
