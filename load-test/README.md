@@ -326,6 +326,9 @@ done
 
 ### 실행기 — `measure.sh`
 
+저장소 루트의 `./holdfast measure`가 이 스크립트에 그대로 위임한다. 아래 예시의
+`load-test/scripts/measure.sh`는 `./holdfast measure`로 바꿔 써도 같다.
+
 시나리오·전략 이름을 외우지 않아도 되고, **전량 실행에서 세션이 갈리지 않는다.**
 
 ```bash

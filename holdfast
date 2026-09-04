@@ -1,0 +1,160 @@
+#!/usr/bin/env bash
+# holdfast — 단일 진입점.
+#
+# load-test/scripts/ 아래 스크립트들과 gradle·docker compose를 서브커맨드로 묶는다.
+# **아무것도 대체하지 않는다.** 각 스크립트는 지금처럼 직접 부를 수 있고, 이
+# 파일은 "무엇을 언제 쓰는가"를 한자리에 모으고 경로를 대신 쳐 줄 뿐이다.
+#
+#   ./holdfast              서브커맨드 목록
+#   ./holdfast <커맨드> -h  그 커맨드의 도움말(위임 대상의 것을 보여준다)
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT"
+S="$ROOT/load-test/scripts"
+
+# Git Bash가 /scenarios/... 같은 인자를 Windows 경로로 바꾸는 것을 막는다.
+# 개별 스크립트도 각자 걸지만, 여기서 걸어 두면 위임 전에 이미 적용된다.
+export MSYS_NO_PATHCONV=1
+
+# node는 반드시 env를 거쳐 부른다. Git Bash가 mintty에서 node를 winpty로 별칭
+# 처리해, 출력을 리다이렉트하면 "stdin is not a tty"로 실패한다
+# (load-test/README의 Windows 주의). env는 셸 별칭을 지나지 않는다.
+node_run() { env -u MSYS_NO_PATHCONV node "$@"; }
+
+usage() {
+  cat <<'USAGE'
+holdfast — 실행 진입점
+
+  ./holdfast <커맨드> [인자...]
+
+스택
+  up [전략]            앱 2대 + DB + Redis + nginx 기동. 전략을 주면 그것으로 띄운다
+  down                 전부 내린다
+  ps                   컨테이너 상태
+  logs [서비스]        로그 (기본 app1)
+
+측정
+  seed <시나리오> <전략>   시드 초기화 (U-2는 none에서만 제거된다)
+  measure [...]            측정 실행기. 인자 없이 대화형, --preset 지원
+  deadlock <전략> [시나리오]  데드락 회피 검증 (7.2.1)
+  sustained <전략>         지속 경합 시나리오 (7.2.2)
+  verify                   DB 검증 쿼리 V-1~V-5
+  summary [...]            결과 요약 표 (기본: 최신 세션)
+
+개발
+  test [패턴]          cd api && ./gradlew test. 패턴을 주면 --tests로 넘긴다
+  build                cd api && ./gradlew build -x test
+
+시연
+  demo [전략]          기동 + 시드 + 화면 주소 안내
+  race                 동시 요청 데모 주소를 알려준다
+
+  각 커맨드에 -h 를 주면 위임 대상의 도움말이 나온다(measure·deadlock 등).
+
+PATH에 넣고 싶으면:
+  export PATH="$PATH:/경로/holdfast"   # 저장소 루트를 PATH에 넣고 `holdfast` 로 호출
+USAGE
+}
+
+# 시연·시드의 기본값. extreme(1석/200명)이 동시성 시연에 가장 선명하다.
+DEMO_SCENARIO="${DEMO_SCENARIO:-extreme}"
+
+wait_healthy() {
+  # docker compose가 Started를 돌려줘도 Spring Boot는 5~6초 더 걸린다
+  # (load-test/README의 "Started는 응답할 준비가 됐다가 아니다").
+  local n=0
+  printf '[holdfast] 앱이 응답할 때까지 기다린다'
+  while [ "$n" -lt 60 ]; do
+    if docker compose exec -T nginx wget -q -O- --timeout=3 \
+         http://127.0.0.1:80/api/health >/dev/null 2>&1; then
+      echo " — 준비됐다."
+      return 0
+    fi
+    printf '.'
+    sleep 2
+    n=$((n + 2))
+  done
+  echo
+  echo "[holdfast] !! 60초 안에 응답하지 않았다. ./holdfast logs app1 로 확인하라." >&2
+  return 1
+}
+
+cmd="${1:-}"
+[ $# -gt 0 ] && shift || true
+
+case "$cmd" in
+  ''|-h|--help|help) usage ;;
+
+  up)
+    strategy="${1:-}"
+    if [ -n "$strategy" ]; then
+      echo "[holdfast] 전략 $strategy 로 기동한다."
+      HOLDFAST_STRATEGY="$strategy" docker compose up -d
+    else
+      docker compose up -d
+    fi
+    wait_healthy
+    ;;
+
+  down) docker compose down ;;
+  ps)   docker compose ps ;;
+  logs) docker compose logs -f --tail 100 "${1:-app1}" ;;
+
+  seed)     "$S/seed.sh" "$@" ;;
+  measure)  "$S/measure.sh" "$@" ;;
+  deadlock) "$S/run-deadlock.sh" "$@" ;;
+  sustained) "$S/run-sustained.sh" "$@" ;;
+  verify)   "$S/verify.sh" "$@" ;;
+  summary)  node_run "$S/summarize.mjs" "$@" ;;
+
+  test)
+    if [ $# -gt 0 ]; then
+      (cd api && ./gradlew test --tests "$1")
+    else
+      (cd api && ./gradlew test)
+    fi
+    ;;
+  build) (cd api && ./gradlew build -x test) ;;
+
+  demo)
+    strategy="${1:-none}"
+    echo "[holdfast] 시연 준비 — 전략 $strategy · 시나리오 $DEMO_SCENARIO"
+    HOLDFAST_STRATEGY="$strategy" docker compose up -d
+    wait_healthy
+    "$S/seed.sh" "$DEMO_SCENARIO" "$strategy"
+    cat <<EOF
+
+════ 시연 주소 ════
+  좌석맵            http://localhost:8080/sessions/1?userId=1
+                    http://localhost:8080/sessions/1?userId=2   ← 창을 둘 띄운다
+  동시 요청 데모    http://localhost:8080/demo/race
+  검표              http://localhost:8080/scan
+  예약 현황(관리자) http://localhost:8080/admin/reservations
+
+  전략을 바꾸려면:  ./holdfast demo pessimistic
+  현재 전략은 데모 페이지 상단에 표시된다.
+
+  **첫 실행은 한 번 눌러 버리고 시작하라.** JVM이 데워지기 전 첫 묶음은
+  일부 요청이 연결 단계에서 실패한다(실측에서 첫 시도만 그랬다).
+EOF
+    ;;
+
+  race)
+    cat <<'EOF'
+동시 요청 데모: http://localhost:8080/demo/race
+
+  좌석 하나에 N개 요청을 동시에 보내 전략별 차이를 화면으로 본다.
+  none 이면 홀드가 여러 건, 전략을 걸면 1건이다.
+
+  준비:  ./holdfast demo none        (또는 pessimistic 등)
+EOF
+    ;;
+
+  *)
+    echo "알 수 없는 커맨드: $cmd" >&2
+    echo >&2
+    usage >&2
+    exit 2
+    ;;
+esac
