@@ -149,3 +149,104 @@ body {
     padding-top: 12px;
     margin-top: 12px;
 }
+
+/* --- 좌석배치 등록 (이슈 #102) --- */
+
+/*
+ * 격자 미리보기. 좌석맵 화면(seatmap.css)과 같은 규칙으로 배치한다 —
+ * 좌석을 rowIndex·colIndex 자리에 놓으므로 지워진 칸이 구멍으로 남는다.
+ * 관리자가 여기서 보는 모양이 사용자가 볼 모양이다.
+ */
+.seat-grid {
+    display: grid;
+    gap: 4px;
+    margin: 10px 0;
+    /* 열이 많은 배치도는 카드를 넘긴다. 줄바꿈하면 격자가 아니게 되므로 민다. */
+    overflow-x: auto;
+}
+.seat-cell {
+    font: inherit;
+    font-size: 11px;
+    padding: 5px 2px;
+    border: 1px solid var(--card-border);
+    border-radius: 4px;
+    background: #eef1f6;
+    color: #1c1c1c;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.seat-cell:hover:not(:disabled) { background: #fdecea; border-color: #b00020; }
+.seat-cell:disabled { cursor: default; opacity: 0.75; }
+
+.admin-form button.danger, .inline-form button.danger { background: #b00020; }
+
+/*
+ * 구역 카드. 예전에는 구역마다 폼 세 개가 나란히 붙어 한 덩어리로 보였다 —
+ * 어디까지가 한 구역인지, 어느 버튼이 무엇을 저장하는지 읽히지 않았다.
+ * 머리줄(무엇인가·어디로·지울까) / 격자 / 아랫줄(행 추가)로 나눈다.
+ */
+.zone-card {
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-top: 12px;
+}
+.zone-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 12px;
+}
+.zone-title { display: flex; align-items: baseline; gap: 8px; }
+.zone-title .meta { margin: 0; }
+.zone-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+
+.zone-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 14px;
+}
+.zone-foot .meta { margin: 0; }
+
+/* 폼 하나가 한 줄에서 끝난다. 라벨을 세로로 쌓는 .admin-form과 다른 쓰임이다. */
+.inline-form { display: flex; align-items: center; gap: 4px; }
+.inline-form input {
+    font: inherit;
+    font-size: 13px;
+    padding: 5px 8px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+.inline-form button {
+    font: inherit;
+    font-size: 13px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 5px;
+    background: #2f6feb;
+    color: #fff;
+    cursor: pointer;
+}
+.inline-form .num-sm { width: 56px; }
+
+/* 순서 이동. 숫자 입력을 대신하므로 눈에 띄되 자리를 적게 쓴다. */
+.icon-btn {
+    background: #eef1f6 !important;
+    color: #1c1c1c !important;
+    padding: 5px 9px !important;
+    border: 1px solid var(--card-border) !important;
+}
+.icon-btn:disabled { opacity: 0.35; cursor: default; }
+
+/* 고급 입력. 접힌 채로 시작해 평소에는 폼을 세 칸으로 보이게 한다. */
+.form-advanced { flex-basis: 100%; margin-top: 4px; }
+.form-advanced summary {
+    cursor: pointer;
+    font-size: 12px;
+    color: #2f6feb;
+}
+.form-advanced label { margin-top: 6px; }

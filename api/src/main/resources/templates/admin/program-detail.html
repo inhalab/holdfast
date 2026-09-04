@@ -36,6 +36,7 @@
         <form method="post" th:action="@{/admin/programs/{id}/sessions(id=${program.id})}" class="admin-form">
             <label>좌석배치도
                 <select name="seatLayoutId" required>
+                    <!-- 목록이 비면 배치도가 하나도 없는 것이다 — 좌석배치도 관리(#102)에서 만든다. -->
                     <option th:each="l : ${layouts}"
                             th:value="${l.id}"
                             th:text="${l.name} + ' (좌석 ' + ${l.seatCount} + '석)'">배치도</option>
@@ -95,7 +96,10 @@
         </p>
     </section>
 
-    <a class="link-back" th:href="@{/admin/programs}">← 프로그램 목록</a>
+    <p class="meta">
+        <a class="link-back" th:href="@{/admin/programs}">← 프로그램 목록</a> ·
+        <a class="link-back" th:href="@{/admin/layouts}">좌석배치도 관리</a>
+    </p>
 </main>
 </body>
 </html>
