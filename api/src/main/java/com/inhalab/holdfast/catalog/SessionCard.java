@@ -5,11 +5,10 @@ import java.time.Instant;
 /**
  * 회차 목록의 카드 한 장.
  *
- * @param reservable 지금 좌석 선택으로 넘어갈 수 있는가. 예약 오픈 전이거나
- *                   회차가 {@code OPEN}이 아니면 거짓이다 — 실제 예약 사이트가
- *                   "오픈 예정"을 눌리지 않게 두는 것과 같다. 서버는 이와 별개로
- *                   홀드 요청을 {@code RESERVATION_NOT_OPEN}으로 거절한다(REQ-08).
- *                   화면은 그 거절을 미리 보여줄 뿐 대신하지 않는다.
+ * @param saleState 목록에서 어떻게 보여줄지. 화면은 이 값만 보고 분기한다 —
+ *                  "예약 오픈 전"과 "종료"를 한 조건으로 묶으면 닫힌 회차에도
+ *                  오픈 일시가 찍힌다. 서버는 이와 별개로 홀드 요청을 다시
+ *                  판정한다(REQ-08) — 화면은 그 거절을 미리 보여줄 뿐이다.
  */
 public record SessionCard(
         Long sessionId,
@@ -19,6 +18,11 @@ public record SessionCard(
         String status,
         long available,
         long total,
-        boolean reservable
+        SaleState saleState
 ) {
+
+    /** 좌석 선택으로 넘어갈 수 있는가. 템플릿에서 쓰기 좋게 파생값으로 둔다. */
+    public boolean isReservable() {
+        return saleState == SaleState.ON_SALE;
+    }
 }

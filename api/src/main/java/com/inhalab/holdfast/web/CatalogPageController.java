@@ -2,6 +2,7 @@ package com.inhalab.holdfast.web;
 
 import com.inhalab.holdfast.catalog.CatalogProgramRepository;
 import com.inhalab.holdfast.catalog.CatalogSessionRepository;
+import com.inhalab.holdfast.catalog.SaleState;
 import com.inhalab.holdfast.catalog.SessionAvailabilityRow;
 import com.inhalab.holdfast.catalog.SessionCard;
 import com.inhalab.holdfast.seat.EventSession;
@@ -37,6 +38,7 @@ public class CatalogPageController {
 
     private static final String STATUS_AVAILABLE = "AVAILABLE";
     private static final String SESSION_OPEN = "OPEN";
+    private static final String SESSION_SCHEDULED = "SCHEDULED";
 
     private final CatalogProgramRepository programRepository;
     private final CatalogSessionRepository sessionRepository;
@@ -77,7 +79,7 @@ public class CatalogPageController {
                     long[] c = counts.getOrDefault(s.getId(), new long[]{0, 0});
                     return new SessionCard(
                             s.getId(), s.getStartsAt(), s.getEndsAt(), s.getReserveOpensAt(),
-                            s.getStatus(), c[0], c[1], isReservable(s, now));
+                            s.getStatus(), c[0], c[1], saleStateOf(s, c[0], now));
                 })
                 .toList();
 
@@ -104,14 +106,29 @@ public class CatalogPageController {
     }
 
     /**
-     * 예약 오픈 전이거나 회차가 열려 있지 않으면 좌석 선택으로 넘기지 않는다.
-     * 서버의 {@code RESERVATION_NOT_OPEN} 거절(REQ-08)을 화면이 미리 보여주는 것이지
-     * 대신하는 것이 아니다 — 링크를 눌러 들어가도 홀드는 서버가 다시 판정한다.
+     * 회차를 목록에서 어떻게 보여줄지 정한다(이슈 #108 — SFR-006의 "접수종료 노출
+     * 방식이 운영정책과 일치").
+     *
+     * <p><b>이유를 하나로 뭉치지 않는다.</b> "오픈 전"과 "종료"를 같은 조건으로
+     * 묶으면 닫힌 회차에도 오픈 일시가 찍힌다 — 실제로 그렇게 만들었다가 고쳤다.
+     *
+     * <p>판단 순서에 뜻이 있다. 닫힌 회차는 잔여석이 남아 있어도 닫힌 것이고,
+     * 오픈 전 회차는 매진일 수 없다.
+     *
+     * <p>서버의 {@code RESERVATION_NOT_OPEN} 거절(REQ-08)을 화면이 미리 보여주는
+     * 것이지 대신하는 것이 아니다 — 링크로 들어가도 홀드는 서버가 다시 판정한다.
      */
-    private boolean isReservable(EventSession session, Instant now) {
-        return SESSION_OPEN.equals(session.getStatus())
-                && session.getReserveOpensAt() != null
-                && !now.isBefore(session.getReserveOpensAt());
+    private SaleState saleStateOf(EventSession session, long available, Instant now) {
+        if (!SESSION_OPEN.equals(session.getStatus())) {
+            // SCHEDULED는 아직 열리지 않은 것이고 CLOSED는 끝난 것이다.
+            return SESSION_SCHEDULED.equals(session.getStatus())
+                    ? SaleState.NOT_YET_OPEN
+                    : SaleState.CLOSED;
+        }
+        if (session.getReserveOpensAt() != null && now.isBefore(session.getReserveOpensAt())) {
+            return SaleState.NOT_YET_OPEN;
+        }
+        return available > 0 ? SaleState.ON_SALE : SaleState.SOLD_OUT;
     }
 
     /** 없는 프로그램. 다른 페이지 컨트롤러와 같이 평문으로 답한다. */

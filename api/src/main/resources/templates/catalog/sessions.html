@@ -20,14 +20,17 @@
             잔여 <strong th:text="${s.available}">0</strong> / <span th:text="${s.total}">0</span>석
         </p>
 
-        <a th:if="${s.reservable and s.available > 0}"
+        <a th:if="${s.saleState.name() == 'ON_SALE'}"
            class="link-back" th:href="@{/sessions/{id}(id=${s.sessionId})}">좌석 선택 →</a>
 
-        <p class="meta" th:if="${s.reservable and s.available == 0}">매진</p>
+        <p class="meta" th:if="${s.saleState.name() == 'SOLD_OUT'}">매진</p>
 
-        <p class="meta" th:if="${not s.reservable}">
-            예약 오픈 전 — <span th:text="${s.reserveOpensAt}">오픈 일시</span>부터
+        <p class="meta" th:if="${s.saleState.name() == 'NOT_YET_OPEN'}">
+            예약 오픈 전<span th:if="${s.reserveOpensAt != null}"> —
+                <span th:text="${s.reserveOpensAt}">오픈 일시</span>부터</span>
         </p>
+
+        <p class="meta" th:if="${s.saleState.name() == 'CLOSED'}">접수 종료</p>
     </section>
 
     <p th:if="${#lists.isEmpty(sessions)}">등록된 회차가 없습니다.</p>
