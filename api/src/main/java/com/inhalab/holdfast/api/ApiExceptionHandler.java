@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 
 import java.util.List;
@@ -194,6 +195,38 @@ public class ApiExceptionHandler {
     })
     public ResponseEntity<ProblemDetail> handleValidation(Exception ex) {
         return respond(ErrorCode.VALIDATION_FAILED, ErrorCode.VALIDATION_FAILED.defaultDetail(), List.of());
+    }
+
+    /**
+     * 정적 자원도 핸들러도 없는 경로. <b>404가 맞다.</b>
+     *
+     * <p>브라우저는 페이지를 열 때마다 {@code /favicon.ico}를 자동으로 요청한다.
+     * 이 예외를 잡지 않으면 아래 {@link #handleUnexpected}로 떨어져 <b>500과
+     * "처리되지 않은 예외" 스택트레이스가 화면을 열 때마다 찍힌다.</b> 진짜
+     * 오류를 로그에서 찾기 어려워진다.
+     *
+     * <h3>{@code code} 없이 빈 404를 낸다</h3>
+     *
+     * <p>이 클래스의 원칙은 "모든 오류 응답에 {@code code}가 붙는다"이고 그것을
+     * 깨는 유일한 자리다. 그래도 {@code ErrorCode}를 새로 만들지 않았다.
+     *
+     * <ul>
+     *   <li>{@code api-spec.md} 3.1의 코드표는 <b>API 계약이 정의한 거절</b>의
+     *       목록이다. "그런 경로가 없다"는 계약 밖의 사건이라 거기 넣으면 표가
+     *       가리키는 것이 흐려진다</li>
+     *   <li>코드를 추가하면 {@code load-test/scenarios/lib/classify.js}의 버킷을
+     *       함께 고쳐야 한다. <b>그 파일은 측정 해석의 핵심</b>이고, favicon
+     *       때문에 건드릴 파일이 아니다</li>
+     * </ul>
+     *
+     * <p>오타 난 API 경로도 여기로 온다. 그때는 {@code code} 없는 404라
+     * {@code classify.js}가 미분류로 세는데, <b>그것이 맞는 동작이다</b> — 계약에
+     * 없는 경로를 부른 것이므로 조용히 어느 버킷에 섞이면 안 된다.
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Void> handleNoResource(NoResourceFoundException ex) {
+        log.debug("정적 자원 없음: {}", ex.getResourcePath());
+        return ResponseEntity.notFound().build();
     }
 
     // ── 서버 오류 ──────────────────────────────────────────────────────
