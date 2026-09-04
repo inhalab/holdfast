@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>holdfast — 예약</title>
+    <link rel="stylesheet" th:href="@{/css/reservation.css}">
+</head>
+<body>
+<main class="page">
+    <h1>예약하기</h1>
+    <p class="meta">예약할 프로그램을 고르세요.</p>
+
+    <section class="card" th:each="program : ${programs}">
+        <h2 th:text="${program.name}">데모 공연</h2>
+        <p th:text="${program.description}" th:if="${program.description != null}">설명</p>
+        <a class="link-back" th:href="@{/programs/{id}(id=${program.id})}">회차 보기 →</a>
+    </section>
+
+    <p th:if="${#lists.isEmpty(programs)}">
+        예약 가능한 프로그램이 없습니다. 시드 스크립트를 먼저 실행하세요
+        (<code>infra/demo-seed.sql</code>).
+    </p>
+
+    <p class="meta">
+        <a class="link-back" th:href="@{/scan}">검표 화면</a> ·
+        <a class="link-back" th:href="@{/admin/reservations}">관리자 예약 현황</a>
+    </p>
+</main>
+</body>
+</html>
