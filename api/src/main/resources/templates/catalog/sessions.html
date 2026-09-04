@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${program.name} + ' — 회차 선택'">회차 선택</title>
+    <link rel="stylesheet" th:href="@{/css/reservation.css}">
+</head>
+<body>
+<main class="page">
+    <h1 th:text="${program.name}">데모 공연</h1>
+    <p class="meta">회차를 고르면 좌석 선택으로 넘어갑니다.</p>
+
+    <section class="card" th:each="s : ${sessions}">
+        <h2>
+            <span th:text="${s.startsAt}">시작</span>
+            <span class="status-badge" th:classappend="${s.status}" th:text="${s.status}">OPEN</span>
+        </h2>
+        <p class="meta">
+            잔여 <strong th:text="${s.available}">0</strong> / <span th:text="${s.total}">0</span>석
+        </p>
+
+        <a th:if="${s.saleState.name() == 'ON_SALE'}"
+           class="link-back" th:href="@{/sessions/{id}(id=${s.sessionId})}">좌석 선택 →</a>
+
+        <p class="meta" th:if="${s.saleState.name() == 'SOLD_OUT'}">매진</p>
+
+        <p class="meta" th:if="${s.saleState.name() == 'NOT_YET_OPEN'}">
+            예약 오픈 전<span th:if="${s.reserveOpensAt != null}"> —
+                <span th:text="${s.reserveOpensAt}">오픈 일시</span>부터</span>
+        </p>
+
+        <p class="meta" th:if="${s.saleState.name() == 'CLOSED'}">접수 종료</p>
+    </section>
+
+    <p th:if="${#lists.isEmpty(sessions)}">등록된 회차가 없습니다.</p>
+
+    <a class="link-back" th:href="@{/programs}">← 프로그램 목록</a>
+</main>
+</body>
+</html>
