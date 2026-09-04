@@ -22,6 +22,11 @@
         .note { background: #f6f6f6; border-left: 3px solid #999; padding: .6rem 1rem;
                 margin: 1rem 0; font-size: .92rem; }
         .note.warn { background: #fff8e1; border-left-color: #e0a800; }
+        details.note > summary { cursor: pointer; color: #555; }
+        details.note[open] > summary { margin-bottom: .6rem; font-weight: 700; color: inherit; }
+        details.note p { margin: .6rem 0; }
+        details.note p:first-of-type { margin-top: 0; }
+        details.note p:last-child { margin-bottom: 0; }
         code { background: #f0f0f0; padding: 0 .25rem; }
         .changed { background: #fff3cd; }
         nav { margin: 0 0 1rem; padding: .5rem .8rem; background: #f2f2f2; border-radius: .4rem; }
@@ -48,12 +53,14 @@
     <span class="dim" id="strategyHint"></span>
 </p>
 
-<div class="note">
-    <b>손으로 두 창을 클릭하는 것으로는 동시성을 보여줄 수 없다.</b> 홀드
-    트랜잭션이 밀리초라 손으로 누른 두 요청은 겹치지 않고, 순차 요청은
-    <code>none</code>에서도 깨지지 않는다. 이 버튼은 브라우저가
-    <code>Promise.all</code>로 요청을 한 번에 발사한다.
-</div>
+<details class="note">
+    <summary><b>손으로 두 창을 클릭하는 것으로는 동시성을 보여줄 수 없다.</b></summary>
+    <p>
+        홀드 트랜잭션이 밀리초라 손으로 누른 두 요청은 겹치지 않고, 순차 요청은
+        <code>none</code>에서도 깨지지 않는다. 이 버튼은 브라우저가
+        <code>Promise.all</code>로 요청을 한 번에 발사한다.
+    </p>
+</details>
 
 <fieldset>
     <legend>시드 — 회차·좌석·사용자를 처음부터 만든다</legend>
@@ -109,23 +116,9 @@
     <b>무엇을 보아야 하나.</b> <code>none</code>이면 <b>좌석 하나에 활성 홀드가 여러
     건</b>으로 남는다 — 같은 좌석을 여러 사람이 동시에 잡은 것이고, 그것이 초과
     홀드(V-2)다. 전략을 걸면 <b>좌석마다 1건</b>이고 나머지는 409로 거절된다.
-    <br><br>
-    <b>좌석 수를 늘리면.</b> 요청이 좌석에 돌아가며 흩어진다(1번 요청→1번 좌석,
-    2번 요청→2번 좌석…). 요청 20개에 좌석 3개면 좌석당 6~7개가 몰리므로,
-    <code>none</code>은 <b>좌석마다 초과 홀드</b>가 생겨 총 홀드가 요청 수에
-    가까워지고, 전략을 걸면 <b>총 홀드가 정확히 좌석 수</b>가 된다.
-    <br><br>
-    <b>요청 수를 20으로 줘도 성공이 6쯤에서 멈추는 것은 정상이다.</b> 브라우저는
-    HTTP/1.1에서 호스트당 커넥션을 6개로 제한하므로, 나머지는 앞 요청이 끝난 뒤에
-    도착해 이미 잡힌 좌석을 만난다. <b>서버의 한계가 아니라 브라우저의 한계다</b> —
-    같은 실험을 스크립트로 20개 동시에 보내면 <code>none</code>에서 20건이 홀드된다.
 </div>
 
 <div class="note warn">
-    <b>전략을 바꾸려면 앱을 다시 띄워야 한다(약 13초).</b> 전략 빈은 기동 시
-    하나만 만들어져 <code>SeatHoldService</code>에 직접 주입되므로, 런타임 교체는
-    측정 경로인 그 클래스를 고치는 일이 된다. 시연 편의로 M3가 잰 코드를 건드리지
-    않는다.
     <div class="cmd">
         <code id="strategyCmd">./holdfast strategy pessimistic</code>
         <select id="strategyPick">
@@ -134,12 +127,36 @@
         </select>
         <button id="copyCmd">명령 복사</button>
     </div>
-    이 화면은 전환을 <b>감지해서</b> 위 배지를 자동으로 갱신한다. 터미널에서 명령을
-    붙여넣고 이 창을 그대로 두면 된다.
-    <br><br>
-    <b>첫 실행은 한 번 눌러 버리고 시작하라.</b> JVM이 데워지기 전 첫 묶음은 일부
-    요청이 연결 단계에서 실패한다.
+    <span class="dim">전환은 앱 재기동이라 약 13초 걸린다. 붙여넣고 이 창을 그대로 두면
+        위 배지가 자동으로 바뀐다 — 왜 재기동인지는 아래에 접어 뒀다.</span>
 </div>
+
+<details class="note">
+    <summary>더 물어볼 만한 것 — 좌석 수, 성공이 6에서 멈추는 이유, 전환이 재기동인 이유, 첫 실행</summary>
+    <p>
+        <b>좌석 수를 늘리면.</b> 요청이 좌석에 돌아가며 흩어진다(1번 요청→1번 좌석,
+        2번 요청→2번 좌석…). 요청 20개에 좌석 3개면 좌석당 6~7개가 몰리므로,
+        <code>none</code>은 <b>좌석마다 초과 홀드</b>가 생겨 총 홀드가 요청 수에
+        가까워지고, 전략을 걸면 <b>총 홀드가 정확히 좌석 수</b>가 된다.
+    </p>
+    <p>
+        <b>요청 수를 20으로 줘도 성공이 6쯤에서 멈추는 것은 정상이다.</b> 브라우저는
+        HTTP/1.1에서 호스트당 커넥션을 6개로 제한하므로, 나머지는 앞 요청이 끝난 뒤에
+        도착해 이미 잡힌 좌석을 만난다. <b>서버의 한계가 아니라 브라우저의 한계다</b> —
+        같은 실험을 스크립트로 20개 동시에 보내면 <code>none</code>에서 20건이 홀드된다.
+    </p>
+    <p>
+        <b>전략을 바꾸려면 앱을 다시 띄워야 한다.</b> 전략 빈은 기동 시 하나만
+        만들어져 <code>SeatHoldService</code>에 직접 주입되므로, 런타임 교체는 측정
+        경로인 그 클래스를 고치는 일이 된다. 게다가 <code>none</code>은 부분 유니크
+        인덱스 U-2를 지워야 <code>none</code>이라, 전환은 앱만의 일도 아니다.
+        <code>./holdfast strategy</code>가 재기동과 인덱스 재적용을 함께 한다.
+    </p>
+    <p>
+        <b>첫 실행은 한 번 눌러 버리고 시작하라.</b> JVM이 데워지기 전 첫 묶음은 일부
+        요청이 연결 단계에서 실패한다.
+    </p>
+</details>
 
 <script>
 (function () {
