@@ -89,9 +89,17 @@
 
 <fieldset>
     <legend>발사</legend>
+    <label>방식
+        <select id="fireMode">
+            <option value="volley" selected>좌석마다 차례로 몰아친다</option>
+            <option value="spread">좌석에 흩뿌린다</option>
+        </select>
+    </label>
+    &nbsp;&nbsp;
     <button class="fire" id="fire">동시에 홀드 요청</button>
     <button id="reset">좌석 되돌리기</button>
-    <span class="dim">되돌리지 않고 다시 쏘면 무슨 일이 나는지도 아래에 그대로 나온다.</span>
+    <div class="dim" id="modeHint" style="margin-top:.4rem"></div>
+    <div class="dim">되돌리지 않고 다시 쏘면 무슨 일이 나는지도 아래에 그대로 나온다.</div>
 </fieldset>
 
 <h2>이번 발사</h2>
@@ -134,11 +142,13 @@
 </div>
 
 <details class="note">
-    <summary>더 물어볼 만한 것 — 좌석에 어떻게 흩어지나, 성공이 도중에 멈추는 이유, 전환이 재기동인 이유, 첫 실행</summary>
+    <summary>더 물어볼 만한 것 — 발사 방식이 둘인 이유, 성공이 도중에 멈추는 이유, 전환이 재기동인 이유, 첫 실행</summary>
     <p>
-        <b>요청은 좌석에 돌아가며 흩어진다.</b> 1번 요청→1번 좌석, 2번 요청→2번
-        좌석… 좌석을 한 바퀴 돌면 다시 1번으로 온다. 전략을 걸면 좌석마다 홀드가
-        하나씩만 남고 나머지는 409이므로, <b>총 홀드는 정확히 좌석 수</b>가 된다.
+        <b>발사 방식이 둘이다.</b> <b>흩뿌리기</b>는 1번 요청→1번 좌석, 2번 요청→2번
+        좌석으로 돌아가며 뿌리고 한 번에 쏜다 — 실제 예약 트래픽에 가깝다.
+        <b>좌석마다 차례로</b>는 좌석 하나에 그 좌석 몫을 몰아친 뒤 다음 좌석으로
+        넘어간다 — 좌석마다 <b>개별 경합</b>을 한 번씩 겪는다. 어느 쪽이든 전략을
+        걸면 좌석마다 홀드가 하나씩만 남으므로 <b>총 홀드는 정확히 좌석 수</b>다.
         <span id="fcSpread" class="fc"></span>
     </p>
     <p>
@@ -150,11 +160,14 @@
         <span id="fcBrowser" class="fc"></span>
     </p>
     <p>
-        <b>그래서 좌석 수가 6 이상이면 초과 홀드가 안 나온다.</b> 동시에 떠 있는
-        요청 6개가 서로 다른 좌석으로 흩어져 <b>애초에 겹치지 않기</b> 때문이다.
-        <code>none</code>과 전략의 차이를 보려면 좌석을 6개보다 적게 잡아야 하고,
-        <b>1개가 가장 선명하다.</b> 이것은 브라우저에서만 걸리는 제약이다 — 측정은
-        k6로 보내므로 좌석 1000개에서도 겹친다.
+        <b>그래서 흩뿌리기는 좌석이 6개 이상이면 아무것도 안 보인다.</b> 동시에 떠
+        있는 요청 6개가 서로 다른 좌석으로 갈라져 <b>애초에 겹치지 않기</b> 때문이다.
+        <code>none</code>도 전략과 같은 결과를 낸다. <b>좌석마다 차례로가 기본인
+        이유가 이것이다</b> — 커넥션 6개가 한 좌석 안에서만 경쟁하므로 좌석을 열 개로
+        늘려도 열 곳 모두에 초과 홀드가 남는다. 표가 여러 줄이 되어 대비가 선명하다.
+        <br><br>
+        이것은 <b>브라우저에서만 걸리는 제약이다.</b> 측정은 k6로 보내므로 좌석
+        1000개에서도 겹친다 — 그래서 측정 시나리오는 이 방식을 쓰지 않는다.
         <span id="fcOverlap" class="fc"></span>
     </p>
     <p>
@@ -247,17 +260,39 @@
   function forecast() {
     const seats = Math.max(1, num('seatCount'));
     const n = Math.max(1, num('count'));
-    const inFlight = Math.min(n, BROWSER_CONNS);   // 동시에 떠 있는 요청
+    const volley = $('fireMode').value === 'volley';
+    const inFlight = Math.min(n, BROWSER_CONNS);   // 한 번에 떠 있는 요청
+
+    if (volley) {
+      // 좌석마다 차례로: 좌석 하나에 그 좌석 몫을 한꺼번에 쏘고 끝나면 다음 좌석.
+      // 커넥션 6개가 **한 좌석 안에서** 경쟁하므로 좌석 수와 무관하게 겹친다.
+      const base = Math.floor(n / seats), rem = n % seats;   // rem개 좌석은 base+1
+      const holdBig = Math.min(base + 1, BROWSER_CONNS);
+      const holdSmall = Math.min(base, BROWSER_CONNS);
+      return {
+        volley, seats, n, inFlight,
+        perSeat: base + (rem > 0 ? 1 : 0),
+        holdsWithStrategy: Math.min(seats, n),
+        // 좌석마다 min(그 좌석 몫, 6)건이 남는다. 실측과 정확히 일치한다
+        // (scope-m4.md 7절 표).
+        holdsWithoutStrategy: rem * holdBig + (seats - rem) * holdSmall,
+        overlaps: Math.max(holdBig, holdSmall) >= 2,
+        excessSeats: (holdBig >= 2 ? rem : 0) + (holdSmall >= 2 ? seats - rem : 0),
+        perSeatInFlight: Math.min(base + (rem > 0 ? 1 : 0), BROWSER_CONNS)
+      };
+    }
+
+    // 흩뿌리기: 1번 요청→1번 좌석, 2번 요청→2번 좌석… 한 바퀴 돌면 다시 1번.
     return {
-      seats, n, inFlight,
-      perSeat: Math.ceil(n / seats),               // 좌석당 총 요청
-      holdsWithStrategy: Math.min(seats, n),       // 전략: 좌석마다 정확히 하나
-      // none: 좌석이 동시 요청보다 많으면 파도가 빈 좌석을 차례로 채워 좌석 수까지
-      // 가고, 적으면 첫 파도에서 겹친 만큼만 남는다. 실측으로 맞춘 식이다
-      // (scope-m4.md 7절 표).
+      volley, seats, n, inFlight,
+      perSeat: Math.ceil(n / seats),
+      holdsWithStrategy: Math.min(seats, n),
+      // 좌석이 동시 요청보다 많으면 파도가 빈 좌석을 차례로 채워 좌석 수까지 가고,
+      // 적으면 첫 파도에서 겹친 만큼만 남는다.
       holdsWithoutStrategy: Math.min(n, Math.max(seats, inFlight)),
-      overlaps: seats < inFlight,                  // 같은 좌석을 동시에 치는가
-      perSeatInFlight: Math.ceil(inFlight / seats) // 겹칠 때 좌석당 동시 요청
+      overlaps: seats < inFlight,
+      excessSeats: seats < inFlight ? seats : 0,
+      perSeatInFlight: Math.ceil(inFlight / seats)
     };
   }
 
@@ -265,14 +300,24 @@
     const f = forecast();
     const base = f.seats === 1
       ? `— 요청 ${f.n}개가 전부 좌석 1번을 노린다`
-      : `— 요청이 좌석에 돌아가며 흩어진다. 좌석당 최대 ${f.perSeat}개`;
+      : f.volley
+        ? `— 좌석 ${f.seats}개에 차례로 ${f.perSeat}개씩 몰아친다`
+        : `— 요청이 좌석에 돌아가며 흩어진다. 좌석당 최대 ${f.perSeat}개`;
     // 겹치지 않는 조건은 시연이 아무것도 못 보여주는 조건이라, 접힌 설명이 아니라
     // 여기에서 경고한다(사용자 풀 경고와 같은 취급).
     $('spreadHint').innerHTML = f.overlaps
       ? base
       : `${base} <b class="bad">— 이 조건에서는 초과 홀드가 안 나온다.</b> ` +
-        `동시에 뜨는 요청 ${f.inFlight}개가 좌석 ${f.seats}개에 하나씩 흩어진다. ` +
-        `좌석을 ${BROWSER_CONNS}개보다 적게 잡아라.`;
+        (f.volley
+          ? `좌석당 요청이 ${f.perSeat}개뿐이라 겹칠 것이 없다. 요청 수를 늘려라.`
+          : `동시에 뜨는 요청 ${f.inFlight}개가 좌석 ${f.seats}개에 하나씩 흩어진다. ` +
+            `좌석을 ${BROWSER_CONNS}개보다 적게 잡거나 발사 방식을 바꿔라.`);
+    $('modeHint').innerHTML = f.volley
+      ? `좌석 1번부터 ${f.seats}번까지 <b>한 좌석씩 차례로</b> 쏜다. 커넥션 6개가 ` +
+        `한 좌석 안에서 경쟁하므로 <b>좌석 수를 늘려도 경합이 유지된다.</b> ` +
+        `발사 ${f.seats}번이 이어지므로 그만큼 오래 걸린다.`
+      : `요청을 좌석에 돌아가며 뿌리고 <b>한 번에</b> 쏜다. 실제 예약 트래픽에 가깝지만, ` +
+        `좌석이 ${BROWSER_CONNS}개 이상이면 겹치지 않는다.`;
     updateForecastText(f);
   }
 
@@ -281,25 +326,34 @@
       f.seats === 1
         ? `<b>지금 조건:</b> 요청 ${f.n}개가 전부 좌석 1번으로 간다. 전략을 걸면 ` +
           `홀드 <b>1건</b>, 나머지 ${f.n - 1}개는 409다.`
-        : `<b>지금 조건:</b> 요청 ${f.n}개 / 좌석 ${f.seats}개 — 좌석당 ` +
-          `${Math.floor(f.n / f.seats)}~${f.perSeat}개가 배정된다. 전략을 걸면 총 홀드 ` +
-          `<b>${f.holdsWithStrategy}건</b>, 나머지 ${f.n - f.holdsWithStrategy}개는 409다.`;
+        : `<b>지금 조건(${f.volley ? '좌석마다 차례로' : '흩뿌리기'}):</b> 요청 ${f.n}개 / ` +
+          `좌석 ${f.seats}개 — 좌석당 ${Math.floor(f.n / f.seats)}~${f.perSeat}개가 ` +
+          `배정된다. 전략을 걸면 총 홀드 <b>${f.holdsWithStrategy}건</b>(좌석마다 하나), ` +
+          `나머지 ${f.n - f.holdsWithStrategy}개는 409다.`;
 
     $('fcBrowser').innerHTML =
-      `<b>지금 조건:</b> 요청 ${f.n}개가 ${f.inFlight}개씩 나뉘어 도착하므로 ` +
+      `<b>지금 조건:</b> ` +
+      (f.volley
+        ? `좌석 하나에 ${f.perSeat}개를 몰아치면 그중 ${f.perSeatInFlight}개만 동시에 뜬다. `
+        : `요청 ${f.n}개가 ${f.inFlight}개씩 나뉘어 도착한다. `) +
       `<b>성공은 요청 수보다 훨씬 적게 멈춘다</b> — 전략을 걸면 ` +
       `<b>${f.holdsWithStrategy}건</b>, <code>none</code>이면 ` +
-      `<b>${f.holdsWithoutStrategy}건</b> 근처다. 좌석이 전부 HELD가 되면 그 뒤 ` +
-      `요청은 409다.`;
+      `<b>${f.holdsWithoutStrategy}건</b> 근처다. 좌석이 HELD가 되면 그 뒤 요청은 409다.`;
 
     $('fcOverlap').innerHTML = f.overlaps
-      ? `<b>지금 조건:</b> 좌석 ${f.seats}개 &lt; 동시 요청 ${f.inFlight}개이므로 ` +
-        `좌석당 <b>${f.perSeatInFlight}개가 겹친다.</b> <code>none</code>이면 여기서 ` +
-        `초과 홀드가 나온다.`
-      : `<b class="bad">지금 조건은 겹치지 않는다.</b> 좌석 ${f.seats}개 ≥ 동시 요청 ` +
-        `${f.inFlight}개라 <code>none</code>도 전략과 똑같이 ${f.holdsWithStrategy}건을 ` +
-        `내놓는다 — <b>이 화면이 보여주려는 차이가 안 보인다.</b> 좌석 수를 ` +
-        `${BROWSER_CONNS}개보다 적게 줄여라.`;
+      ? (f.volley
+          ? `<b>지금 조건:</b> 한 좌석에 ${f.perSeat}개를 몰아치므로 좌석당 ` +
+            `<b>${f.perSeatInFlight}개가 겹친다.</b> <code>none</code>이면 ` +
+            `<b>좌석 ${f.excessSeats}곳 모두</b>에 초과 홀드가 남는다.`
+          : `<b>지금 조건:</b> 좌석 ${f.seats}개 &lt; 동시 요청 ${f.inFlight}개이므로 ` +
+            `좌석당 <b>${f.perSeatInFlight}개가 겹친다.</b> <code>none</code>이면 ` +
+            `<b>최대 좌석 ${f.excessSeats}곳</b>에 초과 홀드가 나온다 — 어느 좌석이 ` +
+            `겹치는지는 도착 순서에 달려 있어 매번 다르다.`)
+      : `<b class="bad">지금 조건은 겹치지 않는다.</b> <code>none</code>도 전략과 똑같이 ` +
+        `${f.holdsWithStrategy}건을 내놓는다 — <b>이 화면이 보여주려는 차이가 안 ` +
+        `보인다.</b> ` +
+        (f.volley ? `좌석당 요청이 2개는 되게 요청 수를 늘려라.`
+                  : `좌석을 ${BROWSER_CONNS}개보다 적게 줄이거나 발사 방식을 바꿔라.`);
   }
 
   async function fetchState() {
@@ -333,6 +387,7 @@
 
   $('count').addEventListener('input', () => { updateSpreadHint(); refreshHints(); });
   $('seatCount').addEventListener('input', updateSpreadHint);
+  $('fireMode').addEventListener('change', updateSpreadHint);
 
   async function refreshHints() {
     try { updatePoolHint(await fetchState()); } catch (e) { /* 재기동 중 */ }
@@ -388,30 +443,49 @@
 
     // **사용자를 전부 다르게 보낸다.** 같은 사용자면 user_session_quota 행에서
     // 전부 직렬화되어 좌석 경합이 일어나지 않는다(concurrency-spec 1.1).
-    // 좌석은 돌아가며 고른다 — 요청이 흩어지는 모습을 그대로 보이기 위해서다.
-    const requests = [];
-    for (let i = 1; i <= n; i++) {
-      const seatId = ((i - 1) % seatCount) + 1;
-      requests.push(
-        fetch('/api/holds', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Idempotency-Key': crypto.randomUUID(),
-            'X-User-Id': String(i),
-          },
-          body: JSON.stringify({ sessionId: 1, seatIds: [seatId] }),
-        }).then(async (res) => {
-          if (res.status === 201) return { label: '201 성공' };
-          let code = '';
-          try { code = (await res.json()).code || ''; } catch (e) { /* 본문 없음 */ }
-          return { label: `${res.status} ${code}`.trim() };
-        }).catch(() => ({ label: '연결 실패' }))
-      );
-    }
+    // userId는 발사 방식과 무관하게 한 번 쓰면 다시 쓰지 않는다.
+    let nextUser = 1;
+    const hold = (seatId) => {
+      const userId = nextUser++;
+      return fetch('/api/holds', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': crypto.randomUUID(),
+          'X-User-Id': String(userId),
+        },
+        body: JSON.stringify({ sessionId: 1, seatIds: [seatId] }),
+      }).then(async (res) => {
+        if (res.status === 201) return { label: '201 성공' };
+        let code = '';
+        try { code = (await res.json()).code || ''; } catch (e) { /* 본문 없음 */ }
+        return { label: `${res.status} ${code}`.trim() };
+      }).catch(() => ({ label: '연결 실패' }));
+    };
 
     const started = performance.now();
-    const results = await Promise.all(requests);   // ← 여기가 동시 발사다
+    let results;
+
+    if ($('fireMode').value === 'volley') {
+      // **좌석마다 차례로 몰아친다.** 한 좌석에 그 좌석 몫을 한꺼번에 쏘고, 끝나면
+      // 다음 좌석으로 간다. 커넥션 6개가 **한 좌석 안에서** 경쟁하므로 좌석을
+      // 늘려도 경합이 유지된다 — 흩뿌리기는 좌석이 6개 이상이면 겹치지 않는다.
+      // 발사가 좌석 수만큼 이어지므로 그만큼 오래 걸린다.
+      results = [];
+      const base = Math.floor(n / seatCount), rem = n % seatCount;
+      for (let seatId = 1; seatId <= seatCount; seatId++) {
+        const per = base + (seatId <= rem ? 1 : 0);
+        if (per === 0) continue;
+        results.push(...await Promise.all(
+          Array.from({ length: per }, () => hold(seatId))));
+      }
+    } else {
+      // **흩뿌리기.** 1번 요청→1번 좌석, 2번 요청→2번 좌석… 실제 예약 트래픽에
+      // 가깝지만 좌석이 6개 이상이면 동시 요청이 서로 다른 좌석으로 갈라진다.
+      results = await Promise.all(
+        Array.from({ length: n }, (_, k) => hold((k % seatCount) + 1)));
+    }
+
     const elapsed = Math.round(performance.now() - started);
 
     const ok = results.filter((r) => r.label.startsWith('201')).length;
