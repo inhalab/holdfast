@@ -53,8 +53,15 @@ INSERT INTO event_session (
 );
 
 -- 좌석재고는 회차 × 좌석으로 사전 생성한다(concurrency-spec 0.4).
+--
+-- **배치도로 거른다.** `FROM seat s`로 전부 넣으면 이 시드를 돌린 뒤 관리자
+-- 화면에서 만든 다른 배치도의 좌석까지 회차 1의 재고가 되어, 회차가 참조하지
+-- 않는 배치도인데 재고는 남는 상태가 생긴다 — 배치도 수정·삭제(#102)가
+-- 그 재고를 보고 막는다. 관리자 화면의 회차 등록도 같은 조건으로 넣는다.
 INSERT INTO seat_inventory (session_id, seat_id, status, hold_id, held_until, version)
-SELECT 1, s.id, 'AVAILABLE', NULL, NULL, 0 FROM seat s;
+SELECT 1, s.id, 'AVAILABLE', NULL, NULL, 0
+FROM seat s JOIN zone z ON z.id = s.zone_id
+WHERE z.seat_layout_id = 1;
 
 -- 1인 최대 매수 집계 행도 사전 생성한다. **없으면 홀드가 500으로 실패한다**
 -- (SeatHoldService가 "할당량 행이 없습니다"로 던진다). 화면은 X-User-Id=1을
