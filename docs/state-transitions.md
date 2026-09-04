@@ -220,6 +220,18 @@ DB에서 검증이 깨진다. 정본은 `TicketStatus` 열거형이다.
 인터페이스는 최건이 정한다." 아래가 그 인터페이스이며, `erd.md`의 `payment.status`
 열거형도 이 값으로 갱신했다(`erd.md` 4절).
 
+> **구현된 것은 이 상태 기계의 왼쪽 절반이다.** #79는 `REQUESTED → APPROVED`와
+> `REQUESTED → DECLINED`만 만들었고, `TIMEOUT`·`FAILED`와 콜백 전이는 없다.
+>
+> **그 이유가 트랜잭션 경계다.** 현재 `PaymentService#pay`는 PG 호출·확정·발권을
+> **하나의 트랜잭션 안에서** 한다. 동기 Mock이 즉답하므로 성립하지만, 실제
+> PG처럼 응답이 늦거나 오지 않으면 그동안 DB 커넥션을(그리고 `pessimistic`이면
+> 좌석 행 락까지) 쥔 채 기다리게 된다.
+>
+> 아래 `TIMEOUT` 구간과 5.2의 `callback-delay-ms`는 **결제가 트랜잭션 밖에 있을
+> 때** 의미를 갖는다. 즉 이 상태 기계의 오른쪽 절반을 구현하는 것과 결제를
+> 비동기로 빼는 것은 같은 작업이며, `scope-m4.md` 5절이 그 관계를 정리했다.
+
 ```mermaid
 stateDiagram-v2
     [*] --> REQUESTED : Mock PG 호출
