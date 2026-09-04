@@ -5,6 +5,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 프로그램·회차 등록. 이슈 #101 — SFR-005(관리자 운영 편의).
@@ -37,6 +39,11 @@ import java.time.Instant;
  */
 @Service
 public class AdminCatalogService {
+
+    /** {@code event_session.status}의 세 값. erd.md 2절 정의이며 S-1이 이것만 받는다. */
+    public static final String SCHEDULED = "SCHEDULED";
+    public static final String OPEN = "OPEN";
+    public static final String CLOSED = "CLOSED";
 
     private final JdbcTemplate jdbc;
 
@@ -72,6 +79,11 @@ public class AdminCatalogService {
                               int maxPerUser,
                               String status,
                               int userPoolSize) {
+
+        validateSchedule(startsAt, endsAt, entryOpensAt, entryClosesAt, reserveOpensAt);
+        validateStatus(status);
+        require(maxPerUser >= 1, "1인 최대 매수는 1 이상이어야 합니다.");
+        require(userPoolSize >= 1, "사용자 풀 크기는 1 이상이어야 합니다.");
 
         Long sessionId = jdbc.queryForObject("""
                 INSERT INTO event_session (
@@ -122,16 +134,64 @@ public class AdminCatalogService {
      * 배치도를 바꾸면 이미 만들어 둔 {@code seat_inventory}가 다른 배치도의
      * 좌석을 가리키게 되고, 판매된 좌석이 있으면 되돌릴 수도 없다. 배치도를
      * 바꾸려면 회차를 새로 만든다.
+     *
+     * <h3>이미 판 뒤에 무엇을 막고 무엇을 허용하는가</h3>
+     *
+     * <p>근거는 {@code erd.md} 2.2의 S-2~S-5다. 요지는 <b>거짓이 되는 변경은
+     * 막고, 운영상 정상인 변경은 알리고 통과시킨다</b>는 것이다.
+     *
+     * @return 막지는 않았지만 운영자가 알아야 할 경고. 비어 있으면 조용히 성공했다.
      */
     @Transactional
-    public void updateSession(long sessionId,
-                              Instant startsAt,
-                              Instant endsAt,
-                              Instant entryOpensAt,
-                              Instant entryClosesAt,
-                              Instant reserveOpensAt,
-                              int maxPerUser,
-                              String status) {
+    public List<String> updateSession(long sessionId,
+                                      Instant startsAt,
+                                      Instant endsAt,
+                                      Instant entryOpensAt,
+                                      Instant entryClosesAt,
+                                      Instant reserveOpensAt,
+                                      int maxPerUser,
+                                      String status) {
+
+        validateSchedule(startsAt, endsAt, entryOpensAt, entryClosesAt, reserveOpensAt);
+        validateStatus(status);
+        require(maxPerUser >= 1, "1인 최대 매수는 1 이상이어야 합니다.");
+
+        List<String> warnings = new ArrayList<>();
+
+        // S-2. SCHEDULED는 "아직 판 적 없다"는 뜻이다. 예약이 있는데 그리로
+        // 되돌리면 카탈로그에서는 사라지는데 발권된 티켓은 살아 있어 갈린다.
+        long liveReservations = count("""
+                SELECT count(*) FROM reservation
+                 WHERE session_id = ? AND status NOT IN ('CANCELLED', 'EXPIRED')
+                """, sessionId);
+        require(!(SCHEDULED.equals(status) && liveReservations > 0),
+                "이미 예약 " + liveReservations + "건을 받은 회차는 '" + SCHEDULED
+                        + "'로 되돌릴 수 없습니다. 접수를 닫으려면 '" + CLOSED + "'로 바꾸세요.");
+
+        // S-3. 판 사실과 모순되는 값이다. saleStateOf가 NOT_YET_OPEN을 띄워
+        // 산 사람이 자기 회차를 목록에서 못 찾는다.
+        long soldSeats = count(
+                "SELECT count(*) FROM seat_inventory WHERE session_id = ? AND status = 'SOLD'",
+                sessionId);
+        require(!(soldSeats > 0 && reserveOpensAt.isAfter(Instant.now())),
+                "이미 좌석 " + soldSeats + "석이 판매된 회차의 예약 오픈을 미래로 옮길 수 없습니다.");
+
+        // S-4. 막지 않는다 — 막으면 한 번 넉넉히 잡은 상한을 영영 못 고친다.
+        // 기존 예약은 CS-6이 홀드 시점에만 보므로 소급 무효가 되지 않는다.
+        long overQuota = count(
+                "SELECT count(*) FROM user_session_quota WHERE session_id = ? AND held_count > ?",
+                sessionId, maxPerUser);
+        if (overQuota > 0) {
+            warnings.add("이미 " + maxPerUser + "매를 넘겨 예약한 사용자가 " + overQuota
+                    + "명 있습니다. 기존 예약은 그대로 두고 추가 예약만 막힙니다.");
+        }
+
+        // S-5. 입장 창 변경은 정상 운영이다. 다만 영향받는 티켓 수를 알린다.
+        if (soldSeats > 0) {
+            warnings.add("판매된 좌석 " + soldSeats + "석이 이 회차를 참조합니다. "
+                    + "입장 시간을 바꾸면 이미 발권된 티켓에 그대로 적용됩니다.");
+        }
+
         jdbc.update("""
                 UPDATE event_session
                    SET starts_at = ?, ends_at = ?,
@@ -143,6 +203,58 @@ public class AdminCatalogService {
                 java.sql.Timestamp.from(entryOpensAt), java.sql.Timestamp.from(entryClosesAt),
                 java.sql.Timestamp.from(reserveOpensAt),
                 maxPerUser, status, sessionId);
+
+        return warnings;
+    }
+
+    // ── 검증 ────────────────────────────────────────────────────────────
+
+    /**
+     * 다섯 시각의 순서를 본다. 근거는 {@code erd.md} 2.2의 T-1~T-4.
+     *
+     * <p><b>이것은 등록 시점의 입력을 막는 것이지 판정을 대신하지 않는다.</b>
+     * 예약 가능 여부와 입장 가능 여부는 {@code SeatHoldService}·
+     * {@code TicketService}가 실행 시각으로 다시 본다.
+     */
+    static void validateSchedule(Instant startsAt,
+                                 Instant endsAt,
+                                 Instant entryOpensAt,
+                                 Instant entryClosesAt,
+                                 Instant reserveOpensAt) {
+        // T-1
+        require(startsAt.isBefore(endsAt),
+                "회차 종료가 시작보다 빠릅니다. 시작 < 종료여야 합니다.");
+        // T-2 — 어기면 TicketService의 두 비교가 동시에 참이라 아무도 못 들어온다.
+        require(entryOpensAt.isBefore(entryClosesAt),
+                "입장 종료가 입장 시작보다 빠릅니다. 이대로면 아무도 입장할 수 없습니다.");
+        // T-3 — 예약이 열리는 시점에 입장이 이미 끝난 회차다.
+        require(reserveOpensAt.isBefore(entryClosesAt),
+                "예약 오픈이 입장 종료보다 늦습니다. 예약해도 쓸 수 없는 표가 됩니다.");
+        // T-4
+        require(entryOpensAt.isBefore(endsAt),
+                "입장 시작이 회차 종료보다 늦습니다. 회차가 끝난 뒤에 문이 열립니다.");
+    }
+
+    static void validateStatus(String status) {
+        require(SCHEDULED.equals(status) || OPEN.equals(status) || CLOSED.equals(status),
+                "회차 상태는 " + SCHEDULED + " / " + OPEN + " / " + CLOSED
+                        + " 중 하나여야 합니다: " + status);
+    }
+
+    /**
+     * 어기면 {@link IllegalArgumentException}. 메시지가 <b>그대로 화면에 뜬다</b> —
+     * "무엇이 잘못됐는지"를 운영자가 읽을 수 있어야 하므로 조건이 아니라 결과를
+     * 적는다("시작 &lt; 종료여야 합니다"가 아니라 "종료가 시작보다 빠릅니다").
+     */
+    private static void require(boolean condition, String message) {
+        if (!condition) {
+            throw new IllegalArgumentException(message);
+        }
+    }
+
+    private long count(String sql, Object... args) {
+        Long n = jdbc.queryForObject(sql, Long.class, args);
+        return n == null ? 0L : n;
     }
 
     private String blankToNull(String s) {

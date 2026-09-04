@@ -11,6 +11,13 @@
     <h1 th:text="${program.name}">데모 공연</h1>
     <p class="meta">모든 시각은 <span th:text="${zone}">Asia/Seoul</span> 기준입니다.</p>
 
+    <!-- 검증 결과. 조용히 저장되면 관리자가 무엇이 잘못됐는지 알 수 없다. -->
+    <div class="flash flash-error" th:if="${error}" role="alert" th:text="${error}"></div>
+    <div class="flash flash-notice" th:if="${saved}" th:text="${saved}"></div>
+    <ul class="flash flash-warn" th:if="${warnings}">
+        <li th:each="w : ${warnings}" th:text="${w}"></li>
+    </ul>
+
     <section class="card">
         <h2>프로그램 수정</h2>
         <form method="post" th:action="@{/admin/programs/{id}(id=${program.id})}" class="admin-form">
