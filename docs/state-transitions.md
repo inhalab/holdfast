@@ -172,30 +172,45 @@ stateDiagram-v2
 
 ## 4. `ticket`
 
-**부분 확정.** 상태값 자체는 `design-spec.md` 3.3절과 `erd.md`의
-`ticket.status`(`ISSUED/USED/VOID`)로 확정돼 있다. 발급·검표 엔드포인트는
-`api-spec.md` 7절에 따라 이 계약의 범위 밖(4개월차, 별도 계약)이므로, 전이를
-일으키는 행위의 세부는 그 작업에서 확정될 때까지 잠정이다.
+**확정됐다.** 발급·검표 엔드포인트가 구현되면서(#80·#87) 잠정 표시를 걷는다.
+상태는 **둘뿐이다** — `VOID`는 두지 않는다.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> ISSUED : 예약 확정 후 티켓 발급 (REQ-07, 별도 계약)
-    ISSUED --> USED : 검표 통과 (REQ-06, 별도 계약)
-    ISSUED --> VOID : 예약 취소
+    [*] --> ISSUED : 결제 승인과 같은 트랜잭션에서 발급 (REQ-07)
+    ISSUED --> USED : 검표 통과 (REQ-06)
     USED --> [*]
-    VOID --> [*]
 ```
 
 | 전이 | 행위 | 함께 바뀌는 테이블 | 원자성 보장 방식 |
 |---|---|---|---|
-| `[*] → ISSUED` | 예약 확정 직후 발급 (**잠정** — 확정 트랜잭션과 같은 트랜잭션인지, 사후 비동기인지는 발권 작업에서 정한다) | `reservation_seat`(이미 존재하는 행에 1:1 연결, U-9) | U-9(`reservation_seat_id` 유니크)가 예약좌석당 1장을 보장(`erd.md` 4절) |
-| `ISSUED → USED` | 검표(**잠정** — API 호출 또는 다른 트리거인지는 별도 계약에서 정한다), lazy 검증(입장 가능시간) | `ticket_scan`(`ADMITTED` INSERT) | U-11 부분 유니크 인덱스(`ticket_id`, `WHERE result = 'ADMITTED'`)가 중복 사용을 막는다(`erd.md` 3절) |
-| `ISSUED → VOID` | 예약 취소(**잠정** — `POST /api/reservations/{id}/cancel`과 같은 트랜잭션인지는 확인 필요) | `reservation`(`CONFIRMED→CANCELLED`) | 미확정 — 발권 도메인은 박태준 담당(`roles.md`)이며 원자성 방식은 그 작업에서 확정한다 |
+| `[*] → ISSUED` | **결제 승인 직후 발급** — `PaymentService#pay`가 확정과 같은 트랜잭션에서 부른다(#80) | `reservation_seat`(이미 존재하는 행에 1:1 연결, U-9) | U-9(`reservation_seat_id` 유니크)가 예약좌석당 1장을 보장(`erd.md` 4절) |
+| `ISSUED → USED` | 검표 `POST /api/tickets/scan`, lazy 검증(예약 상태·입장 가능시간) | `ticket_scan`(`ADMITTED` INSERT) | U-11 부분 유니크 인덱스(`ticket_id`, `WHERE result = 'ADMITTED'`)가 중복 사용을 막는다(`erd.md` 3절) |
 
-**이 다이어그램 전체를 확정으로 취급하지 않는다.** 좌석·예약 도메인(최건 담당)과
-달리 발권·검표(박태준 담당, `roles.md`)는 아직 API 계약이 없다. 여기 적은 것은
-`design-spec.md` 3.3절의 상태값과 `erd.md`의 열거형에서 논리적으로 따라 나오는
-최소한의 전이이며, 발권 API 계약이 확정되면 이 절을 그 계약에 맞춰 갱신해야 한다.
+### `VOID`를 두지 않는 이유
+
+설계 단계에서는 `ISSUED → VOID`(예약 취소)를 잡았다. 구현에서 뺐다.
+
+**취소된 예약의 티켓은 검표 시점에 막는다.** `TicketService#scan`이 예약 상태를
+함께 읽어 `CONFIRMED`가 아니면 `REJECTED_INVALID`로 거절한다. 상태 값이 하나 더
+필요하지 않다.
+
+**미리 무효화하지 않는 이유는 비용이다.** 취소 시점에 티켓을 `VOID`로 바꾸려면
+`reservation/`의 취소 트랜잭션 안에서 `ticket/`의 테이블까지 갱신해야 한다.
+패키지 경계를 넘는 훅이 생기고, **CS-4(취소 시 좌석 반환)의 임계 구역에 쓰기가
+하나 늘어난다** — 알림 Outbox의 INSERT 하나를 두고 같은 논의를 했다
+(`concurrency-spec.md` 7.8). lazy 검증은 그 비용을 검표 쪽으로 옮기며, 검표는
+경합 구간이 아니다. 확정 경로가 홀드 만료를 lazy로 검증하는 것(3절)과 같은
+모양이다.
+
+**아무 코드도 쓰지 않는 상태값을 열거형에 남기지 않는다.** 남겨 두면 상태
+기계에 일어나지 않는 전이가 그려지고, 읽는 사람이 없는 상태를 하나 더 머리에
+담아야 한다. "왜 거절됐는가"는 상태 플래그가 아니라 `ticket_scan.result`에
+시각과 함께 남으며, 몇 번 거절됐는지까지 센다.
+
+**스키마 주석은 고치지 않는다.** V1 마이그레이션의 `-- ISSUED/USED/VOID`는 이미
+적용된 파일이고 Flyway가 내용으로 체크섬을 내므로, 주석 한 줄을 바꾸면 기존
+DB에서 검증이 깨진다. 정본은 `TicketStatus` 열거형이다.
 
 ---
 
@@ -204,6 +219,18 @@ stateDiagram-v2
 **확정.** `roles.md`가 최건에게 배정한 결정이다 — "Mock PG는 박태준이 만들되,
 인터페이스는 최건이 정한다." 아래가 그 인터페이스이며, `erd.md`의 `payment.status`
 열거형도 이 값으로 갱신했다(`erd.md` 4절).
+
+> **구현된 것은 이 상태 기계의 왼쪽 절반이다.** #79는 `REQUESTED → APPROVED`와
+> `REQUESTED → DECLINED`만 만들었고, `TIMEOUT`·`FAILED`와 콜백 전이는 없다.
+>
+> **그 이유가 트랜잭션 경계다.** 현재 `PaymentService#pay`는 PG 호출·확정·발권을
+> **하나의 트랜잭션 안에서** 한다. 동기 Mock이 즉답하므로 성립하지만, 실제
+> PG처럼 응답이 늦거나 오지 않으면 그동안 DB 커넥션을(그리고 `pessimistic`이면
+> 좌석 행 락까지) 쥔 채 기다리게 된다.
+>
+> 아래 `TIMEOUT` 구간과 5.2의 `callback-delay-ms`는 **결제가 트랜잭션 밖에 있을
+> 때** 의미를 갖는다. 즉 이 상태 기계의 오른쪽 절반을 구현하는 것과 결제를
+> 비동기로 빼는 것은 같은 작업이며, `scope-m4.md` 5절이 그 관계를 정리했다.
 
 ```mermaid
 stateDiagram-v2

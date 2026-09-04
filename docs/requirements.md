@@ -26,13 +26,13 @@
 | REQ | 요구사항 | 출처 | 대응 테이블 | 대응 엔드포인트 | 검증 방법 | 검수 기준 | 상태 |
 |---|---|---|---|---|---|---|---|
 | REQ-01 | 동시 예약 요청 시 정원·좌석 초과 확정 방지 | 국립 SFR-001 | `seat_inventory`, `seat_hold`, `reservation`, `reservation_seat` | `POST /api/holds`, `POST /api/reservations` | 단위 경합 테스트 5종(`*SeatHoldStrategyConcurrencyTest`) + 부하 측정 60회 + DB 검증 V-1 | **초과 예약 0건** | **충족** — `none` 제외 4개 전략 V-1 0(각 9회 전부). `none`은 고경합 4석으로 실패 증거를 냈다 |
-| REQ-02 | 실시간 잔여 좌석 검증 및 표시 | 국립 SFR-001, SFR-006 | `program`, `event_session`, `seat_inventory` | `GET /api/sessions/{id}/seats`, `GET /api/sessions/{id}/seats/status` | `SeatMapPageControllerTest`(렌더) | — | **부분** — 조회 API·`ETag`/304·htmx fragment는 구현됐고 렌더 테스트가 있다. **폴링 부하는 측정에 넣지 않았다**(`api-spec.md` 8.1) |
+| REQ-02 | 실시간 잔여 좌석 검증 및 표시 | 국립 SFR-001, SFR-006 | `program`, `event_session`, `seat_inventory` | `GET /api/sessions/{id}/seats`, `GET /api/sessions/{id}/seats/status` | `SeatMapPageControllerTest`(렌더) + 단위 흐름 테스트 `MinimumScopeFlowTest`(좌석맵 렌더 + AVAILABLE→HELD→SOLD 전이) | — | **부분** — 조회 API·`ETag`/304·htmx fragment가 구현됐고 상태 전이가 화면에 반영되는 것까지 확인했다. **폴링 부하는 측정에 넣지 않았다**(`api-spec.md` 8.1) |
 | REQ-03 | 중복 예약 방지 / 1인 최대 매수 제한 | 국립 SFR-001 | `seat_hold`, `user_session_quota`, `reservation`, `idempotency_record` | `POST /api/holds`, `POST /api/reservations` (둘 다 `Idempotency-Key` 필수) | 부하 측정 + DB 검증 V-3 | — | **충족(부하 측정 기준)** — 60회 전부 V-3 0. 전용 단위 경합 테스트는 없다(REQ-11 참조) |
-| REQ-04 | 예약·결제 상태 정합성 검증 | 국립 SFR-002 | `reservation`, `payment`, `idempotency_record` | `POST /api/reservations`, `GET /api/reservations/{id}`, `POST /api/reservations/{id}/cancel` | DB 검증 V-4(재고-예약 불일치)가 예약 축만 덮는다 | — | **부분** — 예약 축은 60회 전부 V-4 0. **결제 축은 미검증**이다. Mock PG가 M4 항목이라 `payment` 행이 생기지 않는다(`design-spec.md` 6절) |
-| REQ-05 | 알림 발송 재시도 및 중복 발송 방지 | 국립 SFR-003 | `outbox` | 없음 — Outbox는 서버 내부 워커이며 외부 API가 아니다 (`api-spec.md` 7절) | 단위 경합 테스트 `OutboxConcurrencyTest` — 워커 8개 동시 실행 / 재시도 / 상한 소진 / 확정 트랜잭션과의 원자성 | **중복 발송 0건** | **충족** — 알림 200건이 정확히 한 번씩 발송된다. 확정 시 INSERT는 확정과 같은 트랜잭션이며 롤백으로 확인한다(이슈 #78, `concurrency-spec.md` 6.1) |
-| REQ-06 | 회차별 입장 가능시간 검증 및 검표 처리 | 국립 SFR-004 | `event_session`, `ticket_scan` | 없음 — 검표 엔드포인트는 별도 계약 (`api-spec.md` 7절, 4개월차 작업) | 없음 | — | **미구현** — M4 항목. 스키마와 U-11만 있다 |
-| REQ-07 | QR 모바일 티켓 발급 | 궁능 SFR-03 | `ticket` | 없음 — 발급 엔드포인트는 별도 계약 (`api-spec.md` 7절, 4개월차 작업) | 없음 | — | **미구현** — M4 항목. 스키마와 U-9·U-10만 있다 |
-| REQ-08 | 예약 오픈 일시 설정 | 궁능 SFR-05 | `event_session` | `GET /api/sessions/{id}/seats` (`reserveOpensAt` 필드), `POST /api/holds` (`RESERVATION_NOT_OPEN` 거절) | 없음 | — | **구현·미검증** — `SeatHoldService`가 `RESERVATION_NOT_OPEN`을 던지고 `classify.js`가 정상 거절로 분류하지만, 오픈 전 시각을 만들어 확인하는 테스트가 없다 |
+| REQ-04 | 예약·결제 상태 정합성 검증 | 국립 SFR-002 | `reservation`, `payment`, `idempotency_record` | `POST /api/reservations`, `GET /api/reservations/{id}`, `POST /api/reservations/{id}/cancel` | DB 검증 V-4(재고-예약 불일치)가 예약 축만 덮는다 + 단위 흐름 테스트 `MinimumScopeFlowTest`(승인·거절·재시도 경로) | — | **충족** — 승인 시 예약 `CONFIRMED`, 거절 시 `HELD` 유지, 재시도가 새 `payment` 행을 만드는 것까지 확인했다. 콜백·`TIMEOUT`은 여유 항목이라 미구현 |
+| REQ-05 | 알림 발송 재시도 및 중복 발송 방지 | 국립 SFR-003 | `outbox` | 없음 — Outbox는 서버 내부 워커이며 외부 API가 아니다 (`api-spec.md` 7절) | 단위 경합 테스트 `OutboxConcurrencyTest` — 워커 8개 동시 실행 / 재시도 / 상한 소진 / 확정 트랜잭션과의 원자성 + 단위 흐름 테스트 `MinimumScopeFlowTest`(확정 트랜잭션이 `outbox` 행을 넣는지) | **중복 발송 0건** | **충족** — 알림 200건이 정확히 한 번씩 발송된다. 확정 시 INSERT는 확정과 같은 트랜잭션이며 롤백으로 확인한다(이슈 #78, `concurrency-spec.md` 6.1) |
+| REQ-06 | 회차별 입장 가능시간 검증 및 검표 처리 | 국립 SFR-004 | `event_session`, `ticket_scan` | `POST /api/tickets/scan`, `GET /scan`(검표 화면) | 단위 흐름 테스트 `MinimumScopeFlowTest`(입장 창 밖 스캔 `REJECTED_TIME`, 중복 스캔 `REJECTED_DUPLICATE`) | **중복 사용 0건** | **충족** — U-11이 티켓당 `ADMITTED` 1건으로 제한하고 거절은 이력으로 남는다 |
+| REQ-07 | QR 모바일 티켓 발급 | 궁능 SFR-03 | `ticket` | `GET /api/reservations/{id}/tickets`, `GET /reservations/{id}`(예약 확인 화면) | 단위 흐름 테스트 `MinimumScopeFlowTest`(발급 → 조회 → 스캔) | — | **충족** — 결제 승인과 같은 트랜잭션에서 발급되고, 화면과 API로 조회되며, 스캔에 쓰인다 |
+| REQ-08 | 예약 오픈 일시 설정 | 궁능 SFR-05 | `event_session` | `GET /api/sessions/{id}/seats` (`reserveOpensAt` 필드), `POST /api/holds` (`RESERVATION_NOT_OPEN` 거절) | 단위 흐름 테스트 `MinimumScopeFlowTest`(오픈 전 홀드가 409 `RESERVATION_NOT_OPEN`) | — | **충족** — 거절이 상태를 남기지 않는 것까지 확인했다 |
 | REQ-09 | 좌석 지정 선택 및 좌석 단위 점유 | 자체 확장 | `seat_layout`, `zone`, `seat`, `seat_inventory`, `seat_hold`, `reservation_seat` | `GET /api/sessions/{id}/seats`, `GET .../seats/status`, `POST /api/holds`, `DELETE /api/holds/{holdId}` | 단위 경합 테스트 5종 + 부하 측정 + DB 검증 V-2·V-4 | — | **충족** — 60회 전부 V-2 0 · V-4 0 |
 | REQ-10 | 응답시간 p95 3초 이내 | 국립 PER-002 | 없음 — 특정 테이블이 아니라 전 구간의 성능 목표 (`erd.md` 2절) | 전체 엔드포인트 공통 | **부하 측정 (k6, 정본)** | **p95 3초 이내** | **충족** — 다섯 전략 **18~41ms**(상한의 1.4% 이하). 단 k6가 앱과 같은 호스트에서 돈다는 제약을 함께 읽는다(`concurrency-spec.md` 7.3) |
 | REQ-11 | 1인 최대 매수 검사는 좌석 단위 락과 독립적으로 직렬화되어야 한다 (좌석 락으로는 막히지 않는다) | 자체 확장 — `concurrency-spec.md` 1.1절 (CS-6) | `user_session_quota` | `POST /api/holds` (`QUOTA_EXCEEDED` 거절) | 부하 측정 + DB 검증 V-3 | **상한 초과 승인 0건** | **충족(부하 측정 기준)** — 60회 전부 V-3 0. **CS-6 전용 단위 경합 테스트는 없다** — 전략 테스트는 `user_session_quota` 행을 시드만 하고 상한을 겨루지 않는다 |
@@ -52,12 +52,13 @@
 요구사항이 검증된 것처럼 보인다.** REQ-05·06·07은 그 시점에 코드가 아예 없는데도
 "통합 테스트"라고 적혀 있었다. (REQ-05는 이후 이슈 #78로 구현·검증됐다.)
 
-현재 존재하는 검증 수단은 다섯이다.
+현재 존재하는 검증 수단은 여섯이다.
 
 | 수단 | 대상 | 어디에 |
 |---|---|---|
 | 단위 경합 테스트 5종 | 전략별 N스레드 동시 홀드·확정 | `api/src/test/.../*SeatHoldStrategyConcurrencyTest` |
 | 화면 렌더 테스트 | 좌석맵 페이지 | `SeatMapPageControllerTest` |
+| **단위 흐름 테스트** | **최소 완결선** — 선점 → 결제 → QR → 검표, 실패 경로 넷 | `api/src/test/.../MinimumScopeFlowTest` |
 | 단위 경합 테스트 (알림) | 워커 동시 실행·재시도·상한·확정과의 원자성 | `api/src/test/.../OutboxConcurrencyTest` |
 | 부하 측정 | 홀드·확정 경로, 앱 2대 | `load-test/scenarios/reservation.js`, 60회 |
 | DB 검증 쿼리 | V-1~V-6 | `load-test/sql/verify.sql` |
@@ -65,9 +66,11 @@
 **검증되지 않은 것은 그렇게 적는다.** "미구현"과 "구현했지만 검증 수단이 없음"은
 다르며, 뒤엣것(REQ-08)이 더 위험하다 — 동작한다고 믿고 넘어가기 쉽다.
 
-**M4에서 메울 것은 두 가지다.** 첫째, 기능 자체가 없는 REQ-06·07(그리고 REQ-04의
-결제 축). 둘째, **기능은 있는데 검증이 없는 REQ-08과, 부하 측정에만 기대고 있는
-REQ-03·11이다.** V-3이 60회 내내 0인 것은 강한 증거지만, 상한을
+**M4에서 메울 것은 두 가지였다.** 첫째, 기능 자체가 없던 REQ-06·07(그리고
+REQ-04의 결제 축) — **구현하고 `MinimumScopeFlowTest`로 검증했다.** 둘째, 기능은
+있는데 검증이 없던 REQ-08 — **같은 테스트가 덮었다.**
+
+**남은 것은 부하 측정에만 기대고 있는 REQ-03·11이다.** V-3이 60회 내내 0인 것은 강한 증거지만, 상한을
 실제로 겨루는 단위 테스트가 있어야 회귀를 잡는다.
 
 ---

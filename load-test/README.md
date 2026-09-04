@@ -63,6 +63,9 @@ results/               실행 결과 JSON·검증 출력 (gitignore 대상)
 # 1) 앱 기동 (앱 2대 + DB + Redis + nginx)
 docker compose up -d
 
+# 2') 무엇을 고를지 모르겠으면 실행기를 쓴다 (아래 참조)
+load-test/scripts/measure.sh
+
 # 2) 스모크 — 실행 환경·집계 파이프라인 확인
 load-test/scripts/run.sh smoke
 
@@ -320,6 +323,48 @@ for s in none pessimistic optimistic unique redis; do
   DURATION_SEC=120 load-test/scripts/run.sh high $s
 done
 ```
+
+### 실행기 — `measure.sh`
+
+시나리오·전략 이름을 외우지 않아도 되고, **전량 실행에서 세션이 갈리지 않는다.**
+
+```bash
+load-test/scripts/measure.sh                          # 대화형 — 선택지를 보여준다
+load-test/scripts/measure.sh high pessimistic         # 단건 (개발 확인용 30초)
+load-test/scripts/measure.sh high pessimistic 120     # 단건 (최종 측정용)
+load-test/scripts/measure.sh --preset m3-all          # 5전략 × 3시나리오
+load-test/scripts/measure.sh --preset high-controlled # 고경합 + 전략별 대조군
+load-test/scripts/measure.sh --preset deadlock        # 데드락 회피 검증 5전략
+load-test/scripts/measure.sh --preset deadlock --yes  # 확인 생략(스크립트용)
+```
+
+**시작 전에 예상 시간을 보여주고 확인을 받는다.** 80분짜리를 모르고 시작하는
+일이 없게 하려는 것이다.
+
+```
+════ 측정 계획 (프리셋 high-controlled) ════
+  high / pessimistic — 120초 × 3회
+  high / none — 120초 × 3회
+  ...
+────────────────────────────
+  실행 단위 10개 · 예상 약 100분
+진행할까? [y/N]
+```
+
+| 프리셋 | 구성 | 왜 |
+|---|---|---|
+| `m3-all` | 5전략 × 3시나리오 = 45회 | M3가 실제로 돈 조합 |
+| `high-controlled` | 4전략 각각 + 같은 세션 `none`, 끝에 `none` 대 `none` 2블록 = 30회 | 7.8.3 방식. **마지막 두 블록이 잡음 바닥**이고, 그것 없이는 어떤 비율도 해석할 수 없다 |
+| `deadlock` | 5전략 × `run-deadlock.sh` | 7.2.1 |
+
+**`run.sh`를 대체하지 않는다.** 사전 점검(7.4.0)·재초기화(7.4.1)·회차별
+캡처(7.4.2)·커밋과 이미지 기록(7.3)은 전부 `run.sh` 것을 그대로 탄다. 개별
+호출은 지금처럼 되고, 이 스크립트가 더하는 것은 **선택지 · 세션 고정 · 예상
+시간** 셋뿐이다.
+
+**세션 고정이 이 스크립트를 만든 실질적 이유다.** `run.sh`는 부를 때마다 태그를
+새로 만들므로, 전략마다 부르면서 밖에서 고정하지 않으면 세션이 갈려
+`summarize.mjs`가 마지막 하나만 잡는다.
 
 ### 측정 대상 커밋도 함께 남는다
 

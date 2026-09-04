@@ -28,6 +28,28 @@ import java.util.UUID;
  * k6 측정 시나리오와 {@code verify.sql}의 V-1(확정 좌석 수) 판정이 M3와 같은
  * 의미를 유지해야 재측정이 가능하다.
  *
+ * <h2>결제가 확정과 같은 트랜잭션에 있다 — 동기 Mock이라 성립한다</h2>
+ *
+ * <p>{@link #pay}는 하나의 {@code @Transactional} 안에서 <b>PG 호출 → 확정 →
+ * 발권</b>을 모두 한다. Mock이 즉답하므로 그 안이 서브밀리초이고, 그래서 다른
+ * 확정 경로와 비용이 같다.
+ *
+ * <p><b>실제 PG였다면 이 구조는 성립하지 않는다.</b> 외부 호출이 수백 ms
+ * 걸리거나 응답이 오지 않으면 그동안 DB 커넥션을 쥐고, {@code pessimistic}
+ * 전략이면 좌석 행 락까지 쥔 채 기다린다 — concurrency-spec 4.2가 그 전략의
+ * 성능 특성으로 지목한 상황이 <b>전략과 무관하게</b> 만들어진다.
+ *
+ * <p>그때는 결제를 트랜잭션 밖에서 하고 <b>콜백으로 확정</b>해야 한다.
+ * state-transitions 5절의 {@code TIMEOUT} 상태와 5.2의
+ * {@code callback-delay-ms}가 원래 그것을 위한 설계이며, 최소 완결에서 둘 다
+ * 뺀 이유도 같다 — 동기 Mock에는 쓸 자리가 없다. 관계는
+ * {@code docs/scope-m4.md} 5절에 정리했다.
+ *
+ * <p><b>concurrency-spec 7.7.1이 "결제는 임계 구역 밖"이라고 적은 것은 결제
+ * 화면 체류 시간이며, 결제 호출 자체는 지금 임계 구역 안이다.</b> M3 측정값은
+ * 이 경로를 지나지 않으므로(측정 시나리오는 {@code POST /api/reservations}를
+ * 쓴다) 영향받지 않는다.
+ *
  * <h2>PENDING_PAYMENT를 쓰지 않는다</h2>
  *
  * <p>state-transitions.md 1절은 Mock PG가 확정되면 예약 전이를
