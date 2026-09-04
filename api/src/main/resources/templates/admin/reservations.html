@@ -17,7 +17,8 @@
 
     <section class="card">
         <h2>회차별 좌석 현황</h2>
-        <table class="admin-table" th:if="${not #maps.isEmpty(seatSummary)}">
+        <div class="table-scroll" th:if="${not #maps.isEmpty(seatSummary)}">
+        <table class="admin-table">
             <thead>
                 <tr>
                     <th>회차</th>
@@ -36,12 +37,14 @@
                 </tr>
             </tbody>
         </table>
+        </div>
         <p th:if="${#maps.isEmpty(seatSummary)}">좌석 데이터가 없다.</p>
     </section>
 
     <section class="card">
         <h2>예약 목록 <span class="meta">(최근 200건)</span></h2>
-        <table class="admin-table" th:if="${not #lists.isEmpty(reservations)}">
+        <div class="table-scroll" th:if="${not #lists.isEmpty(reservations)}">
+        <table class="admin-table">
             <thead>
                 <tr>
                     <th>예약번호</th>
@@ -83,6 +86,7 @@
                 </tr>
             </tbody>
         </table>
+        </div>
         <p th:if="${#lists.isEmpty(reservations)}">예약이 없다.</p>
     </section>
 </main>

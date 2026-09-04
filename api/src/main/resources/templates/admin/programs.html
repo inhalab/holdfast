@@ -28,7 +28,8 @@
 
     <section class="card">
         <h2>프로그램 목록</h2>
-        <table class="admin-table" th:if="${not #lists.isEmpty(programs)}">
+        <div class="table-scroll" th:if="${not #lists.isEmpty(programs)}">
+        <table class="admin-table">
             <thead>
                 <tr><th>ID</th><th>이름</th><th>설명</th><th></th></tr>
             </thead>
@@ -41,6 +42,7 @@
                 </tr>
             </tbody>
         </table>
+        </div>
         <p th:if="${#lists.isEmpty(programs)}">등록된 프로그램이 없습니다.</p>
     </section>
 
