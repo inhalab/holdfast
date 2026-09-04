@@ -37,8 +37,6 @@ import java.util.Map;
 public class CatalogPageController {
 
     private static final String STATUS_AVAILABLE = "AVAILABLE";
-    private static final String SESSION_OPEN = "OPEN";
-    private static final String SESSION_SCHEDULED = "SCHEDULED";
 
     private final CatalogProgramRepository programRepository;
     private final CatalogSessionRepository sessionRepository;
@@ -106,29 +104,13 @@ public class CatalogPageController {
     }
 
     /**
-     * 회차를 목록에서 어떻게 보여줄지 정한다(이슈 #108 — SFR-006의 "접수종료 노출
-     * 방식이 운영정책과 일치").
-     *
-     * <p><b>이유를 하나로 뭉치지 않는다.</b> "오픈 전"과 "종료"를 같은 조건으로
-     * 묶으면 닫힌 회차에도 오픈 일시가 찍힌다 — 실제로 그렇게 만들었다가 고쳤다.
-     *
-     * <p>판단 순서에 뜻이 있다. 닫힌 회차는 잔여석이 남아 있어도 닫힌 것이고,
-     * 오픈 전 회차는 매진일 수 없다.
-     *
-     * <p>서버의 {@code RESERVATION_NOT_OPEN} 거절(REQ-08)을 화면이 미리 보여주는
-     * 것이지 대신하는 것이 아니다 — 링크로 들어가도 홀드는 서버가 다시 판정한다.
+     * 노출 상태는 {@link SaleState#of}가 정한다. 좌석맵 화면
+     * ({@link SeatMapPageController})도 같은 메서드를 쓴다 — 목록에서는 "접수
+     * 종료"인데 들어가 보면 좌석이 눌리는 어긋남을 없애려면 규칙이 한 벌이어야
+     * 한다(이슈 #108). 정책과 근거는 그 열거형의 클래스 주석에 있다.
      */
     private SaleState saleStateOf(EventSession session, long available, Instant now) {
-        if (!SESSION_OPEN.equals(session.getStatus())) {
-            // SCHEDULED는 아직 열리지 않은 것이고 CLOSED는 끝난 것이다.
-            return SESSION_SCHEDULED.equals(session.getStatus())
-                    ? SaleState.NOT_YET_OPEN
-                    : SaleState.CLOSED;
-        }
-        if (session.getReserveOpensAt() != null && now.isBefore(session.getReserveOpensAt())) {
-            return SaleState.NOT_YET_OPEN;
-        }
-        return available > 0 ? SaleState.ON_SALE : SaleState.SOLD_OUT;
+        return SaleState.of(session.getStatus(), session.getReserveOpensAt(), available, now);
     }
 
     /** 없는 프로그램. 다른 페이지 컨트롤러와 같이 평문으로 답한다. */

@@ -19,7 +19,8 @@
       th:attr="data-session-id=${seatMap.sessionId},
                data-max-per-user=${seatMap.maxPerUser},
                data-hold-ttl=${seatMap.holdTtlSeconds},
-               data-user-id=${userId}">
+               data-user-id=${userId},
+               data-sale-state=${saleState}">
 
     <header class="page-head">
         <h1 th:text="'회차 ' + ${seatMap.sessionId} + ' 좌석 선택'">좌석 선택</h1>
@@ -27,6 +28,28 @@
             <span th:text="'상태 ' + ${seatMap.sessionStatus}">상태 OPEN</span>
             <span th:text="'· 1인 최대 ' + ${seatMap.maxPerUser} + '매'">· 1인 최대 4매</span>
         </p>
+        <!--
+          **막힐 것은 누르기 전에 알린다**(이슈 #108). 이 화면은 링크로 곧장
+          열리므로, 목록에 상태를 적는 것만으로는 오픈 전·종료된 회차가 평소와
+          똑같이 뜬다 — 좌석을 고르고 눌러야 서버 거절을 보게 된다.
+
+          판단은 SaleState.of가 하고 목록 화면과 같은 규칙을 쓴다. 여기서 막는
+          것은 화면일 뿐이고, 홀드는 서버가 다시 판정한다.
+        -->
+        <p class="sale-notice warn" th:if="${saleState.name() == 'NOT_YET_OPEN'}">
+            <strong>아직 예약 오픈 전입니다.</strong>
+            <span th:if="${seatMap.reserveOpensAt != null}"
+                  th:text="${#temporals.format(seatMap.reserveOpensAt, 'M월 d일 HH:mm')} + '부터 선택할 수 있습니다.'">
+                9월 5일 10:00부터 선택할 수 있습니다.
+            </span>
+        </p>
+        <p class="sale-notice warn" th:if="${saleState.name() == 'SOLD_OUT'}">
+            <strong>매진되었습니다.</strong> 선점이 풀리면 자리가 다시 나올 수 있습니다.
+        </p>
+        <p class="sale-notice warn" th:if="${saleState.name() == 'CLOSED'}">
+            <strong>접수가 종료된 회차입니다.</strong>
+        </p>
+
         <ul class="legend" aria-hidden="true">
             <li><span class="swatch is-available"></span>선택 가능</li>
             <li><span class="swatch is-selected"></span>내 선택</li>
@@ -62,7 +85,8 @@
                 <ul id="selected-list" class="seat-list">
                     <li class="empty">좌석을 선택하세요</li>
                 </ul>
-                <button type="button" id="hold-btn" class="primary" disabled>선점하기</button>
+                <button type="button" id="hold-btn" class="primary" disabled
+                        th:text="${saleState.sellable()} ? '선점하기' : '선택할 수 없음'">선점하기</button>
             </section>
 
             <section id="hold-panel" hidden>
