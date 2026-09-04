@@ -27,6 +27,8 @@
         details.note p { margin: .6rem 0; }
         details.note p:first-of-type { margin-top: 0; }
         details.note p:last-child { margin-bottom: 0; }
+        .fc { display: block; margin-top: .35rem; padding-left: .6rem;
+              border-left: 2px solid #bbb; color: #333; }
         code { background: #f0f0f0; padding: 0 .25rem; }
         .changed { background: #fff3cd; }
         nav { margin: 0 0 1rem; padding: .5rem .8rem; background: #f2f2f2; border-radius: .4rem; }
@@ -79,7 +81,7 @@
     <button id="applySeats">좌석 수만 바꾸기</button>
     &nbsp;&nbsp;
     <label>요청 수
-        <input id="count" type="number" value="20" min="2" max="60" style="width:4rem">
+        <input id="count" type="number" value="20" min="2" max="200" style="width:4rem">
     </label>
     <span class="dim" id="spreadHint"></span>
     <div class="dim" id="poolHint" style="margin-top:.4rem"></div>
@@ -132,18 +134,28 @@
 </div>
 
 <details class="note">
-    <summary>더 물어볼 만한 것 — 좌석 수, 성공이 6에서 멈추는 이유, 전환이 재기동인 이유, 첫 실행</summary>
+    <summary>더 물어볼 만한 것 — 좌석에 어떻게 흩어지나, 성공이 도중에 멈추는 이유, 전환이 재기동인 이유, 첫 실행</summary>
     <p>
-        <b>좌석 수를 늘리면.</b> 요청이 좌석에 돌아가며 흩어진다(1번 요청→1번 좌석,
-        2번 요청→2번 좌석…). 요청 20개에 좌석 3개면 좌석당 6~7개가 몰리므로,
-        <code>none</code>은 <b>좌석마다 초과 홀드</b>가 생겨 총 홀드가 요청 수에
-        가까워지고, 전략을 걸면 <b>총 홀드가 정확히 좌석 수</b>가 된다.
+        <b>요청은 좌석에 돌아가며 흩어진다.</b> 1번 요청→1번 좌석, 2번 요청→2번
+        좌석… 좌석을 한 바퀴 돌면 다시 1번으로 온다. 전략을 걸면 좌석마다 홀드가
+        하나씩만 남고 나머지는 409이므로, <b>총 홀드는 정확히 좌석 수</b>가 된다.
+        <span id="fcSpread" class="fc"></span>
     </p>
     <p>
-        <b>요청 수를 20으로 줘도 성공이 6쯤에서 멈추는 것은 정상이다.</b> 브라우저는
-        HTTP/1.1에서 호스트당 커넥션을 6개로 제한하므로, 나머지는 앞 요청이 끝난 뒤에
-        도착해 이미 잡힌 좌석을 만난다. <b>서버의 한계가 아니라 브라우저의 한계다</b> —
-        같은 실험을 스크립트로 20개 동시에 보내면 <code>none</code>에서 20건이 홀드된다.
+        <b>성공이 요청 수보다 한참 적은 것은 정상이다.</b> 브라우저는 HTTP/1.1에서
+        호스트당 커넥션을 6개로 제한한다. <b>한 번에 떠 있는 요청은 6개뿐이고</b>
+        나머지는 앞 요청이 끝난 뒤에 도착해 이미 잡힌 좌석을 만난다.
+        <b>서버의 한계가 아니라 브라우저의 한계다</b> — 같은 실험을 스크립트로 보내면
+        <code>none</code>에서 요청 수만큼 홀드된다.
+        <span id="fcBrowser" class="fc"></span>
+    </p>
+    <p>
+        <b>그래서 좌석 수가 6 이상이면 초과 홀드가 안 나온다.</b> 동시에 떠 있는
+        요청 6개가 서로 다른 좌석으로 흩어져 <b>애초에 겹치지 않기</b> 때문이다.
+        <code>none</code>과 전략의 차이를 보려면 좌석을 6개보다 적게 잡아야 하고,
+        <b>1개가 가장 선명하다.</b> 이것은 브라우저에서만 걸리는 제약이다 — 측정은
+        k6로 보내므로 좌석 1000개에서도 겹친다.
+        <span id="fcOverlap" class="fc"></span>
     </p>
     <p>
         <b>전략을 바꾸려면 앱을 다시 띄워야 한다.</b> 전략 빈은 기동 시 하나만
@@ -212,18 +224,82 @@
   function updatePoolHint(s) {
     if (!s) return;
     const n = num('count');
-    $('poolHint').innerHTML = s.userPool >= n
+    const pool = s.userPool >= n
       ? `사용자 풀 ${s.userPool}명 — 요청 ${n}개를 전부 다른 사용자로 보낼 수 있다.`
       : `<b class="bad">사용자 풀이 ${s.userPool}명뿐이다.</b> 요청 ${n}개 중 뒤쪽은 ` +
         `할당량 행이 없어 실패한다 — 시드에서 사용자 수를 늘려라.`;
+    // U-2는 앱이 아니라 스키마에 있다. 남아 있으면 전략이 none이어도 DB가 초과
+    // 홀드를 막으므로, 화면은 전략을 걸었을 때와 같은 결과를 보여준다.
+    const u2 = (s.strategy === 'none' && s.u2Present)
+      ? `<br><b class="bad">전략은 none인데 U-2 인덱스가 남아 있다.</b> DB가 초과 ` +
+        `홀드를 막으므로 none이 none처럼 동작하지 않는다 — ` +
+        `<code>./holdfast strategy none</code>으로 시드까지 다시 돌려라.`
+      : '';
+    $('poolHint').innerHTML = pool + u2;
+  }
+
+  // 브라우저가 한 호스트에 동시에 여는 커넥션 수(HTTP/1.1). 이 값이 이 화면에서
+  // 무엇이 겹치고 무엇이 안 겹치는지를 전부 결정하므로 상수로 뽑아 둔다.
+  const BROWSER_CONNS = 6;
+
+  // 지금 입력값에서 무엇이 나올지 계산한다. **예시 숫자를 글로 박지 않는다** —
+  // 박아 두면 시연 조건을 바꿀 때마다 설명이 조용히 어긋난다.
+  function forecast() {
+    const seats = Math.max(1, num('seatCount'));
+    const n = Math.max(1, num('count'));
+    const inFlight = Math.min(n, BROWSER_CONNS);   // 동시에 떠 있는 요청
+    return {
+      seats, n, inFlight,
+      perSeat: Math.ceil(n / seats),               // 좌석당 총 요청
+      holdsWithStrategy: Math.min(seats, n),       // 전략: 좌석마다 정확히 하나
+      // none: 좌석이 동시 요청보다 많으면 파도가 빈 좌석을 차례로 채워 좌석 수까지
+      // 가고, 적으면 첫 파도에서 겹친 만큼만 남는다. 실측으로 맞춘 식이다
+      // (scope-m4.md 7절 표).
+      holdsWithoutStrategy: Math.min(n, Math.max(seats, inFlight)),
+      overlaps: seats < inFlight,                  // 같은 좌석을 동시에 치는가
+      perSeatInFlight: Math.ceil(inFlight / seats) // 겹칠 때 좌석당 동시 요청
+    };
   }
 
   function updateSpreadHint() {
-    const seats = num('seatCount'), n = num('count');
-    const per = Math.ceil(n / seats);
-    $('spreadHint').textContent =
-      seats === 1 ? `— 요청 ${n}개가 전부 좌석 1번을 노린다`
-                  : `— 요청이 좌석에 돌아가며 흩어진다. 좌석당 최대 ${per}개`;
+    const f = forecast();
+    const base = f.seats === 1
+      ? `— 요청 ${f.n}개가 전부 좌석 1번을 노린다`
+      : `— 요청이 좌석에 돌아가며 흩어진다. 좌석당 최대 ${f.perSeat}개`;
+    // 겹치지 않는 조건은 시연이 아무것도 못 보여주는 조건이라, 접힌 설명이 아니라
+    // 여기에서 경고한다(사용자 풀 경고와 같은 취급).
+    $('spreadHint').innerHTML = f.overlaps
+      ? base
+      : `${base} <b class="bad">— 이 조건에서는 초과 홀드가 안 나온다.</b> ` +
+        `동시에 뜨는 요청 ${f.inFlight}개가 좌석 ${f.seats}개에 하나씩 흩어진다. ` +
+        `좌석을 ${BROWSER_CONNS}개보다 적게 잡아라.`;
+    updateForecastText(f);
+  }
+
+  function updateForecastText(f) {
+    $('fcSpread').innerHTML =
+      f.seats === 1
+        ? `<b>지금 조건:</b> 요청 ${f.n}개가 전부 좌석 1번으로 간다. 전략을 걸면 ` +
+          `홀드 <b>1건</b>, 나머지 ${f.n - 1}개는 409다.`
+        : `<b>지금 조건:</b> 요청 ${f.n}개 / 좌석 ${f.seats}개 — 좌석당 ` +
+          `${Math.floor(f.n / f.seats)}~${f.perSeat}개가 배정된다. 전략을 걸면 총 홀드 ` +
+          `<b>${f.holdsWithStrategy}건</b>, 나머지 ${f.n - f.holdsWithStrategy}개는 409다.`;
+
+    $('fcBrowser').innerHTML =
+      `<b>지금 조건:</b> 요청 ${f.n}개가 ${f.inFlight}개씩 나뉘어 도착하므로 ` +
+      `<b>성공은 요청 수보다 훨씬 적게 멈춘다</b> — 전략을 걸면 ` +
+      `<b>${f.holdsWithStrategy}건</b>, <code>none</code>이면 ` +
+      `<b>${f.holdsWithoutStrategy}건</b> 근처다. 좌석이 전부 HELD가 되면 그 뒤 ` +
+      `요청은 409다.`;
+
+    $('fcOverlap').innerHTML = f.overlaps
+      ? `<b>지금 조건:</b> 좌석 ${f.seats}개 &lt; 동시 요청 ${f.inFlight}개이므로 ` +
+        `좌석당 <b>${f.perSeatInFlight}개가 겹친다.</b> <code>none</code>이면 여기서 ` +
+        `초과 홀드가 나온다.`
+      : `<b class="bad">지금 조건은 겹치지 않는다.</b> 좌석 ${f.seats}개 ≥ 동시 요청 ` +
+        `${f.inFlight}개라 <code>none</code>도 전략과 똑같이 ${f.holdsWithStrategy}건을 ` +
+        `내놓는다 — <b>이 화면이 보여주려는 차이가 안 보인다.</b> 좌석 수를 ` +
+        `${BROWSER_CONNS}개보다 적게 줄여라.`;
   }
 
   async function fetchState() {
