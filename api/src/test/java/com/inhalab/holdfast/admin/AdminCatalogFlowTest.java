@@ -19,12 +19,18 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.hamcrest.Matchers.containsString;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -120,6 +126,17 @@ class AdminCatalogFlowTest {
                         now() - interval '1 hour', 4, 'OPEN')
                 """);
 
+        // 좌석재고·할당량도 시드가 만든다(concurrency-spec 0.4, 1.1). seed.sql과
+        // 같은 모양이어야 "이미 판 회차를 수정한다"를 재현할 수 있다.
+        jdbc.update("""
+                INSERT INTO seat_inventory (session_id, seat_id, status, version)
+                SELECT 1, s.id, 'AVAILABLE', 0 FROM seat s
+                """);
+        jdbc.update("""
+                INSERT INTO user_session_quota (session_id, user_id, held_count)
+                SELECT 1, u, 0 FROM generate_series(1, 10) AS u
+                """);
+
         // 좌석 없는 배치도. 회차 등록의 거절 경로를 보기 위한 것이다.
         jdbc.update("INSERT INTO seat_layout (id, name, created_at) VALUES (9, '빈 배치도', now())");
 
@@ -172,6 +189,277 @@ class AdminCatalogFlowTest {
 
         assertThat(inventory).isEqualTo(10);   // 배치도 1의 좌석 수
         assertThat(quota).isEqualTo(25);
+    }
+
+    // ── 시각 관계 (erd.md 2.2의 T-1~T-4) ──────────────────────────────
+
+    /**
+     * 정상 회차를 기준으로 두고 테스트마다 <b>한 값만</b> 어긋나게 한다.
+     * 다섯 개를 매번 나열하면 무엇이 다른지 읽히지 않는다.
+     */
+    private static final Instant BASE = Instant.parse("2026-10-01T00:00:00Z");
+
+    private void createSessionWith(Instant starts, Instant ends,
+                                   Instant entryOpens, Instant entryCloses,
+                                   Instant reserveOpens) {
+        service.createSession(1L, 1L, starts, ends, entryOpens, entryCloses, reserveOpens,
+                4, "OPEN", 10);
+    }
+
+    /** 어느 값도 어긋나지 않은 조합. 아래 테스트들이 여기서 하나씩만 바꾼다. */
+    private void createValidSession() {
+        createSessionWith(BASE.plus(2, ChronoUnit.HOURS), BASE.plus(4, ChronoUnit.HOURS),
+                BASE.plus(1, ChronoUnit.HOURS), BASE.plus(5, ChronoUnit.HOURS), BASE);
+    }
+
+    @Test
+    @DisplayName("정상 조합은 통과한다 — 아래 거절들이 검증 때문임을 보인다")
+    void validScheduleIsAccepted() {
+        createValidSession();
+
+        Long count = jdbc.queryForObject(
+                "SELECT count(*) FROM event_session WHERE program_id = 1", Long.class);
+        assertThat(count).isEqualTo(2);   // 시드 1건 + 방금 만든 1건
+    }
+
+    @Test
+    @DisplayName("T-1 회차 종료가 시작보다 빠르면 거절한다")
+    void rejectsEndBeforeStart() {
+        assertThatThrownBy(() -> createSessionWith(
+                BASE.plus(4, ChronoUnit.HOURS), BASE.plus(2, ChronoUnit.HOURS),
+                BASE.plus(1, ChronoUnit.HOURS), BASE.plus(5, ChronoUnit.HOURS), BASE))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("종료가 시작보다");
+        assertNoSessionAdded();
+    }
+
+    @Test
+    @DisplayName("T-2 입장 종료가 입장 시작보다 빠르면 거절한다 — 아무도 입장할 수 없다")
+    void rejectsEntryWindowInverted() {
+        assertThatThrownBy(() -> createSessionWith(
+                BASE.plus(2, ChronoUnit.HOURS), BASE.plus(4, ChronoUnit.HOURS),
+                BASE.plus(5, ChronoUnit.HOURS), BASE.plus(1, ChronoUnit.HOURS), BASE))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("입장");
+        assertNoSessionAdded();
+    }
+
+    @Test
+    @DisplayName("T-3 예약 오픈이 입장 종료보다 늦으면 거절한다")
+    void rejectsReserveOpenAfterEntryClose() {
+        assertThatThrownBy(() -> createSessionWith(
+                BASE.plus(2, ChronoUnit.HOURS), BASE.plus(4, ChronoUnit.HOURS),
+                BASE.plus(1, ChronoUnit.HOURS), BASE.plus(5, ChronoUnit.HOURS),
+                BASE.plus(6, ChronoUnit.HOURS)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("예약 오픈");
+        assertNoSessionAdded();
+    }
+
+    @Test
+    @DisplayName("T-4 입장 시작이 회차 종료보다 늦으면 거절한다")
+    void rejectsEntryOpenAfterEnd() {
+        assertThatThrownBy(() -> createSessionWith(
+                BASE.plus(2, ChronoUnit.HOURS), BASE.plus(4, ChronoUnit.HOURS),
+                BASE.plus(5, ChronoUnit.HOURS), BASE.plus(6, ChronoUnit.HOURS), BASE))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("입장 시작");
+        assertNoSessionAdded();
+    }
+
+    /**
+     * <b>실제로 저장됐던 값이다.</b> 종료가 시작보다 17일 앞서고 예약 오픈이
+     * 입장 종료보다 늦다. 이 회차는 아무도 예약할 수 없고 예약해도 입장할 수
+     * 없는데 조용히 통과했다.
+     */
+    @Test
+    @DisplayName("실제로 통과했던 조합을 이제는 거절한다")
+    void rejectsTheCombinationThatSlippedThrough() {
+        assertThatThrownBy(() -> createSessionWith(
+                Instant.parse("2026-09-24T10:22:00Z"),   // 시작
+                Instant.parse("2026-09-07T10:22:00Z"),   // 종료 — 시작보다 17일 앞
+                Instant.parse("2026-09-07T10:22:00Z"),   // 입장 시작
+                Instant.parse("2026-09-29T16:24:00Z"),   // 입장 종료
+                Instant.parse("2026-09-30T10:25:00Z")))  // 예약 오픈 — 입장 종료보다 늦다
+                .isInstanceOf(IllegalArgumentException.class);
+        assertNoSessionAdded();
+    }
+
+    @Test
+    @DisplayName("S-1 정의에 없는 상태는 거절한다")
+    void rejectsUnknownStatus() {
+        assertThatThrownBy(() -> service.createSession(1L, 1L,
+                BASE.plus(2, ChronoUnit.HOURS), BASE.plus(4, ChronoUnit.HOURS),
+                BASE.plus(1, ChronoUnit.HOURS), BASE.plus(5, ChronoUnit.HOURS), BASE,
+                4, "OPENED", 10))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("회차 상태는");
+        assertNoSessionAdded();
+    }
+
+    @Test
+    @DisplayName("1인 최대 매수 0은 거절한다")
+    void rejectsZeroMaxPerUser() {
+        assertThatThrownBy(() -> service.createSession(1L, 1L,
+                BASE.plus(2, ChronoUnit.HOURS), BASE.plus(4, ChronoUnit.HOURS),
+                BASE.plus(1, ChronoUnit.HOURS), BASE.plus(5, ChronoUnit.HOURS), BASE,
+                0, "OPEN", 10))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertNoSessionAdded();
+    }
+
+    // ── 이미 판 뒤의 수정 (erd.md 2.2의 S-2~S-5) ───────────────────────
+
+    @Test
+    @DisplayName("S-2 예약을 받은 회차는 SCHEDULED로 되돌릴 수 없다")
+    void rejectsRevertToScheduledWhenReserved() {
+        givenConfirmedReservation();
+
+        assertThatThrownBy(() -> updateSeededSession("SCHEDULED", 4, RESERVE_OPENED))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("SCHEDULED");
+
+        assertThat(seededStatus()).isEqualTo("OPEN");
+    }
+
+    @Test
+    @DisplayName("S-2 접수를 닫는 CLOSED는 예약이 있어도 허용한다")
+    void allowsCloseWhenReserved() {
+        givenConfirmedReservation();
+
+        updateSeededSession("CLOSED", 4, RESERVE_OPENED);
+
+        assertThat(seededStatus()).isEqualTo("CLOSED");
+    }
+
+    @Test
+    @DisplayName("S-3 판매된 좌석이 있으면 예약 오픈을 미래로 옮길 수 없다")
+    void rejectsMovingReserveOpenToFutureWhenSold() {
+        givenConfirmedReservation();   // 좌석 1을 SOLD로 만든다
+
+        assertThatThrownBy(() ->
+                updateSeededSession("OPEN", 4, Instant.now().plus(7, ChronoUnit.DAYS)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("판매된");
+    }
+
+    @Test
+    @DisplayName("S-4 1인 최대 매수를 줄이는 것은 막지 않고 알린다")
+    void warnsInsteadOfBlockingWhenReducingQuota() {
+        jdbc.update("INSERT INTO user_session_quota (session_id, user_id, held_count)"
+                + " VALUES (1, 77, 3)");
+
+        List<String> warnings = updateSeededSession("OPEN", 2, RESERVE_OPENED);
+
+        // 줄이는 것 자체는 통과한다 — 막으면 넉넉히 잡은 상한을 영영 못 고친다.
+        Integer max = jdbc.queryForObject(
+                "SELECT max_per_user FROM event_session WHERE id = 1", Integer.class);
+        assertThat(max).isEqualTo(2);
+        assertThat(warnings).anyMatch(w -> w.contains("1명"));
+    }
+
+    @Test
+    @DisplayName("S-5 판매된 좌석이 있으면 입장 시간 변경을 알린다 — 막지는 않는다")
+    void warnsWhenSoldSeatsExist() {
+        givenConfirmedReservation();
+
+        List<String> warnings = updateSeededSession("OPEN", 4, RESERVE_OPENED);
+
+        assertThat(warnings).anyMatch(w -> w.contains("발권된 티켓"));
+    }
+
+    @Test
+    @DisplayName("수정에도 같은 시각 검증이 걸린다")
+    void updateValidatesScheduleToo() {
+        assertThatThrownBy(() -> service.updateSession(1L,
+                BASE.plus(4, ChronoUnit.HOURS), BASE.plus(2, ChronoUnit.HOURS),
+                BASE.plus(1, ChronoUnit.HOURS), BASE.plus(5, ChronoUnit.HOURS), BASE,
+                4, "OPEN"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    // ── 화면 ───────────────────────────────────────────────────────────
+
+    /**
+     * <b>조용히 저장되면 관리자가 알 수 없다.</b> 실패는 리다이렉트하지 않고 그
+     * 자리에서 상세 화면을 다시 그린다 — 이유가 보이고, 입력하던 폼도 남는다.
+     *
+     * <p><b>플래시 메시지를 쓰지 않는 이유는 앱이 2대이기 때문이다.</b> 플래시는
+     * 세션에 담기는데 POST를 받은 인스턴스와 리다이렉트된 GET을 받는 인스턴스가
+     * 달라 유실된다. 앱에 직접 붙이면 뜨고 nginx를 거치면 안 뜬다.
+     */
+    @Test
+    @DisplayName("화면에서 잘못된 값을 넣으면 이유가 그 자리에 뜬다")
+    void pageShowsWhyItFailed() throws Exception {
+        mvc.perform(post("/admin/programs/1/sessions")
+                        .param("seatLayoutId", "1")
+                        .param("startsAt", "2026-09-24T19:22")
+                        .param("endsAt", "2026-09-07T19:22")      // 시작보다 앞
+                        .param("entryOpensAt", "2026-09-07T19:22")
+                        .param("entryClosesAt", "2026-09-30T01:24")
+                        .param("reserveOpensAt", "2026-09-30T19:25")
+                        .param("maxPerUser", "4")
+                        .param("status", "OPEN"))
+                .andExpect(status().isOk())              // 리다이렉트가 아니다
+                .andExpect(view().name("admin/program-detail"))
+                .andExpect(model().attributeExists("error"))
+                // 폼을 다시 그리는 데 필요한 것이 모두 실려 있어야 한다
+                .andExpect(model().attributeExists("program", "sessions", "layouts"))
+                .andExpect(content().string(containsString("종료가 시작보다")));
+
+        assertNoSessionAdded();
+    }
+
+    @Test
+    @DisplayName("성공은 리다이렉트한다 — 새로고침으로 다시 등록되지 않는다")
+    void successStillRedirects() throws Exception {
+        mvc.perform(post("/admin/programs/1/sessions")
+                        .param("seatLayoutId", "1")
+                        .param("startsAt", "2026-10-01T21:00")
+                        .param("endsAt", "2026-10-01T23:00")
+                        .param("entryOpensAt", "2026-10-01T20:00")
+                        .param("entryClosesAt", "2026-10-02T00:00")
+                        .param("reserveOpensAt", "2026-09-01T10:00")
+                        .param("maxPerUser", "4")
+                        .param("status", "OPEN"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/programs/1"));
+    }
+
+    // ── 도우미 ─────────────────────────────────────────────────────────
+
+    /** 시드가 만든 회차 1건 말고는 늘어나지 않았다. */
+    private void assertNoSessionAdded() {
+        Long count = jdbc.queryForObject("SELECT count(*) FROM event_session", Long.class);
+        assertThat(count).isEqualTo(1);
+    }
+
+    private String seededStatus() {
+        return jdbc.queryForObject("SELECT status FROM event_session WHERE id = 1", String.class);
+    }
+
+    /**
+     * <b>이미 지난</b> 예약 오픈. S-3은 판매된 좌석이 있을 때 예약 오픈을 미래로
+     * 옮기는 것만 막으므로, 그 규칙을 건드리지 않으려는 테스트는 이 값을 쓴다.
+     */
+    private static final Instant RESERVE_OPENED = Instant.now().minus(1, ChronoUnit.DAYS);
+
+    /** 시드 회차(1번)를 상태·상한·예약오픈만 바꿔 수정한다. 시각은 늘 유효하다. */
+    private List<String> updateSeededSession(String status, int maxPerUser, Instant reserveOpens) {
+        return service.updateSession(1L,
+                BASE.plus(2, ChronoUnit.HOURS), BASE.plus(4, ChronoUnit.HOURS),
+                BASE.plus(1, ChronoUnit.HOURS), BASE.plus(5, ChronoUnit.HOURS),
+                reserveOpens, maxPerUser, status);
+    }
+
+    /** 시드 회차에 확정 예약 1건과 판매된 좌석 1석을 만든다. */
+    private void givenConfirmedReservation() {
+        jdbc.update("""
+                INSERT INTO reservation (session_id, user_id, hold_id, status, confirmed_at)
+                VALUES (1, 1, 'hold-test', 'CONFIRMED', now())
+                """);
+        jdbc.update("UPDATE seat_inventory SET status = 'SOLD'"
+                + " WHERE session_id = 1 AND seat_id = 1");
     }
 
     @Test

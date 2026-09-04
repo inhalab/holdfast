@@ -109,6 +109,15 @@ body {
 
 /* --- 관리자 표 (이슈 #82) --- */
 .admin-page { max-width: 960px; }
+
+/* 등록·수정 결과 배너. 검증 실패가 조용히 지나가면 관리자가 알 수 없다. */
+.flash { margin: 12px 0; padding: 10px 14px; border-radius: 6px;
+         border-left: 3px solid; font-size: 13px; line-height: 1.6; }
+.flash-error  { background: #fdecea; border-color: #b00020; color: #7f0015; }
+.flash-notice { background: #eaf7ee; border-color: #0a7; color: #05543a; }
+.flash-warn   { background: #fff8e1; border-color: #e0a800; color: #6b4e00;
+                padding-left: 30px; }
+.flash-warn li { margin: 2px 0; }
 .admin-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .admin-table th, .admin-table td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--card-border); }
 .admin-table th { color: #666; font-weight: 600; }
