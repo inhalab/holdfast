@@ -66,6 +66,15 @@ DEMO_SCENARIO="${DEMO_SCENARIO:-extreme}"
 # 설명하는 사이에 좌석이 풀려 버린다. 3절이 정한 운영값 5분을 쓴다.
 DEMO_HOLD_TTL_SECONDS="${DEMO_HOLD_TTL_SECONDS:-300}"
 
+# nginx는 기동 시 읽은 설정으로 계속 돈다. infra/nginx/nginx.conf는 바인드
+# 마운트라 컨테이너 안 파일은 바로 바뀌지만, `docker compose up -d`는 마운트된
+# 파일이 바뀌었다고 컨테이너를 다시 만들지 않는다. **실제로 Host 헤더 수정이
+# 하루 넘게 적용되지 않아 리다이렉트에서 포트가 계속 빠졌다.**
+# 이미 최신 설정이면 reload는 아무 일도 하지 않으므로 매번 부른다.
+reload_nginx() {
+  docker compose exec -T nginx nginx -s reload >/dev/null 2>&1 || true
+}
+
 wait_healthy() {
   # docker compose가 Started를 돌려줘도 Spring Boot는 5~6초 더 걸린다
   # (load-test/README의 "Started는 응답할 준비가 됐다가 아니다").
@@ -101,6 +110,7 @@ case "$cmd" in
       docker compose up -d
     fi
     wait_healthy
+    reload_nginx
     ;;
 
   down) docker compose down ;;
@@ -128,6 +138,7 @@ case "$cmd" in
     echo "[holdfast] 시연 준비 — 전략 $strategy · 시나리오 $DEMO_SCENARIO"
     HOLDFAST_STRATEGY="$strategy" HOLD_TTL_SECONDS="$DEMO_HOLD_TTL_SECONDS"       docker compose up -d
     wait_healthy
+    reload_nginx
     "$S/seed.sh" "$DEMO_SCENARIO" "$strategy"
     cat <<EOF
 

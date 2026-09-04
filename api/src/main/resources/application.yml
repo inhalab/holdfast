@@ -1,6 +1,25 @@
 server:
   port: ${PORT:8080}
   tomcat:
+    # **리다이렉트를 상대 경로로 낸다.** Location에 절대 URL을 쓰면 그 URL을
+    # 앱이 만들어야 하고, 앱은 그 재료(호스트·포트·스킴)를 프록시가 넘겨 준
+    # 헤더에서만 알 수 있다. 프록시 설정이 하나만 어긋나도 사용자가 엉뚱한
+    # 주소로 튄다 — nginx가 Host를 포트 없이 넘겨 localhost:8080에서 누른
+    # 등록이 localhost로 가서 연결이 거부됐다.
+    #
+    # 상대 경로면 **브라우저가 자기 주소를 기준으로 푼다.** 앱이 프록시에 대해
+    # 아무것도 몰라도 되고, RFC 9110 §10.2.2가 허용하는 형식이다.
+    #
+    # **다만 nginx 뒤에서는 이것만으로 부족하다.** nginx는 업스트림의 상대
+    # Location을 자기가 넘긴 Host로 절대화한다(proxy_redirect off로도 안 막힌다).
+    # 그쪽은 nginx.conf의 `Host $http_host`가 맡는다.
+    #
+    # **이 설정이 값을 하는 곳은 ALB다.** ALB는 Location을 그대로 흘리므로 앱이
+    # 낸 상대 경로가 곧 정답이 된다. 절대 URL이었다면 ALB가 HTTPS를 끊고 앱에
+    # HTTP로 넘기는 표준 구성에서 http:// 로 리다이렉트해 브라우저가 막는다.
+    #
+    # 네 조합의 실측 표는 docs/design-spec.md 5.4.
+    use-relative-redirects: true
     threads:
       # concurrency-spec 7.3 고정 변수: "Tomcat max-threads — 명시적 고정".
       # 값 자체는 Boot 기본값과 같지만, 기본값에 기대면 Boot 버전이 올라갈 때
