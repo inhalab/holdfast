@@ -25,7 +25,8 @@
 
     <section class="card">
         <h2>배치도 목록</h2>
-        <table class="admin-table" th:if="${not #lists.isEmpty(layouts)}">
+        <div class="table-scroll" th:if="${not #lists.isEmpty(layouts)}">
+        <table class="admin-table">
             <thead>
                 <tr><th>ID</th><th>이름</th><th>구역</th><th>좌석</th><th>쓰는 회차</th><th></th></tr>
             </thead>
@@ -47,6 +48,7 @@
                 </tr>
             </tbody>
         </table>
+        </div>
         <p th:if="${#lists.isEmpty(layouts)}">등록된 배치도가 없습니다.</p>
     </section>
 
