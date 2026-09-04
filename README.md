@@ -126,16 +126,48 @@ docker compose exec -T db psql -U holdfast -d holdfast < infra/demo-seed.sql
 만료된 홀드를 회수하지 않는다(그것이 베이스라인의 정의다). 두 시드의 차이는
 [`infra/demo-seed.sql`](infra/demo-seed.sql) 머리말에 적어 두었다.
 
+## 실행 — `./holdfast`
+
+저장소 루트의 `holdfast`가 단일 진입점이다. 서브커맨드로 가르고, 각 스크립트에
+위임할 뿐 **아무것도 대체하지 않는다** — 개별 호출은 지금처럼 된다.
+
+```bash
+./holdfast                       # 서브커맨드 목록
+./holdfast up                    # 스택 기동 (앱이 응답할 때까지 기다린다)
+./holdfast demo none             # 시연 준비 — 기동 + 시드 + 화면 주소 안내
+./holdfast measure               # 측정 실행기 (대화형)
+./holdfast test                  # cd api && ./gradlew test
+./holdfast summary               # 결과 요약 표
+```
+
+PATH에 넣고 싶으면 저장소 루트를 넣는다 — `export PATH="$PATH:$(pwd)"`.
+넣지 않아도 `./holdfast`로 그대로 실행된다.
+
+## 동시성을 화면으로 보이기
+
+**손으로 두 창을 클릭하는 것으로는 동시성을 보여줄 수 없다.** 홀드 트랜잭션이
+밀리초라 손으로 누른 두 요청은 겹치지 않고, 순차 요청은 `none`에서도 깨지지
+않는다.
+
+```bash
+./holdfast demo none
+# http://localhost:8080/demo/race 에서 "동시에 홀드 요청"
+```
+
+브라우저가 `Promise.all`로 한 번에 발사하고, 결과와 **DB 상태**를 함께 보여준다.
+`none`이면 활성 홀드가 여러 건 남고(초과 홀드), 전략을 걸면 1건이다 —
+**7.6 표의 초과 홀드 열이 화면에서 재현된다.**
+
 ## 부하 테스트
 
 측정 실행 환경과 집계 로직은 [`load-test/`](load-test/)에 있다. 자세한 내용은
 [부하 테스트 README](load-test/README.md).
 
 ```bash
-docker compose up -d                    # 앱 2대 + DB + Redis + nginx
-load-test/scripts/run.sh smoke          # k6 실행 환경·집계 파이프라인 확인
+./holdfast up                                          # 앱 2대 + DB + Redis + nginx
+load-test/scripts/run.sh smoke                         # k6 실행 환경·집계 확인
 DURATION_SEC=120 load-test/scripts/run.sh high pessimistic   # 본 측정
-load-test/scripts/summarize.mjs --scenario high        # 7.6 기록 양식 표
+./holdfast summary --scenario high                     # 7.6 기록 양식 표
 ```
 
 전략을 바꿔 측정할 때는 `HOLDFAST_STRATEGY`를 넘겨 앱 2대를 다시 띄운다.

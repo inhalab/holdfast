@@ -39,6 +39,35 @@ fmt_minutes() {
   if [ "$s" -lt 60 ]; then echo "${s}초"; else echo "약 $(( (s + 59) / 60 ))분"; fi
 }
 
+usage() {
+  cat <<'USAGE'
+사용법: measure.sh [시나리오 전략 [지속초]] | --preset <이름> [--yes]
+
+  measure.sh                          대화형 — 선택지를 보여준다
+  measure.sh high pessimistic         단건 (개발 확인용 30초)
+  measure.sh high pessimistic 120     단건 (최종 측정용)
+  measure.sh --preset high-controlled 프리셋
+  measure.sh --preset deadlock --yes  확인 생략 (스크립트에서 부를 때)
+
+시나리오  low | high | extreme | sustained
+전략      none | pessimistic | optimistic | unique | redis
+
+프리셋
+  m3-all           5전략 × 3시나리오 (45회)
+  high-controlled  고경합 + 전략별 대조군, 끝에 잡음 바닥 (30회)
+  deadlock         데드락 회피 검증 5전략
+
+옵션
+  --yes, -y   예상 시간 확인을 건너뛴다
+  --help, -h  이 도움말
+
+환경변수
+  MEASURE_SESSION      세션 태그를 직접 지정 (기본: 실행 시각)
+  REPEATS              회차 수 (기본 3)
+  PREFLIGHT_TIMEOUT_SEC 사전 점검 대기 상한 (기본 90)
+USAGE
+}
+
 # ── 인자 파싱 ────────────────────────────────────────────────────────────
 PRESET=""
 ASSUME_YES=no
@@ -47,7 +76,8 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --preset) PRESET="${2:?--preset 뒤에 이름이 필요하다}"; shift 2 ;;
     --yes|-y) ASSUME_YES=yes; shift ;;
-    -h|--help) sed -n '2,30p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help) usage; exit 0 ;;
+    --*) echo "알 수 없는 옵션: $1" >&2; echo >&2; usage >&2; exit 2 ;;
     *) POSITIONAL+=("$1"); shift ;;
   esac
 done
@@ -114,7 +144,7 @@ build_preset() {
       add_run none high 120 ;;
     deadlock)
       for st in "${STRATEGIES[@]}"; do add_deadlock "$st" 120; done ;;
-    *) echo "알 수 없는 프리셋: $1 (m3-all|high-controlled|deadlock)" >&2; exit 2 ;;
+    *) echo "알 수 없는 프리셋: $1" >&2; echo >&2; usage >&2; exit 2 ;;
   esac
 }
 
@@ -124,8 +154,10 @@ if [ -n "$PRESET" ]; then
   TITLE="프리셋 $PRESET"
 elif [ ${#POSITIONAL[@]} -ge 2 ]; then
   SC="${POSITIONAL[0]}"; ST="${POSITIONAL[1]}"; DUR="${POSITIONAL[2]:-30}"
-  contains "$SC" "${SCENARIOS[@]}" || { echo "시나리오는 ${SCENARIOS[*]} 중 하나다: $SC" >&2; exit 2; }
-  contains "$ST" "${STRATEGIES[@]}" || { echo "전략은 ${STRATEGIES[*]} 중 하나다: $ST" >&2; exit 2; }
+  contains "$SC" "${SCENARIOS[@]}" || {
+    echo "시나리오는 ${SCENARIOS[*]} 중 하나다: $SC" >&2; echo >&2; usage >&2; exit 2; }
+  contains "$ST" "${STRATEGIES[@]}" || {
+    echo "전략은 ${STRATEGIES[*]} 중 하나다: $ST" >&2; echo >&2; usage >&2; exit 2; }
   add_run "$ST" "$SC" "$DUR"
   TITLE="단건"
 else
