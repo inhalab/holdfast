@@ -4,29 +4,35 @@
     <meta charset="UTF-8">
     <title>동시 요청 데모 — holdfast</title>
     <style>
-        body { font-family: system-ui, sans-serif; max-width: 60rem; margin: 2rem auto;
+        body { font-family: system-ui, sans-serif; max-width: 66rem; margin: 2rem auto;
                padding: 0 1rem; line-height: 1.6; }
-        .strategy { display: inline-block; padding: .2rem .6rem; border-radius: .3rem;
-                    background: #222; color: #fff; font-weight: 700; }
+        .strategy { display: inline-block; padding: .2rem .7rem; border-radius: .3rem;
+                    background: #16a34a; color: #fff; font-weight: 700; }
         .strategy.none { background: #b00020; }
+        .strategy.pending { background: #999; }
         fieldset { border: 1px solid #ccc; border-radius: .4rem; margin: 1rem 0; }
         button { font-size: 1rem; padding: .5rem 1rem; cursor: pointer; }
         button.fire { font-size: 1.2rem; font-weight: 700; }
-        table { border-collapse: collapse; margin: .5rem 0; }
-        th, td { border: 1px solid #ddd; padding: .3rem .7rem; text-align: left; }
-        .big { font-size: 2rem; font-weight: 700; }
-        .ok { color: #0a7; } .bad { color: #b00020; }
+        table { border-collapse: collapse; margin: .5rem 0; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: .35rem .7rem; text-align: left; }
+        th { background: #fafafa; }
+        .big { font-size: 1.6rem; font-weight: 700; }
+        .ok { color: #0a7; } .bad { color: #b00020; } .dim { color: #888; }
+        .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
         .note { background: #f6f6f6; border-left: 3px solid #999; padding: .6rem 1rem;
                 margin: 1rem 0; font-size: .92rem; }
-        code { background: #f0f0f0; padding: 0 .2rem; }
+        .note.warn { background: #fff8e1; border-left-color: #e0a800; }
+        code { background: #f0f0f0; padding: 0 .25rem; }
+        .changed { background: #fff3cd; }
     </style>
 </head>
 <body>
 
 <h1>동시 요청 데모</h1>
 <p>
-    현재 전략 <span class="strategy" th:classappend="${strategy}" th:text="${strategy}">none</span>
-    &nbsp;— 바꾸려면 터미널에서 <code>./holdfast demo pessimistic</code>
+    현재 전략
+    <span class="strategy" id="strategyBadge" th:classappend="${strategy}" th:text="${strategy}">none</span>
+    <span class="dim" id="strategyHint"></span>
 </p>
 
 <div class="note">
@@ -37,40 +43,69 @@
 </div>
 
 <fieldset>
-    <legend>발사</legend>
-    <label>회차 <input id="sessionId" type="number" value="1" style="width:4rem"></label>
-    <label>좌석 <input id="seatId" type="number" value="1" style="width:4rem"></label>
-    <label>요청 수 <input id="count" type="number" value="20" min="2" max="60" style="width:4rem"></label>
-    <button class="fire" id="fire">동시에 홀드 요청</button>
-    <button id="reset">좌석 되돌리기</button>
+    <legend>설정</legend>
+    <label>좌석 수
+        <input id="seatCount" type="number" value="1" min="1" max="10" style="width:4rem">
+    </label>
+    <button id="applySeats">좌석 수 적용</button>
+    &nbsp;&nbsp;
+    <label>요청 수
+        <input id="count" type="number" value="20" min="2" max="60" style="width:4rem">
+    </label>
+    <span class="dim" id="spreadHint"></span>
 </fieldset>
 
-<h2>결과</h2>
+<fieldset>
+    <legend>발사</legend>
+    <button class="fire" id="fire">동시에 홀드 요청</button>
+    <button id="reset">좌석 되돌리기</button>
+    <span class="dim">되돌리지 않고 다시 쏘면 무슨 일이 나는지도 아래에 그대로 나온다.</span>
+</fieldset>
+
+<h2>이번 발사</h2>
 <p><span class="big" id="summary">아직 실행하지 않았다.</span></p>
 <table id="codes" hidden>
     <thead><tr><th>응답</th><th>건수</th></tr></thead>
     <tbody></tbody>
 </table>
 
-<h2>DB 상태 <small>— 판정은 응답이 아니라 여기서 읽는다</small></h2>
-<table>
-    <tbody>
-    <tr><th>좌석 상태</th><td id="seatStatus" th:text="${state.seatStatus}">?</td></tr>
-    <tr><th>활성 홀드 수 (HELD)</th><td class="big" id="activeHolds" th:text="${state.activeHolds}">?</td></tr>
-    <tr><th>확정된 홀드 (CONFIRMED)</th><td id="confirmedSeats" th:text="${state.confirmedSeats}">?</td></tr>
-    <tr><th>U-2 인덱스</th><td id="u2Present" th:text="${state.u2Present} ? '있음' : '없음 (none 베이스라인)'">?</td></tr>
-    </tbody>
-</table>
+<h2>DB 상태 <small class="dim">— 판정은 응답이 아니라 여기서 읽는다</small></h2>
+<div class="cols">
+    <div>
+        <h3>발사 직전</h3>
+        <table id="beforeTable"><tbody><tr><td class="dim">아직 없다</td></tr></tbody></table>
+    </div>
+    <div>
+        <h3>발사 직후</h3>
+        <table id="afterTable"><tbody><tr><td class="dim">아직 없다</td></tr></tbody></table>
+    </div>
+</div>
+<p id="verdict"></p>
 
 <div class="note">
-    <b>무엇을 보아야 하나.</b> <code>none</code>이면 <b>활성 홀드가 여러 건</b>으로
-    남는다 — 같은 좌석을 여러 사람이 동시에 잡은 것이고, 그것이 초과 홀드(V-2)다.
-    전략을 걸면 <b>1건</b>이고 나머지는 409로 거절된다.
+    <b>무엇을 보아야 하나.</b> <code>none</code>이면 <b>좌석 하나에 활성 홀드가 여러
+    건</b>으로 남는다 — 같은 좌석을 여러 사람이 동시에 잡은 것이고, 그것이 초과
+    홀드(V-2)다. 전략을 걸면 <b>좌석마다 1건</b>이고 나머지는 409로 거절된다.
+    <br><br>
+    <b>좌석 수를 늘리면.</b> 요청이 좌석에 돌아가며 흩어진다(1번 요청→1번 좌석,
+    2번 요청→2번 좌석…). 요청 20개에 좌석 3개면 좌석당 6~7개가 몰리므로,
+    <code>none</code>은 <b>좌석마다 초과 홀드</b>가 생겨 총 홀드가 요청 수에
+    가까워지고, 전략을 걸면 <b>총 홀드가 정확히 좌석 수</b>가 된다.
     <br><br>
     <b>요청 수를 20으로 줘도 성공이 6쯤에서 멈추는 것은 정상이다.</b> 브라우저는
     HTTP/1.1에서 호스트당 커넥션을 6개로 제한하므로, 나머지는 앞 요청이 끝난 뒤에
     도착해 이미 잡힌 좌석을 만난다. <b>서버의 한계가 아니라 브라우저의 한계다</b> —
     같은 실험을 스크립트로 20개 동시에 보내면 <code>none</code>에서 20건이 홀드된다.
+</div>
+
+<div class="note warn">
+    <b>전략을 바꾸려면 앱을 다시 띄워야 한다(약 13초).</b> 전략 빈은 기동 시
+    하나만 만들어져 <code>SeatHoldService</code>에 직접 주입되므로, 런타임 교체는
+    측정 경로인 그 클래스를 고치는 일이 된다. 시연 편의로 M3가 잰 코드를 건드리지
+    않는다.
+    <pre>./holdfast strategy pessimistic</pre>
+    이 화면은 전환을 <b>감지해서</b> 위 배지를 자동으로 갱신한다. 터미널에서 명령을
+    치고 이 창을 그대로 두면 된다.
     <br><br>
     <b>첫 실행은 한 번 눌러 버리고 시작하라.</b> JVM이 데워지기 전 첫 묶음은 일부
     요청이 연결 단계에서 실패한다.
@@ -80,29 +115,123 @@
 (function () {
   const $ = (id) => document.getElementById(id);
   const num = (id) => Number($(id).value);
+  let before = null;
+  let knownStrategy = $('strategyBadge').textContent.trim();
 
-  function renderState(s) {
-    $('seatStatus').textContent = s.seatStatus;
-    $('activeHolds').textContent = s.activeHolds;
-    $('confirmedSeats').textContent = s.confirmedSeats;
-    $('u2Present').textContent = s.u2Present ? '있음' : '없음 (none 베이스라인)';
-    $('activeHolds').className = 'big ' + (s.activeHolds > 1 ? 'bad' : 'ok');
+  function renderTable(el, s, cmp) {
+    if (!s) { el.innerHTML = '<tbody><tr><td class="dim">아직 없다</td></tr></tbody>'; return; }
+    const rows = s.seats.map((seat) => {
+      const prev = cmp && cmp.seats.find((x) => x.seatId === seat.seatId);
+      const moved = prev && prev.activeHolds !== seat.activeHolds;
+      const cls = seat.activeHolds > 1 ? 'bad' : (seat.activeHolds === 1 ? 'ok' : 'dim');
+      return `<tr class="${moved ? 'changed' : ''}">
+                <td>좌석 ${seat.seatId}</td><td>${seat.status}</td>
+                <td class="${cls}"><b>${seat.activeHolds}</b></td></tr>`;
+    }).join('');
+    el.innerHTML =
+      `<thead><tr><th>좌석</th><th>상태</th><th>활성 홀드</th></tr></thead><tbody>${rows}
+       <tr><th>합계</th><th>U-2 ${s.u2Present ? '있음' : '없음'}</th>
+           <th class="${s.totalActiveHolds > s.seatCount ? 'bad' : 'ok'}">${s.totalActiveHolds}</th></tr>
+       </tbody>`;
   }
 
-  async function loadState() {
-    const r = await fetch(`/demo/race/state?sessionId=${num('sessionId')}&seatId=${num('seatId')}`);
-    renderState(await r.json());
+  function renderVerdict(b, a, ok) {
+    if (!b || !a) { $('verdict').textContent = ''; return; }
+    const gained = a.totalActiveHolds - b.totalActiveHolds;
+    const excess = a.seatsWithExcess;
+
+    if (gained === 0 && ok === 0) {
+      $('verdict').innerHTML =
+        `<b>이번 발사는 아무것도 바꾸지 못했다.</b> 좌석이 이미 잡혀 있어 전부 ` +
+        `거절됐다 — 왼쪽과 오른쪽이 같다. 되돌리기를 누르고 다시 쏘면 처음부터 겨룬다. ` +
+        `<span class="dim">(이미 잡힌 좌석이 그대로인 것은 정상이다. 발사할 때마다 ` +
+        `자동으로 초기화하지 않는 이유다.)</span>`;
+      return;
+    }
+    if (gained === 0 && ok > 0) {
+      // 홀드 총량은 그대로인데 성공이 있었다 = 만료된 홀드를 새 요청이 인수했다.
+      // 시연에서는 TTL을 운영값으로 두므로 흔치 않지만, 설명이 길어지면 나온다.
+      $('verdict').innerHTML =
+        `<b>앞선 홀드가 만료돼 ${ok}건이 그 자리를 인수했다.</b> 총량은 그대로지만 ` +
+        `주인이 바뀐 것이다 — 홀드 TTL이 지나면 좌석이 돌아온다(concurrency-spec 3절). ` +
+        `<span class="dim">되돌리기를 누르고 다시 쏘면 빈 좌석에서 겨룬다.</span>`;
+      return;
+    }
+    $('verdict').innerHTML = excess > 0
+      ? `이번 발사로 홀드가 <b>${gained}건</b> 늘었고, <b class="bad">좌석 ${excess}곳에 초과 홀드</b>가 남았다 — 같은 좌석을 여럿이 동시에 잡았다.`
+      : `이번 발사로 홀드가 <b>${gained}건</b> 늘었고, <b class="ok">좌석마다 정확히 하나</b>다 — 나머지는 전부 거절됐다.`;
   }
+
+  function updateSpreadHint() {
+    const seats = num('seatCount'), n = num('count');
+    const per = Math.ceil(n / seats);
+    $('spreadHint').textContent =
+      seats === 1 ? `— 요청 ${n}개가 전부 좌석 1번을 노린다`
+                  : `— 요청이 좌석에 돌아가며 흩어진다. 좌석당 최대 ${per}개`;
+  }
+
+  async function fetchState() {
+    const r = await fetch('/demo/race/state');
+    if (!r.ok) throw new Error('state ' + r.status);
+    return r.json();
+  }
+
+  function applyStrategy(s) {
+    const badge = $('strategyBadge');
+    if (s !== knownStrategy) {
+      knownStrategy = s;
+      badge.textContent = s;
+      badge.className = 'strategy ' + s;
+      $('strategyHint').textContent = '— 전략이 바뀌었다. 되돌리기를 누르고 다시 쏜다.';
+    }
+  }
+
+  // 전략 전환(앱 재기동)을 감지한다. 재기동 중에는 조회가 실패하므로 그 사이
+  // 배지를 흐리게 두고, 살아나면 새 전략으로 갱신한다.
+  setInterval(async () => {
+    try {
+      const s = await fetchState();
+      $('strategyBadge').classList.remove('pending');
+      applyStrategy(s.strategy);
+    } catch (e) {
+      $('strategyBadge').classList.add('pending');
+      $('strategyHint').textContent = '— 앱이 응답하지 않는다(재기동 중일 수 있다)';
+    }
+  }, 2000);
+
+  $('count').addEventListener('input', updateSpreadHint);
+  $('seatCount').addEventListener('input', updateSpreadHint);
+
+  $('applySeats').addEventListener('click', async () => {
+    const r = await fetch(`/demo/race/seats?count=${num('seatCount')}`, { method: 'POST' });
+    const s = await r.json();
+    before = null;
+    renderTable($('beforeTable'), null);
+    renderTable($('afterTable'), s);
+    $('summary').textContent = `좌석 ${s.seatCount}개로 맞췄다. 홀드는 비웠다.`;
+    $('codes').hidden = true;
+    $('verdict').textContent = '';
+    updateSpreadHint();
+  });
 
   $('fire').addEventListener('click', async () => {
-    const n = num('count'), sessionId = num('sessionId'), seatId = num('seatId');
+    const n = num('count');
+    const seatCount = num('seatCount');
     $('summary').textContent = '발사 중…';
     $('codes').hidden = true;
 
+    // **발사 직전 상태를 먼저 찍는다.** 되돌리기를 깜빡하고 다시 쏘면 "성공 0인데
+    // 홀드는 6건"으로 보여 정반대 인상이 되므로, 이번 발사가 무엇을 바꿨는지가
+    // 드러나야 한다.
+    before = await fetchState();
+    renderTable($('beforeTable'), before);
+
     // **사용자를 전부 다르게 보낸다.** 같은 사용자면 user_session_quota 행에서
     // 전부 직렬화되어 좌석 경합이 일어나지 않는다(concurrency-spec 1.1).
+    // 좌석은 돌아가며 고른다 — 요청이 흩어지는 모습을 그대로 보이기 위해서다.
     const requests = [];
     for (let i = 1; i <= n; i++) {
+      const seatId = ((i - 1) % seatCount) + 1;
       requests.push(
         fetch('/api/holds', {
           method: 'POST',
@@ -111,7 +240,7 @@
             'Idempotency-Key': crypto.randomUUID(),
             'X-User-Id': String(i),
           },
-          body: JSON.stringify({ sessionId, seatIds: [seatId] }),
+          body: JSON.stringify({ sessionId: 1, seatIds: [seatId] }),
         }).then(async (res) => {
           if (res.status === 201) return { label: '201 성공' };
           let code = '';
@@ -126,8 +255,7 @@
     const elapsed = Math.round(performance.now() - started);
 
     const ok = results.filter((r) => r.label.startsWith('201')).length;
-    $('summary').innerHTML =
-      `성공 <span class="${ok > 1 ? 'bad' : 'ok'}">${ok}</span> / ${n}건 · ${elapsed}ms`;
+    $('summary').innerHTML = `성공 <b>${ok}</b> / ${n}건 · ${elapsed}ms`;
 
     const counts = new Map();
     for (const r of results) counts.set(r.label, (counts.get(r.label) || 0) + 1);
@@ -140,16 +268,29 @@
     }
     $('codes').hidden = false;
 
-    await loadState();
+    const after = await fetchState();
+    renderTable($('afterTable'), after, before);
+    renderVerdict(before, after, ok);
   });
 
   $('reset').addEventListener('click', async () => {
-    const r = await fetch(
-      `/demo/race/reset?sessionId=${num('sessionId')}&seatId=${num('seatId')}`, { method: 'POST' });
-    renderState(await r.json());
+    const r = await fetch('/demo/race/reset', { method: 'POST' });
+    const s = await r.json();
+    before = null;
+    renderTable($('beforeTable'), null);
+    renderTable($('afterTable'), s);
     $('summary').textContent = '되돌렸다. 다시 발사할 수 있다.';
     $('codes').hidden = true;
+    $('verdict').textContent = '';
   });
+
+  // 초기 표시
+  (async () => {
+    const s = await fetchState();
+    $('seatCount').value = s.seatCount;
+    renderTable($('afterTable'), s);
+    updateSpreadHint();
+  })();
 })();
 </script>
 

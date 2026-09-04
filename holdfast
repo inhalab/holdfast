@@ -48,6 +48,7 @@ holdfast — 실행 진입점
 
 시연
   demo [전략]          기동 + 시드 + 화면 주소 안내
+  strategy <이름>      전략을 바꿔 앱만 다시 띄운다 (약 13초)
   race                 동시 요청 데모 주소를 알려준다
 
   각 커맨드에 -h 를 주면 위임 대상의 도움말이 나온다(measure·deadlock 등).
@@ -59,6 +60,11 @@ USAGE
 
 # 시연·시드의 기본값. extreme(1석/200명)이 동시성 시연에 가장 선명하다.
 DEMO_SCENARIO="${DEMO_SCENARIO:-extreme}"
+
+# **시연은 홀드 TTL을 운영값으로 쓴다.** docker-compose의 기본 10초는 부하 측정용
+# 고정 변수이고(concurrency-spec 7.3 — 경합을 빨리 관찰하려는 값), 시연에서는
+# 설명하는 사이에 좌석이 풀려 버린다. 3절이 정한 운영값 5분을 쓴다.
+DEMO_HOLD_TTL_SECONDS="${DEMO_HOLD_TTL_SECONDS:-300}"
 
 wait_healthy() {
   # docker compose가 Started를 돌려줘도 Spring Boot는 5~6초 더 걸린다
@@ -120,12 +126,14 @@ case "$cmd" in
   demo)
     strategy="${1:-none}"
     echo "[holdfast] 시연 준비 — 전략 $strategy · 시나리오 $DEMO_SCENARIO"
-    HOLDFAST_STRATEGY="$strategy" docker compose up -d
+    HOLDFAST_STRATEGY="$strategy" HOLD_TTL_SECONDS="$DEMO_HOLD_TTL_SECONDS"       docker compose up -d
     wait_healthy
     "$S/seed.sh" "$DEMO_SCENARIO" "$strategy"
     cat <<EOF
 
 ════ 시연 주소 ════
+  홀드 TTL은 시연용 ${DEMO_HOLD_TTL_SECONDS}초다(측정 기본값 10초는 설명 중에 풀린다).
+
   좌석맵            http://localhost:8080/sessions/1?userId=1
                     http://localhost:8080/sessions/1?userId=2   ← 창을 둘 띄운다
   동시 요청 데모    http://localhost:8080/demo/race
@@ -138,6 +146,18 @@ case "$cmd" in
   **첫 실행은 한 번 눌러 버리고 시작하라.** JVM이 데워지기 전 첫 묶음은
   일부 요청이 연결 단계에서 실패한다(실측에서 첫 시도만 그랬다).
 EOF
+    ;;
+
+  strategy)
+    s="${1:?전략을 지정한다: none|pessimistic|optimistic|unique|redis}"
+    case "$s" in none|pessimistic|optimistic|unique|redis) ;;
+      *) echo "전략은 none|pessimistic|optimistic|unique|redis 중 하나다: $s" >&2; exit 2 ;; esac
+    echo "[holdfast] 전략을 $s 로 바꾼다 — 앱 2대만 다시 띄운다."
+    HOLDFAST_STRATEGY="$s" HOLD_TTL_SECONDS="$DEMO_HOLD_TTL_SECONDS"       docker compose up -d app1 app2
+    wait_healthy
+    # U-2는 전략에 따라 있고 없다(erd 3.1). 시드가 그 판단을 하므로 함께 돌린다.
+    "$S/seed.sh" "$DEMO_SCENARIO" "$s"
+    echo "[holdfast] 전략 $s 준비됐다. 데모 화면은 자동으로 갱신된다."
     ;;
 
   race)
