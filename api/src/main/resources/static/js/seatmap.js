@@ -119,6 +119,25 @@
         }
     }
 
+    /*
+     * **팔지 않는 회차에서는 아무것도 켜지 않는다**(이슈 #108).
+     *
+     * 서버가 SaleState를 data-sale-state로 내려 준다. 이 값이 ON_SALE이 아니면
+     * 오픈 전·매진·종료 중 하나이고, 홀드는 어차피 서버가 거절한다
+     * (RESERVATION_NOT_OPEN 등, REQ-08). 화면에서 미리 막는 것은 사용자가 좌석을
+     * 고르고 버튼을 눌러야 그 사실을 알게 되는 것을 없애려는 것이다.
+     *
+     * **막는 것이 판정은 아니다.** 이 플래그를 지워도 서버가 다시 본다.
+     */
+    const onSale = document.querySelector(".seatmap").dataset.saleState === "ON_SALE";
+
+    // 최초 렌더는 좌석 상태만 보고 그려지므로(grid.html), 팔지 않는 회차에서도
+    // AVAILABLE 좌석이 파랗게 눌릴 것처럼 보인다. 클릭은 isSelectable이 막지만
+    // **눌리는 줄 알고 누르게 두지 않는다** — 첫 폴링을 기다리지 않고 여기서 끈다.
+    if (!onSale) {
+        document.querySelectorAll(".seat").forEach((el) => { el.disabled = true; });
+    }
+
     const grid = () => document.getElementById("seat-grid");
     const selectedList = document.getElementById("selected-list");
     const heldList = document.getElementById("held-list");
@@ -187,7 +206,7 @@
                 .map((id) => "<li>" + seatNoOf(id) + "</li>")
                 .join("");
         }
-        holdBtn.disabled = ids.length === 0;
+        holdBtn.disabled = ids.length === 0 || !onSale;
     }
 
     // --- 서버 status fragment 교체 후, 내 선택/내 홀드 표시를 다시 덧입힌다 ---
@@ -195,6 +214,7 @@
     /** 이 좌석을 고를 수 있는가. 만료된 내 홀드의 좌석도 포함한다. */
     function isSelectable(el) {
         if (!el) return false;
+        if (!onSale) return false;
         return el.dataset.status === "AVAILABLE" || expiredMine.has(Number(el.dataset.seatId));
     }
 
@@ -214,7 +234,7 @@
             el.classList.toggle("is-held-mine", !!hold && hold.seatIds.has(id));
             // 만료된 내 좌석은 회색이지만 다시 고를 수 있다는 것을 보여준다.
             el.classList.toggle("is-expired-mine", expiredMine.has(id));
-            if (expiredMine.has(id)) el.disabled = false;
+            if (expiredMine.has(id) && onSale) el.disabled = false;
         });
         renderSelection();
     }
@@ -242,7 +262,7 @@
             el.dataset.status = status;
             el.classList.remove("is-available", "is-held", "is-sold");
             el.classList.add(STATUS_CLASS[status] || "is-held");
-            el.disabled = status !== "AVAILABLE";
+            el.disabled = status !== "AVAILABLE" || !onSale;
 
             // 서버가 회수했거나(AVAILABLE) 남에게 팔린(SOLD) 좌석은 더 이상
             // "만료된 내 좌석"이 아니다. HELD로 남아 있는 동안만 열어 둔다.

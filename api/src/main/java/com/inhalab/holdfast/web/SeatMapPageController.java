@@ -1,7 +1,9 @@
 package com.inhalab.holdfast.web;
 
 import com.inhalab.holdfast.api.ApiException;
+import com.inhalab.holdfast.catalog.SaleState;
 import com.inhalab.holdfast.seat.SeatMapResponse;
+import com.inhalab.holdfast.seat.SeatMapZoneResponse;
 import com.inhalab.holdfast.seat.SeatQueryService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -11,6 +13,9 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PathVariable;
+
+import java.time.Instant;
+import java.util.List;
 
 /**
  * 좌석맵 페이지를 렌더하는 컨트롤러. 서버렌더 화면이므로 templates/(박태준 담당)에 속한다.
@@ -34,6 +39,9 @@ public class SeatMapPageController {
     // generate_series(1, :users)로 그 행을 만들어 두므로, 표준 시드로 로컬을 띄우면
     // 이 값이 항상 그 범위 안에 들어 별도 수동 시드 없이 화면이 바로 동작한다.
     private static final long DEFAULT_USER_ID = 1L;
+
+    /** {@code seat_inventory.status} — 잔여석을 셀 때 쓴다. */
+    private static final String STATUS_AVAILABLE = "AVAILABLE";
 
     private final SeatQueryService seatQueryService;
 
@@ -63,9 +71,36 @@ public class SeatMapPageController {
                           @RequestParam(name = "userId", defaultValue = "" + DEFAULT_USER_ID)
                           long userId,
                           Model model) {
-        model.addAttribute("seatMap", seatQueryService.getSeatMap(sessionId));
+        SeatMapResponse seatMap = seatQueryService.getSeatMap(sessionId);
+        model.addAttribute("seatMap", seatMap);
         model.addAttribute("userId", userId);
+        model.addAttribute("saleState", saleStateOf(seatMap));
         return "seatmap/index";
+    }
+
+    /**
+     * 이 회차를 지금 팔고 있는가(이슈 #108 — SFR-006 "접수종료 노출 방식이
+     * 운영정책과 일치").
+     *
+     * <p><b>회차 목록에만 상태를 적는 것으로는 부족했다.</b> 좌석맵은 링크로 곧장
+     * 열리고, 그때는 오픈 전이든 종료됐든 화면이 평소와 똑같이 떴다 — 좌석을 고르고
+     * 선점을 눌러야 서버의 {@code RESERVATION_NOT_OPEN}을 보게 된다.
+     *
+     * <p><b>판단은 {@link SaleState#of}가 한다.</b> 목록과 규칙이 갈리면 목록에서는
+     * "접수 종료"인데 들어가면 좌석이 눌리는 화면이 생긴다.
+     *
+     * <p>잔여석은 <b>이미 받아 온 좌석맵에서 센다.</b> 같은 것을 묻는 쿼리를 하나 더
+     * 두면 두 값이 어긋날 수 있고, 어긋난 순간이 곧 "매진인데 고를 수 있는" 화면이다.
+     */
+    private SaleState saleStateOf(SeatMapResponse seatMap) {
+        long available = seatMap.zones().stream()
+                .map(SeatMapZoneResponse::seats)
+                .flatMap(List::stream)
+                .filter(seat -> STATUS_AVAILABLE.equals(seat.status()))
+                .count();
+
+        return SaleState.of(seatMap.sessionStatus(), seatMap.reserveOpensAt(),
+                available, Instant.now());
     }
 
     /**

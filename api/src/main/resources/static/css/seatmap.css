@@ -33,6 +33,17 @@ body {
 
 .layout { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
 
+/* 오픈 전·매진·종료 안내 (이슈 #108). 범례 위, 격자보다 먼저 읽히는 자리다. */
+.sale-notice {
+    margin: 0 0 12px;
+    padding: 10px 14px;
+    border-radius: 6px;
+    border-left: 3px solid;
+    font-size: 13px;
+    line-height: 1.6;
+}
+.sale-notice.warn { background: #fff8e1; border-color: #e0a800; color: #6b4e00; }
+
 /* --- 좌석 격자 --- */
 
 /*
