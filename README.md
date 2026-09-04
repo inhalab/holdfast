@@ -176,6 +176,7 @@ DURATION_SEC=120 load-test/scripts/run.sh high pessimistic   # 본 측정
 
 ## 문서
 
+- [시연 시나리오](docs/demo-script.md)
 - [요구사항 원본과 범위 재조정](docs/rfp-scope.md)
 - [M3 결론 — 다섯 전략 측정 종합](docs/results/m3-conclusion.md)
 - [폐기 기록 — 버린 측정과 회수한 전제](docs/results/discarded-measurements.md)

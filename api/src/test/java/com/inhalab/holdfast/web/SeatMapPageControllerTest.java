@@ -1,5 +1,6 @@
 package com.inhalab.holdfast.web;
 
+import com.inhalab.holdfast.catalog.CatalogSessionRepository;
 import com.inhalab.holdfast.seat.SeatMapResponse;
 import com.inhalab.holdfast.seat.SeatMapSeatResponse;
 import com.inhalab.holdfast.seat.SeatMapZoneResponse;
@@ -38,6 +39,14 @@ class SeatMapPageControllerTest {
 
     @MockitoBean
     SeatQueryService seatQueryService;
+
+    /**
+     * 좌석맵이 "회차 목록으로" 링크를 그리려면 programId가 필요하고, 그 값은
+     * 좌석 조회 계약에 없어 이 리포지토리에서 읽는다. 슬라이스 테스트에는 DB가
+     * 없으므로 대체한다 — 비어 있으면 화면은 프로그램 목록으로 보낸다.
+     */
+    @MockitoBean
+    CatalogSessionRepository sessionRepository;
 
     @Test
     void 좌석맵_페이지가_격자와_함께_렌더된다() throws Exception {

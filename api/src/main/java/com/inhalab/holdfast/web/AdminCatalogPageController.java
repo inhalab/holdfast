@@ -207,11 +207,11 @@ public class AdminCatalogPageController {
      * 없는 프로그램(GET). 다른 페이지 컨트롤러와 같이 평문으로 답한다.
      *
      * <p><b>등록·수정 실패는 여기로 오지 않는다.</b> 각 POST가 직접 잡아
-     * 플래시 메시지로 폼 위에 띄운다 — 여기로 흘리면 평문 400 페이지가 떠서
+     * 플래시 메시지로 폼 위에 띄운다 — 여기로 흘리면 평문 오류 페이지가 떠서
      * 운영자가 입력하던 폼을 잃는다. 잘못된 값을 고치려면 폼이 필요하다.
      */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<String> handleBadRequest(IllegalArgumentException ex) {
-        return ResponseEntity.badRequest().contentType(MediaType.TEXT_PLAIN).body(ex.getMessage());
+        return ResponseEntity.status(404).contentType(MediaType.TEXT_PLAIN).body(ex.getMessage());
     }
 }

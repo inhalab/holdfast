@@ -1,6 +1,7 @@
 package com.inhalab.holdfast.web;
 
 import com.inhalab.holdfast.api.ApiException;
+import com.inhalab.holdfast.catalog.CatalogSessionRepository;
 import com.inhalab.holdfast.catalog.SaleState;
 import com.inhalab.holdfast.seat.SeatMapResponse;
 import com.inhalab.holdfast.seat.SeatMapZoneResponse;
@@ -44,9 +45,12 @@ public class SeatMapPageController {
     private static final String STATUS_AVAILABLE = "AVAILABLE";
 
     private final SeatQueryService seatQueryService;
+    private final CatalogSessionRepository sessionRepository;
 
-    public SeatMapPageController(SeatQueryService seatQueryService) {
+    public SeatMapPageController(SeatQueryService seatQueryService,
+                                 CatalogSessionRepository sessionRepository) {
         this.seatQueryService = seatQueryService;
+        this.sessionRepository = sessionRepository;
     }
 
     /**
@@ -75,6 +79,14 @@ public class SeatMapPageController {
         model.addAttribute("seatMap", seatMap);
         model.addAttribute("userId", userId);
         model.addAttribute("saleState", saleStateOf(seatMap));
+
+        // **이 화면에는 나가는 링크가 하나도 없었다.** 좌석맵은 회차 목록에서
+        // 들어오는데, 되돌아가려면 브라우저 뒤로가기밖에 없었다. 어느 프로그램의
+        // 회차인지는 좌석맵 응답에 없으므로(SeatMapResponse는 좌석 조회 계약이다)
+        // 여기서 한 번 읽는다.
+        sessionRepository.findById(sessionId)
+                .ifPresent(s -> model.addAttribute("programId", s.getProgramId()));
+
         return "seatmap/index";
     }
 
