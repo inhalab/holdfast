@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>관리자 — 프로그램</title>
+    <link rel="stylesheet" th:href="@{/css/reservation.css}">
+</head>
+<body>
+<main class="page admin-page">
+    <h1>프로그램 관리</h1>
+    <p class="meta">프로그램을 등록하고, 각 프로그램의 회차를 관리합니다.</p>
+
+    <section class="card">
+        <h2>프로그램 등록</h2>
+        <form method="post" th:action="@{/admin/programs}" class="admin-form">
+            <label>이름 <input type="text" name="name" required></label>
+            <label>설명 <input type="text" name="description"></label>
+            <button type="submit">등록</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>프로그램 목록</h2>
+        <table class="admin-table" th:if="${not #lists.isEmpty(programs)}">
+            <thead>
+                <tr><th>ID</th><th>이름</th><th>설명</th><th></th></tr>
+            </thead>
+            <tbody>
+                <tr th:each="p : ${programs}">
+                    <td th:text="${p.id}">1</td>
+                    <td th:text="${p.name}">데모 공연</td>
+                    <td th:text="${p.description}">설명</td>
+                    <td><a th:href="@{/admin/programs/{id}(id=${p.id})}">회차 관리 →</a></td>
+                </tr>
+            </tbody>
+        </table>
+        <p th:if="${#lists.isEmpty(programs)}">등록된 프로그램이 없습니다.</p>
+    </section>
+
+    <p class="meta">
+        <a class="link-back" th:href="@{/admin/reservations}">예약 현황</a> ·
+        <a class="link-back" th:href="@{/programs}">사용자 화면</a>
+    </p>
+</main>
+</body>
+</html>
