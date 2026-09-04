@@ -219,6 +219,86 @@ QR 티켓 발급
 
 ---
 
+### 5.4 프록시 뒤에서는 리다이렉트를 상대 경로로 낸다
+
+`/admin/programs`에서 등록을 누르면 `localhost:8080`에서 눌렀는데
+`http://localhost/`로 튀어 연결이 거부됐다. **DB에는 저장돼 있었다** — 실패한
+것은 저장이 아니라 그 뒤의 리다이렉트다.
+
+#### 당장의 원인은 nginx가 옛 설정으로 돌고 있던 것이다
+
+nginx 설정은 이미 `Host $http_host`로 고쳐져 있었다(#109, 9월 4일).
+**적용이 안 됐을 뿐이다** — 실행 중이던 nginx는 9월 3일에 읽은 `$host`
+설정으로 돌고 있었다. 바인드 마운트라 컨테이너 안 파일은 바뀌지만 nginx는
+기동 시 읽은 설정을 계속 쓰고, **`docker compose up -d`는 마운트된 파일이
+바뀌었다고 컨테이너를 다시 만들지 않는다.** `./holdfast up`·`demo`가
+`nginx -s reload`를 함께 하도록 고쳤다.
+
+#### 그런데 그것만으로는 프록시가 바뀌면 또 난다
+
+`Location`에 절대 URL을 쓰면 그 URL의 스킴·호스트·포트를 **누군가 만들어야**
+하고, 그 재료는 프록시가 넘겨 준 것뿐이다. 그래서
+`server.tomcat.use-relative-redirects: true`로 **앱이 상대 경로를 내게** 했다.
+`Location: /admin/programs`가 나가고 받는 쪽이 자기 주소로 푼다. RFC 9110
+§10.2.2가 허용하는 형식이다.
+
+`server.forward-headers-strategy`로 `X-Forwarded-*`를 읽는 방법도 있지만
+**채택하지 않았다.** 문제를 옮길 뿐이다 — 필터를 켜고, 프록시가 그 헤더 세 개를
+정확히 보내도록 유지해야 한다. 지켜야 할 설정이 하나에서 넷으로 는다.
+
+#### 다만 nginx는 상대 경로를 그냥 두지 않는다 — 실측
+
+**앱을 고쳐도 nginx 뒤에서는 여전히 nginx의 `Host`에 달려 있다.** nginx가
+업스트림의 상대 `Location`을 **자기가 업스트림에 넘긴 `Host`로 절대화**하기
+때문이다. `proxy_redirect off`로도 막히지 않는다.
+
+| 앱 | nginx `Host` | `proxy_redirect` | 응답 `Location` |
+|---|---|---|---|
+| 상대 | (nginx 우회, 앱 직접) | — | `/admin/programs` ✅ |
+| 상대 | `$http_host` | default | `http://localhost:8080/admin/programs` ✅ |
+| 상대 | `$host` | default | `http://localhost/admin/programs` ❌ |
+| 상대 | `$host` | `off` | `http://localhost/admin/programs` ❌ |
+
+**그래서 두 고침이 각각 다른 환경을 맡는다.**
+
+- **지금(nginx)** — 맞는 것은 `Host $http_host`다. nginx가 절대화하므로 앱의
+  상대 경로는 여기서 눈에 보이지 않는다
+- **나중(ALB)** — ALB는 `Location`을 고쳐 쓰지 않고 그대로 흘린다. 그때 **앱의
+  상대 경로가 곧 정답**이 된다. 절대 URL이었다면 ALB가 HTTPS를 끊고 앱에 HTTP로
+  넘기는 표준 구성에서 `http://`로 리다이렉트해 브라우저가 막았을 것이다
+
+한쪽만으로는 두 환경을 다 덮지 못한다. 둘 다 둔다.
+
+#### 범위 — 리다이렉트는 네 곳뿐이다
+
+전수 확인했다. `redirect:`는 `AdminCatalogPageController`의 **네 곳이 전부**이고
+(프로그램 등록·수정, 회차 등록·수정), 절대 URL을 만드는 코드
+(`ServletUriComponentsBuilder` 등)는 **한 곳도 없다.**
+
+**예약 확정·결제·취소는 리다이렉트하지 않는다.** JSON API로 응답하고, 화면
+이동은 `static/js/seatmap.js`가 `window.location.href`로 한다 — 브라우저 안에서
+도는 것이라 이 문제와 무관하다. Thymeleaf의 `@{...}`도 컨텍스트 상대 경로를
+낸다.
+
+#### 테스트로 잡히지 않았던 이유
+
+**`MockMvc`는 서블릿 컨테이너를 띄우지 않는다.** 절대 URL을 만드는 것은 Tomcat의
+`Response#sendRedirect`인데 그 코드가 아예 돌지 않고, `MockMvc`는
+`MockHttpServletResponse`에 컨트롤러가 돌려준 문자열을 그대로 적는다. 그래서
+`redirectedUrl("/admin/programs")`는 **고치기 전에도 통과한다.**
+
+`RedirectShapeTest` 하나만 `RANDOM_PORT`로 **진짜 Tomcat**을 띄워 `Location`을
+직접 읽는다. `use-relative-redirects`를 끄고 돌려 실패하는 것을 확인했다.
+
+**프록시까지 넣은 e2e는 만들지 않았다.** 위 표를 만든 확인이 곧 그 e2e인데,
+그것을 CI에 두려면 docker compose 스택 다섯 컨테이너를 매번 띄워야 한다. 값이
+크고, **막으려는 사고는 설정 실수가 아니라 "고친 설정이 안 돌고 있던 것"**이라
+테스트보다 `./holdfast up`의 `reload`가 더 곧은 대응이다.
+
+**대신 표를 남긴다.** nginx의 `Host`를 고칠 일이 생기면 이 표의 네 줄을 손으로
+다시 확인한다 — 명령은 `curl -s -i -X POST http://localhost:8080/admin/programs
+--data-urlencode "name=x"` 한 줄이다.
+
 ## 6. 일정 배분
 
 | 기간 | 내용 | 완료 판정 |
