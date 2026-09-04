@@ -24,7 +24,8 @@
             </thead>
             <tbody>
                 <tr th:each="entry : ${seatSummary}">
-                    <td th:text="${entry.key}">1</td>
+                    <td><a th:href="@{/sessions/{id}(id=${entry.key}, userId=1)}"
+                           th:text="${entry.key}" target="_blank">1</a></td>
                     <td th:text="${entry.value.get('AVAILABLE')} ?: 0">0</td>
                     <td th:text="${entry.value.get('HELD')} ?: 0">0</td>
                     <td th:text="${entry.value.get('SOLD')} ?: 0">0</td>
@@ -52,8 +53,18 @@
             </thead>
             <tbody>
                 <tr th:each="r : ${reservations}">
-                    <td th:text="${r.reservationId}">1</td>
-                    <td th:text="${r.sessionId}">1</td>
+                    <!--
+                      예약번호 → 그 예약의 확인 화면. **userId를 실어 보낸다.**
+                      화면은 소유자의 예약만 보여주므로(ReservationService#get이
+                      남의 예약을 404로 막는다) 링크가 그 값을 들고 가야 열린다.
+                      관리자라고 소유권 검사를 건너뛰게 만들지 않는다 — 인증이
+                      없는 상태에서 "관리자는 예외"를 두면 아무나 그 예외를 쓴다.
+                      관리자 화면은 이미 소유자 id를 알고 있으니 링크에 담으면 된다.
+                    -->
+                    <td><a th:href="@{/reservations/{id}(id=${r.reservationId}, userId=${r.userId})}"
+                           th:text="${r.reservationId}" target="_blank">1</a></td>
+                    <td><a th:href="@{/sessions/{id}(id=${r.sessionId}, userId=${r.userId})}"
+                           th:text="${r.sessionId}" target="_blank">1</a></td>
                     <td th:text="${r.userId}">1</td>
                     <td><span class="status-badge" th:classappend="${r.status}" th:text="${r.status}">CONFIRMED</span></td>
                     <td>
