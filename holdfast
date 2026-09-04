@@ -194,7 +194,9 @@ EOF
     fi
 
     git archive --format=zip -o "$out" HEAD README.md 'docs/*.md' docs/openapi.yaml
-    n=$(git ls-tree -r --name-only HEAD -- README.md 'docs/*.md' docs/openapi.yaml | wc -l)
+    # ls-tree가 아니라 ls-files다 — ls-tree의 경로지정자는 여기서 두 개만
+    # 잡는다(디렉토리 경계를 넘지 않는다).
+    n=$(git ls-files -- README.md 'docs/*.md' docs/openapi.yaml | wc -l)
     echo "[holdfast] $out — 문서 ${n}개"
     echo "[holdfast] 먼저 읽을 것: docs/status.md"
     ;;
