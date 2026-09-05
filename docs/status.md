@@ -127,7 +127,7 @@ M4는 계획보다 두 달 앞당겨 끝났다. **M4의 남은 #42(AWS Fargate)�
 | **전략 밖 코드에 전략별 분기를 넣지 않는다** | `SeatHoldStrategy` 구현체 5개를 `@ConditionalOnProperty`로 하나만 띄운다. 분기가 새면 "무엇을 측정했는가"가 흐려진다 |
 | **홀드와 확정을 분리한다** | 임계 구역이 서브밀리초인 이유이자 M3 결론의 근거다 |
 | **좌석재고·할당량 행을 미리 만든다** | 이것이 없으면 행 단위 락과 유니크 제약을 둘 다 쓸 수 없다 |
-| **CS-6: 사용자 할당량 행을 좌석보다 **먼저** 잠근다** | 같은 사용자의 동시 요청이 완전히 직렬화된다. 데모에서 요청마다 `X-User-Id`를 다르게 보내야 하는 이유 |
+| **CS-6: 사용자 할당량 행을 좌석보다 먼저 잠근다** | 같은 사용자의 동시 요청이 완전히 직렬화된다. 데모에서 요청마다 `X-User-Id`를 다르게 보내야 하는 이유 |
 | **U-2는 `none`에서만 없앤다** | `none`은 "락 없이 돌리면 몇 건 깨지나"의 베이스라인이다. 제약을 걸면 실패 데이터를 못 얻는다. **U-2는 앱이 아니라 스키마에 있다** — `docker compose up`만으로는 안 지워지고 `seed.sh`가 지운다 |
 | **read-then-act 대신 조건부 UPDATE + `rowsAffected`** | Outbox 클레임과 좌석 확정이 같은 관용구를 쓴다 |
 | **결제가 확정과 같은 트랜잭션에 있다** | 실제 PG로는 성립하지 않는다는 것을 [`scope-m4.md`](scope-m4.md) 5절에 명시했다 |
@@ -149,6 +149,8 @@ M4는 계획보다 두 달 앞당겨 끝났다. **M4의 남은 #42(AWS Fargate)�
 | **id를 명시하는 시드는 IDENTITY 시퀀스를 맞춘다** | 안 맞추면 앱의 자동 생성 INSERT가 이미 있는 id를 받는다 — [`erd.md`](erd.md) 2.1 |
 | **적용된 Flyway 마이그레이션은 주석도 안 고친다** | 체크섬이 바뀌어 기존 DB가 기동을 거부한다 |
 | **PR을 쌓지 않는다** (R8) | squash로 해시가 달라져 같은 내용이 충돌하고, base 브랜치가 지워지면 되살릴 수 없다 — [`workflow.md`](workflow.md) |
+| **`/demo/**`는 끌 수 있고 기본값은 켬이다** | `holdfast.demo.enabled=false`로 끈다. 되돌리기가 한 회차의 좌석·홀드·예약을 지우므로 **로컬 시연 밖에서 켜 두지 않는다**. 기본값이 켬인 것은 이 프로젝트의 실행 환경이 로컬 Docker Compose뿐이기 때문이다(`infra-decision.md` 2절) — [`scope-m4.md`](scope-m4.md) 7절 |
+| **`/admin/**`은 아무나 연다** | 인증이 없다. 지금은 로컬 전용이라 노출이 없지만 #42(AWS)를 하면 그대로 열린 채 뜬다. 수단과 대가는 #124에 있다 |
 
 ---
 
@@ -189,12 +191,17 @@ M4는 계획보다 두 달 앞당겨 끝났다. **M4의 남은 #42(AWS Fargate)�
 |---|---|---|---|---|
 | 1 | 관리자 프로그램·회차 등록 | #101 | F3ZLoV | ✅ |
 | 2 | 관리자 좌석배치 등록 | #102 | F3ZLoV | ✅ |
-| 3 | 비회원 예약 조회 | #103 | Asirante | 열림 |
+| 3 | 비회원 예약 조회 **+ 마이페이지** | #103 | Asirante | 열림 (중) |
 | 4 | 회차별 예약 현황 통계 | #104 | Asirante | 열림 |
-| 5 | PER-002 화면별 응답시간 측정 | #105 | Asirante | 열림 (**선행: #101·#102**) |
+| 5 | PER-002 화면별 응답시간 측정 | #105 | Asirante | 열림 (**선행: #101·#102·#103·#123**) |
 | 6 | 예약 취소 후 환불 상태 전이 | #106 | Asirante | 열림 |
 | 7 | 반응형 (모바일 폭 좌석맵) | #107 | F3ZLoV | ✅ |
 | 8 | 접수종료 노출 정책 | #108 | F3ZLoV | ✅ |
+| 9 | 관리자 회차 목록 — 좌석 수·삭제 | #123 | F3ZLoV | 열림 |
+| 10 | 로컬 밖에서 꺼야 하는 화면과 그 링크 | #124 | F3ZLoV | 열림 (**#42 거취에 매임**) |
+
+**번호는 만든 순서이고 진행 순서는 보드 Priority가 말한다.** 완료 항목을 아래로
+옮기지 않는 것도 같은 이유다 — 옮기면 이 표와 보드가 어긋난다.
 
 그 밖에 **#42 AWS Fargate 배포**(M4)가 열려 있고, 이것은 자를 수 있다.
 
@@ -227,13 +234,19 @@ cd api && ./gradlew test                 # 91건
 
 | 화면 | 주소 |
 |---|---|
-| 프로그램 목록 (진입점) | `http://localhost:8080/` |
+| 프로그램 목록 (진입점) | `http://localhost:8080/` — `/programs`도 같은 화면이다 |
+| 회차 목록 | `/programs/{프로그램}` |
 | 좌석맵 | `/sessions/1?userId=1` — 창을 둘 띄워 사용자를 바꾼다 |
+| **예약 확인 · 티켓(QR)** | `/reservations/{예약}?userId={소유자}` — 예약 뒤에 여기로 온다. 소유자가 아니면 404다 |
 | 동시 요청 데모 | `/demo/race` |
 | 검표 | `/scan` |
 | 관리자 — 예약 현황 | `/admin/reservations` |
 | 관리자 — 프로그램·회차 | `/admin/programs` |
 | 관리자 — 좌석배치 | `/admin/layouts` |
+
+**주소를 외울 필요는 없다.** 모든 서버렌더 화면 바닥에 내비가 있고(#121), 관리자
+예약 현황의 예약번호·회차 열이 각각 예약 확인과 좌석맵으로 이어진다. 어디서
+어디로 갈 수 있는지는 [`scope-m4.md`](scope-m4.md) 8절의 표에 있다.
 
 **시연에서 주의할 것 셋.**
 
@@ -261,9 +274,21 @@ cd api && ./gradlew test                 # 91건
 | [`api-spec.md`](api-spec.md) | API 계약, 오류 코드 19종, 분류표 |
 | [`scope-m4.md`](scope-m4.md) | 최소 완결선, 시연 수단, 전략 전환을 웹에서 안 하는 이유 |
 | [`requirements.md`](requirements.md) | 요구사항 추적표 — REQ 번호와 구현·테스트 대응 |
+| [`openapi.yaml`](openapi.yaml) | API 계약의 기계 판독본. `api-spec.md`와 짝이다 |
 | [`workflow.md`](workflow.md) | 협업 규칙. 문서 갱신 8개 규칙 |
 | [`infra-decision.md`](infra-decision.md) | AWS 판단. 4절이 "잘라도 되는 것" |
 | [`setup.md`](setup.md) · [`roles.md`](roles.md) · [`demo-script.md`](demo-script.md) | 환경 구축 · 역할 · 시연 대본 |
+
+**`results/` 아래의 나머지 다섯**은 결론이 아니라 **결론에 이르는 과정**이다.
+"왜 그렇게 판정했나"를 다시 물을 때 여는 것이지 먼저 읽을 것은 아니다.
+
+| 문서 | 무엇 |
+|---|---|
+| [`m2-none-baseline.md`](results/m2-none-baseline.md) | 락 없는 베이스라인. 6절에 폐기 1·2번의 전말 |
+| [`m2-pessimistic.md`](results/m2-pessimistic.md) | 첫 락 전략 측정 |
+| [`reseed-artifact-investigation.md`](results/reseed-artifact-investigation.md) | 폐기 3번 — 재초기화가 만든 고아 상태 추적 |
+| [`p95-inversion-investigation.md`](results/p95-inversion-investigation.md) | p95가 뒤집혀 보인 것을 판정한 기록 |
+| [`sustained-lock-wait-investigation.md`](results/sustained-lock-wait-investigation.md) | 지속 경합 시나리오의 락 대기 조사 |
 
 **`load-test/results/`의 원본 JSON은 `.gitignore` 대상이다.** 저장소에 남는 것은
 `docs/results/`의 중앙값 JSON과 분석 문서뿐이다.
