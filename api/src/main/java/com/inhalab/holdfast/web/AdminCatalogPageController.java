@@ -2,6 +2,8 @@ package com.inhalab.holdfast.web;
 
 import com.inhalab.holdfast.admin.AdminCatalogService;
 import com.inhalab.holdfast.admin.AdminSeatLayoutRepository;
+import com.inhalab.holdfast.admin.AdminSessionRepository;
+import com.inhalab.holdfast.admin.SessionSeatInfo;
 import com.inhalab.holdfast.admin.SessionFormRow;
 import com.inhalab.holdfast.catalog.CatalogProgramRepository;
 import com.inhalab.holdfast.catalog.CatalogSessionRepository;
@@ -21,6 +23,8 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 관리자 프로그램·회차 등록. 이슈 #101 — SFR-005.
@@ -51,15 +55,18 @@ public class AdminCatalogPageController {
     private final CatalogProgramRepository programRepository;
     private final CatalogSessionRepository sessionRepository;
     private final AdminSeatLayoutRepository seatLayoutRepository;
+    private final AdminSessionRepository adminSessionRepository;
     private final AdminCatalogService catalogService;
 
     public AdminCatalogPageController(CatalogProgramRepository programRepository,
                                       CatalogSessionRepository sessionRepository,
                                       AdminSeatLayoutRepository seatLayoutRepository,
+                                      AdminSessionRepository adminSessionRepository,
                                       AdminCatalogService catalogService) {
         this.programRepository = programRepository;
         this.sessionRepository = sessionRepository;
         this.seatLayoutRepository = seatLayoutRepository;
+        this.adminSessionRepository = adminSessionRepository;
         this.catalogService = catalogService;
     }
 
@@ -110,14 +117,25 @@ public class AdminCatalogPageController {
         Program program = programRepository.findById(programId)
                 .orElseThrow(() -> new IllegalArgumentException("프로그램을 찾을 수 없습니다: " + programId));
 
+        // 배치도 이름과 좌석 수는 **한 번에** 가져와 회차 id로 맞춘다. 줄마다
+        // 세면 회차가 늘수록 목록이 느려진다(N+1).
+        Map<Long, SessionSeatInfo> seatInfo = adminSessionRepository.seatInfoOf(programId)
+                .stream()
+                .collect(Collectors.toMap(SessionSeatInfo::sessionId, i -> i));
+
         List<SessionFormRow> sessions = sessionRepository.findByProgramIdOrderByStartsAtAsc(programId)
                 .stream()
-                .map(s -> new SessionFormRow(
-                        s.getId(), s.getSeatLayoutId(),
-                        toFormValue(s.getStartsAt()), toFormValue(s.getEndsAt()),
-                        toFormValue(s.getEntryOpensAt()), toFormValue(s.getEntryClosesAt()),
-                        toFormValue(s.getReserveOpensAt()),
-                        s.getMaxPerUser(), s.getStatus()))
+                .map(s -> {
+                    SessionSeatInfo info = seatInfo.get(s.getId());
+                    return new SessionFormRow(
+                            s.getId(), s.getSeatLayoutId(),
+                            info == null ? null : info.layoutName(),
+                            info == null ? 0L : info.seatCount(),
+                            toFormValue(s.getStartsAt()), toFormValue(s.getEndsAt()),
+                            toFormValue(s.getEntryOpensAt()), toFormValue(s.getEntryClosesAt()),
+                            toFormValue(s.getReserveOpensAt()),
+                            s.getMaxPerUser(), s.getStatus());
+                })
                 .toList();
 
         model.addAttribute("program", program);
@@ -189,6 +207,29 @@ public class AdminCatalogPageController {
             model.addAttribute("warnings", warnings);
             model.addAttribute("saved", "회차 " + sessionId + "을(를) 수정했습니다.");
             return program(programId, model);
+        }
+        return "redirect:/admin/programs/" + programId;
+    }
+
+    /**
+     * 회차 삭제. <b>예약이 하나도 없는 회차만</b> 지워진다
+     * ({@code AdminCatalogService#deleteSession}, {@code erd.md} 2.2의 S-6).
+     *
+     * <p><b>{@code POST}인 이유</b>는 HTML 폼이 {@code DELETE}를 보낼 수 없어서다.
+     * 경로에 {@code /delete}를 붙여 수정({@code POST /admin/sessions/{id}})과
+     * 가른다.
+     *
+     * <p>거절도 성공도 {@code programId}가 있어야 돌아갈 자리를 안다. 삭제된
+     * 뒤에는 회차에서 그 값을 읽을 수 없으므로 폼이 실어 보낸다.
+     */
+    @PostMapping("/admin/sessions/{sessionId}/delete")
+    public String deleteSession(@PathVariable long sessionId,
+                                @RequestParam long programId,
+                                Model model) {
+        try {
+            catalogService.deleteSession(sessionId);
+        } catch (IllegalArgumentException e) {
+            return detailWithError(programId, e.getMessage(), model);
         }
         return "redirect:/admin/programs/" + programId;
     }

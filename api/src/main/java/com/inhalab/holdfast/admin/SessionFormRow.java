@@ -11,6 +11,10 @@ package com.inhalab.holdfast.admin;
 public record SessionFormRow(
         Long id,
         Long seatLayoutId,
+        /** 배치도 이름. 배치도가 없으면 {@code null}이다. */
+        String seatLayoutName,
+        /** <b>이 회차의</b> 좌석 수 — {@code seat_inventory} 행 수다({@link SessionSeatInfo}). */
+        Long seatCount,
         String startsAt,
         String endsAt,
         String entryOpensAt,

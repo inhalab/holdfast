@@ -69,11 +69,20 @@
         <h2>회차 목록</h2>
         <p class="meta" th:if="${#lists.isEmpty(sessions)}">등록된 회차가 없습니다.</p>
 
-        <form th:each="s : ${sessions}" method="post"
-              th:action="@{/admin/sessions/{id}(id=${s.id})}" class="admin-form session-row">
+        <div th:each="s : ${sessions}" class="session-row">
+        <form method="post"
+              th:action="@{/admin/sessions/{id}(id=${s.id})}" class="admin-form">
             <input type="hidden" name="programId" th:value="${program.id}">
             <strong>#<span th:text="${s.id}">1</span></strong>
-            <span class="meta">배치도 <span th:text="${s.seatLayoutId}">1</span> (변경 불가)</span>
+            <!--
+              좌석 수는 배치도가 아니라 **이 회차의 seat_inventory 행 수**다.
+              대개 같지만 시드가 배치도로 거르지 않고 넣으면 갈리고, 그때 맞는
+              것은 사용자가 실제로 보는 좌석맵 쪽이다(SessionSeatInfo).
+            -->
+            <span class="meta">
+                배치도 <span th:text="${s.seatLayoutName} ?: '(없음)'">시연 배치도</span>
+                · <b th:text="${s.seatCount} + '석'">10석</b> (변경 불가)
+            </span>
             <label>시작 <input type="datetime-local" name="startsAt" th:value="${s.startsAt}" required></label>
             <label>종료 <input type="datetime-local" name="endsAt" th:value="${s.endsAt}" required></label>
             <label>입장 시작 <input type="datetime-local" name="entryOpensAt" th:value="${s.entryOpensAt}" required></label>
@@ -90,9 +99,24 @@
             <button type="submit">저장</button>
             <a class="link-back" th:href="@{/sessions/{id}(id=${s.id})}">좌석맵 →</a>
         </form>
+        <!--
+          삭제는 수정 폼 안에 넣을 수 없다 — 폼을 중첩할 수 없기 때문이다.
+          형제 폼으로 두고 .session-row가 둘을 한 덩어리로 묶는다.
+        -->
+        <form method="post" th:action="@{/admin/sessions/{id}/delete(id=${s.id})}"
+              class="inline-form session-delete"
+              onsubmit="return confirm('이 회차를 지웁니다. 되돌릴 수 없습니다.')">
+            <input type="hidden" name="programId" th:value="${program.id}">
+            <button type="submit" class="danger">삭제</button>
+        </form>
+        </div>
         <p class="meta" th:if="${not #lists.isEmpty(sessions)}">
             <strong>좌석배치도는 등록 후 바꿀 수 없습니다.</strong> 바꾸면 이미 만든 좌석재고가
             다른 배치도의 좌석을 가리키게 되고, 판매된 좌석이 있으면 되돌릴 수 없습니다.
+            <br>
+            <strong>삭제는 예약이 하나도 없는 회차만 됩니다.</strong> 예약을 받은 뒤에는
+            상태를 <code>CLOSED</code>로 바꿔 접수를 닫습니다 — 발권된 티켓이 살아 있는데
+            회차만 사라지면 화면과 티켓이 갈립니다.
         </p>
     </section>
 

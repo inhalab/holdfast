@@ -172,11 +172,18 @@ body {
     color: #fff;
     cursor: pointer;
 }
+/* 수정 폼과 삭제 폼을 한 덩어리로 묶는다. 폼은 중첩할 수 없어 형제로 둔다. */
 .session-row {
     border-top: 1px solid var(--card-border);
     padding-top: 12px;
     margin-top: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 10px 14px;
 }
+.session-row > .admin-form { flex: 1 1 auto; }
+.session-delete { align-self: flex-end; }
 
 /* --- 좌석배치 등록 (이슈 #102) --- */
 
