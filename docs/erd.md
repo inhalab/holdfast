@@ -487,11 +487,11 @@ user_session_quota 행 잠금
 | `none` | 홀드 경로에서 수행하지 않는다. U-2가 없어 만료 행이 INSERT를 막지 않고, `rowsAffected` 게이트는 앱 레벨 방어라 베이스라인에 넣으면 실패 증거가 흐려진다. **따라서 만료 홀드를 회수하는 경로가 실제로 없다** — 청소 스케줄러는 미구현이다(concurrency-spec 3절) |
 | `pessimistic` | 해당 좌석의 `seat_inventory` 행을 `FOR UPDATE`로 잡은 직후 같은 트랜잭션 안에서 수행한다. 행 락이 이미 직렬화하므로 `rowsAffected = 0` 분기는 사실상 나오지 않지만, 전략 간 코드 경로를 같게 두기 위해 판정은 유지한다 |
 | `optimistic` | `seat_inventory`의 조건부 UPDATE(`version` 비교)가 성공한 뒤 수행한다. `rowsAffected = 0`은 정리할 만료 행이 없었다는 뜻이므로 **그대로 진행한다** — 이 표가 처음 적은 "충돌로 보고 재시도"는 성립하지 않는다. 아래 참조 |
-| `unique` | **앱 락이 없어 이 UPDATE가 유일한 직렬화 지점이다.** INSERT 직전에 단독으로 수행하고, `rowsAffected = 0`이면 재시도 없이 409로 거절한다. 이 전략은 제약 위반을 정상 동작으로 세므로(4.4) 앱 레벨 재시도를 넣으면 다른 전략과 비교가 깨진다 |
-| `redis` | `lock:seat:{sessionId}:{seatId}`를 획득한 뒤 같은 트랜잭션 안에서 수행한다. 락이 정리와 INSERT를 함께 감싸므로 두 단계 사이가 벌어지지 않는다. `rowsAffected = 0`은 정리할 만료 행이 없었다는 뜻이므로 그대로 진행한다 — `pessimistic`과 같은 근거이며 배타성을 보장하는 것이 행 락이 아니라 분산락일 뿐이다. 해제는 커밋 이후 `afterCompletion`(5.2). **락을 트랜잭션 안에서 잡는다 — 아래 참조** |
+| `unique` | **앱 락이 없어 이 UPDATE가 유일한 직렬화 지점이다.** INSERT 직전에 단독으로 수행하고, `rowsAffected = 0`이면 재시도 없이 409로 거절한다. 이 전략은 제약 위반을 정상 동작으로 세므로(`concurrency-spec.md` 4.4) 앱 레벨 재시도를 넣으면 다른 전략과 비교가 깨진다 |
+| `redis` | `lock:seat:{sessionId}:{seatId}`를 획득한 뒤 같은 트랜잭션 안에서 수행한다. 락이 정리와 INSERT를 함께 감싸므로 두 단계 사이가 벌어지지 않는다. `rowsAffected = 0`은 정리할 만료 행이 없었다는 뜻이므로 그대로 진행한다 — `pessimistic`과 같은 근거이며 배타성을 보장하는 것이 행 락이 아니라 분산락일 뿐이다. 해제는 커밋 이후 `afterCompletion`(`concurrency-spec.md` 5.2). **락을 트랜잭션 안에서 잡는다 — 아래 참조** |
 
 **`optimistic`의 만료 정리는 `rowsAffected = 0`에서 재시도하지 않는다.** 이 표가
-처음 적은 것은 "충돌로 보고 4.3의 재시도에 태운다"였으나, 그렇게 하면 **요청이
+처음 적은 것은 "충돌로 보고 `concurrency-spec.md` 4.3의 재시도에 태운다"였으나, 그렇게 하면 **요청이
 자기 자신을 거절한다.**
 
 같은 트랜잭션 안에서 **재고 인수 → 홀드 정리 → 홀드 INSERT** 순으로 진행하는데,
@@ -506,7 +506,7 @@ user_session_quota 행 잠금
 다르다.
 
 **충돌 판정이 필요한 자리는 정리가 아니라 재고 인수다.** 그쪽의
-`rowsAffected = 0`은 `version`이 어긋났다는 뜻이고, 4.3의 재시도 상한 3회·지수
+`rowsAffected = 0`은 `version`이 어긋났다는 뜻이고, `concurrency-spec.md` 4.3의 재시도 상한 3회·지수
 백오프에 태우는 것은 그 판정이다.
 
 ---
@@ -562,7 +562,7 @@ ticket         : ISSUED → USED
 클레임을 표시하는 값이며 V2 마이그레이션에서 추가됐다 — 발송이 외부 호출이라
 클레임과 같은 트랜잭션에 둘 수 없기 때문이다. `claimed_at`이 충분히 오래되면
 집은 워커가 죽은 것으로 보고 다른 워커가 되찾는다. `seat_inventory.held_until`이
-만료된 점유를 다음 요청에 넘기는 것과 같은 구조다(4.1).
+만료된 점유를 다음 요청에 넘기는 것과 같은 구조다(이 문서 4.1).
 
 M3에서 좌석 점유에 쓴 조건부 UPDATE + `rowsAffected` 판정이 여기에 그대로
 재사용된다. 두 도메인의 대조는 `concurrency-spec.md` 6.1절에 있다.
