@@ -64,11 +64,27 @@ stateDiagram-v2
 | `HELD → CANCELLED` | API 호출 — `DELETE /api/holds/{holdId}` | `seat_inventory`(`HELD→AVAILABLE`), `seat_hold`(`HELD→RELEASED`), `user_session_quota`(감소) | 조건부 UPDATE, `reservation.status='HELD'` 확인 후 전이 |
 | `CONFIRMED → CANCELLED` | API 호출 — `POST /api/reservations/{id}/cancel` | `seat_inventory`(`SOLD→AVAILABLE`), `seat_hold`(`CONFIRMED→RELEASED`) | 조건부 UPDATE, `reservation.status='CONFIRMED'` 확인 후 전이. 재호출 시 200과 기존 결과(`api-spec.md` 6.1절 멱등) |
 
-**`PENDING_PAYMENT`는 이 다이어그램에 없다.** `erd.md` 스키마의 `reservation.status`
-열거형에는 존재하지만(`HELD/PENDING_PAYMENT/CONFIRMED/CANCELLED/EXPIRED`), Mock PG
-연동이 아직 별도 작업으로 남아 있어(`api-spec.md` 7절) 현재 계약의 확정은
-`HELD → CONFIRMED` 직행이다(`api-spec.md` 1.2절). Mock PG 인터페이스가 확정되면
-`HELD → PENDING_PAYMENT → CONFIRMED`로 이 다이어그램을 갱신한다.
+**`PENDING_PAYMENT`는 이 다이어그램에 없다. (M4 기준 — 조건이 판정돼 결론이
+바뀌었다.)** `erd.md` 스키마의 `reservation.status` 열거형에는 존재한다
+(`HELD/PENDING_PAYMENT/CONFIRMED/CANCELLED/EXPIRED`).
+
+이 자리에는 원래 **"Mock PG 인터페이스가 확정되면
+`HELD → PENDING_PAYMENT → CONFIRMED`로 갱신한다"**는 조건부 약속이 적혀 있었다.
+**Mock PG는 M4에서 구현됐고(#79·#80), 그 결과 약속은 회수한다.**
+
+**확정이 결제 안에 있기 때문이다.** `PaymentService#pay`가 승인 직후
+`ReservationService#confirm`을 부르고 발권까지 **같은 트랜잭션에서** 끝낸다
+(`scope-m4.md` 2절). 그래서 `PENDING_PAYMENT`를 쓰면 **트랜잭션 내부에서만
+존재하다 사라지는 값**이 된다 — 외부에서 관측되지 않는 상태를 상태 전이도에 그리는
+것은 사실과 다르다.
+
+**그 값이 의미를 갖는 조건은 따로 있다.** `TIMEOUT`과 비동기 콜백을 구현할 때다
+(`scope-m4.md` 4절의 여유 항목). 실제 PG는 승인이 언제 올지 모르므로 그때는
+중간 상태가 외부에서 관측된다. **그 작업을 할 때 이 다이어그램도 함께 고친다** —
+근거는 `PaymentService`의 "PENDING_PAYMENT를 쓰지 않는다" 주석에 있다.
+
+따라서 현재 계약의 확정은 두 경로 모두 `HELD → CONFIRMED` 직행이다
+(`api-spec.md` 1.2절).
 
 **확정 — `CONFIRMED → CANCELLED` 시 `seat_hold`도 `RELEASED`로 전이한다.**
 만료 처리와 동일하다. `seat_hold`는 홀드 레코드의 **생명주기만** 표현하는 테이블이고,

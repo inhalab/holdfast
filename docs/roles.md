@@ -8,8 +8,9 @@
 | **3개월차** | 락 전략 4종 구현, 전략별 비교 측정, 만료·취소·멱등성 | 예약 조회 화면, 모니터링·로그 수집 |
 | **4개월차** | 최종 측정, 비교표 작성, 발표 자료 | Mock PG(실패 주입 포함), QR 티켓·검표, 알림 Outbox, 관리자 화면 |
 
-Mock PG를 4개월차로 옮긴 근거는 `design-spec.md` 6절에 있다.
 | **공통** | 요구사항 추적표, ERD, 상태 전이도, 최종 발표 | 좌: 문서 초안 / 우: 리뷰 |
+
+Mock PG를 4개월차로 옮긴 근거는 `design-spec.md` 6절에 있다.
 
 ## 경계선
 
@@ -27,7 +28,10 @@ Mock PG를 4개월차로 옮긴 근거는 `design-spec.md` 6절에 있다.
 | `.../holdfast/payment/` | Mock PG | 박태준 |
 | `.../holdfast/ticket/` | QR 발급, 검표 | 박태준 |
 | `.../holdfast/notification/` | Outbox | 박태준 |
-| `.../holdfast/admin/` | 관리자 기능 — **아직 없음**(4개월차 착수 시 생성) | 박태준 |
+| `.../holdfast/admin/` | 관리자 기능 — 예약 현황, 프로그램·회차 등록, 좌석배치 등록 | 박태준 |
+| `.../holdfast/catalog/` | 프로그램·회차 목록의 조회 전용 저장소 | 박태준 |
+| `.../holdfast/web/` | 서버렌더 화면 컨트롤러 | 박태준 |
+| `.../holdfast/support/` | 시드·스키마 보조(`IdentitySequences`) | 박태준 |
 | `api/src/main/resources/db/migration/` | Flyway 마이그레이션 (스키마 정본) | 최건 |
 | `api/src/main/resources/templates/` | Thymeleaf 화면 | 박태준 |
 | `infra/` | Terraform, 배포 | 박태준 |
@@ -36,8 +40,10 @@ Mock PG를 4개월차로 옮긴 근거는 `design-spec.md` 6절에 있다.
 접근 권한이 아니라 리뷰 책임의 구분이다. 상대 영역도 필요하면 손대되, PR에서 담당자가 리뷰어로 붙는다.
 
 **패키지 구조는 확정됐고 `.github/CODEOWNERS`가 이 표를 그대로 반영한다.**
-`admin/`만 아직 만들어지지 않았는데, 생성 전까지는 `/api/` 기본 규칙이 박태준에게
-걸리므로 CODEOWNERS에 따로 줄을 두지 않았다.
+
+**`admin/`·`catalog/`·`web/`·`support/`에는 CODEOWNERS 줄이 없다.** 넷 다
+`/api/` 기본 규칙에 걸려 박태준에게 가고, 이 표가 적은 담당도 같다. **줄을 더해도
+결과가 같아서 두지 않는다** — 같은 사실을 두 곳에서 지키면 어긋난다.
 
 **`seat_inventory`·`seat_hold`·`user_session_quota`가 `seat/`가 아니라
 `reservation/`에 있는 이유**는 `docs/erd.md` 4절에 있다 — 이 셋은 CS-1·CS-6의 쓰기
