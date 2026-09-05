@@ -7,24 +7,31 @@
 ## 0. 준비
 
 ```bash
-./holdfast demo pessimistic          # 기동 + 시드 + 주소 안내
+./holdfast demo none                 # 기동 + 시드 + 주소 안내
 ```
+
+**`none`으로 시작한다.** 1절이 "락이 없으면 깨진다"를 먼저 보이기 때문이다. 1절
+끝에서 `pessimistic`으로 바꾸고, 2절부터는 그 상태로 간다.
 
 또는 직접:
 
 ```bash
-HOLDFAST_STRATEGY=pessimistic HOLD_TTL_SECONDS=300 docker compose up -d --build
+HOLDFAST_STRATEGY=none HOLD_TTL_SECONDS=300 docker compose up -d --build
 docker compose exec -T db psql -U holdfast -d holdfast < infra/demo-seed.sql
 ```
 
-**두 값이 시연의 전제다.** `none`은 만료된 홀드를 회수하지 않고(그것이 베이스라인의
-정의다), TTL 10초는 설명하는 동안 선점이 풀린다.
+**TTL 300초가 시연의 전제다.** 기본값 10초는 부하 측정용 고정 변수라
+(`concurrency-spec.md` 7.3) 설명하는 동안 선점이 풀린다. `./holdfast demo`가 이
+값을 대신 넣어 준다.
+
+**2절은 `pessimistic`에서 한다.** `none`은 만료된 홀드를 회수하지 않는 것이
+베이스라인의 정의라(`erd.md` 4.1), 예약 한 바퀴를 도는 동안 좌석 상태가 어긋난다.
 
 브라우저 탭을 미리 열어 둔다 — 시연 중 주소를 타이핑하지 않는다.
 
 | 탭 | 주소 |
 |---|---|
-| 1 | <http://localhost:8080/programs> |
+| 1 | <http://localhost:8080/> — 프로그램 목록. `/programs`도 같은 화면이다 |
 | 2 | <http://localhost:8080/demo/race> |
 | 3 | <http://localhost:8080/admin/programs> |
 
@@ -38,10 +45,32 @@ docker compose exec -T db psql -U holdfast -d holdfast < infra/demo-seed.sql
 **탭 2 — `/demo/race`**
 
 1. `none` 전략으로 "동시에 홀드 요청" — 활성 홀드가 여러 건 남는다(초과 홀드)
-2. 화면에서 전략을 `pessimistic`으로 바꾸고 다시 — 1건
+2. **좌석 수를 1로 둔 채로 한다.** 브라우저는 호스트당 커넥션이 6개라, 좌석이
+   6개 이상이면 동시에 뜬 요청이 서로 다른 좌석으로 갈라져 **`none`도 초과 홀드를
+   내지 않는다**(`scope-m4.md` 7절의 실측 표). 화면이 이 조건을 계산해 경고한다
 3. **손으로 두 창을 클릭하는 것으로는 이 장면을 만들 수 없다**는 점을 말한다.
    홀드 트랜잭션이 밀리초라 사람이 누른 두 요청은 겹치지 않는다. 그래서 브라우저가
    `Promise.all`로 한 번에 발사한다
+4. **전략을 바꾼다 — 화면이 아니라 터미널에서 한다.** 화면의 `명령 복사`를 누르고
+   터미널에 붙여넣는다.
+
+   ```bash
+   ./holdfast strategy pessimistic
+   ```
+
+   **앱 재기동이라 약 13초 걸린다.** 그 창을 그대로 두면 화면이 전환을 감지해
+   상단 배지를 스스로 갱신하므로, 붙여넣은 뒤 터미널을 다시 볼 일이 없다
+5. 다시 발사 — 좌석마다 1건이고 나머지는 409다
+
+**13초에 할 말이 있다.** 그 사이에 일어나는 일이 곧 설명거리다 — 앱만 다시 뜨는
+것이 아니라 **부분 유니크 인덱스 U-2를 지우거나 다시 만든다.** `none`은 U-2가
+빠져야 비로소 `none`이기 때문이다(`erd.md` 3.1). **전략은 앱 안에만 있는 것이
+아니다**가 이 프로젝트 결론과 그대로 붙는 이야기다.
+
+> **화면에서 전략을 바꾸지 않는 이유**는 `scope-m4.md` 8절에 있다. 런타임 교체는
+> 측정 경로인 `SeatHoldService`를 고치는 일이고, 위임 프록시로 그것을 피해도
+> U-2가 스키마에 있어 `none`이 `unique`처럼 동작한다. 네 가지 경로를 전부 따져
+> 보고 하지 않기로 했다 — 질문이 나오면 이 대목이 답이다.
 
 **이어서 README의 측정 표를 띄운다.** 화면에서 본 것이 60회 측정에서 같은 모양으로
 나온다는 것 — 락 없음만 초과 확정 4석, 네 전략은 전부 0.
