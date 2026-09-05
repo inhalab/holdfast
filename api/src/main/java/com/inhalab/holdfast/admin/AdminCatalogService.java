@@ -207,6 +207,61 @@ public class AdminCatalogService {
         return warnings;
     }
 
+    /**
+     * 회차를 지운다. <b>예약이 하나도 없는 회차만</b> 지울 수 있다.
+     *
+     * <h3>왜 이 기준인가 — {@code erd.md} 2.2의 S-6</h3>
+     *
+     * <p>S-2가 "예약이 있으면 {@code SCHEDULED}로 되돌릴 수 없다"를 정했다.
+     * 되돌리기가 <b>"판 적 없다고 말하는 것"</b>이라면 삭제는 <b>"판 기록을
+     * 없애는 것"</b>이다. 되돌리기를 막았으면서 삭제를 허용할 근거가 없다.
+     * 예약이 있는 회차를 닫는 수단은 이미 {@code CLOSED}로 있고 S-2가 그쪽을
+     * 명시적으로 허용해 뒀다.
+     *
+     * <h3>S-2의 조건을 그대로 쓰지 않는다</h3>
+     *
+     * <p>S-2는 <b>살아 있는</b> 예약만 센다
+     * ({@code status NOT IN ('CANCELLED','EXPIRED')}). 그 조건으로 삭제를
+     * 판정하면 <b>만료된 예약만 남은 회차가 통과하고 곧바로
+     * {@code fk_reservation_session}에 걸린다.</b> 두 규칙이 묻는 것이 다르다 —
+     * 되돌리기는 "지금 유효한 예약이 있는가", 삭제는 "이 회차에 무슨 일이든
+     * 있었는가"다. 그래서 여기서는 {@code status}를 가리지 않는다.
+     *
+     * <h3>함께 지우는 것은 둘뿐이다</h3>
+     *
+     * <p>{@code event_session}을 참조하는 FK는 넷인데({@code seat_inventory},
+     * {@code user_session_quota}, {@code seat_hold}, {@code reservation})
+     * <b>{@code seat_hold}에 걸릴 행은 없다.</b> {@code SeatHoldService}가 홀드를
+     * 넣는 같은 트랜잭션에서 {@code reservation} 행을 만들고({@code erd.md} 4절
+     * "예약은 홀드 시점에 생성된다"), 만료돼도 그 행을 지우지 않는다. 예약이
+     * 0이면 홀드도 0이다.
+     *
+     * <h3>회차 행을 먼저 잠근다</h3>
+     *
+     * <p>세는 것과 지우는 것 사이에 홀드가 들어오면 FK 위반으로 500이 된다.
+     * {@code FOR UPDATE}는 예약 INSERT가 부모 행에 거는 {@code KEY SHARE}와
+     * 충돌하므로 그 창을 닫는다. <b>홀드 경로는 바뀌지 않는다</b> — 그쪽이
+     * 부모 행에 {@code KEY SHARE}를 거는 것은 FK가 원래 하던 일이고, 이 락은
+     * 삭제하는 쪽에만 있다.
+     */
+    @Transactional
+    public void deleteSession(long sessionId) {
+        Long locked = jdbc.query(
+                "SELECT id FROM event_session WHERE id = ? FOR UPDATE",
+                rs -> rs.next() ? rs.getLong(1) : null, sessionId);
+        require(locked != null, "회차를 찾을 수 없습니다: " + sessionId);
+
+        long reservations = count(
+                "SELECT count(*) FROM reservation WHERE session_id = ?", sessionId);
+        require(reservations == 0,
+                "예약 " + reservations + "건이 있는 회차는 지울 수 없습니다. "
+                        + "접수를 닫으려면 상태를 '" + CLOSED + "'로 바꾸세요.");
+
+        jdbc.update("DELETE FROM seat_inventory WHERE session_id = ?", sessionId);
+        jdbc.update("DELETE FROM user_session_quota WHERE session_id = ?", sessionId);
+        jdbc.update("DELETE FROM event_session WHERE id = ?", sessionId);
+    }
+
     // ── 검증 ────────────────────────────────────────────────────────────
 
     /**

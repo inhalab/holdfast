@@ -378,6 +378,84 @@ class AdminCatalogFlowTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    // ── 회차 삭제 (erd.md 2.2의 S-6) ──────────────────────────────────
+
+    @Test
+    @DisplayName("S-6 예약이 없으면 지워지고 재고·할당량 행도 함께 없다")
+    void deletesSessionWithoutReservations() {
+        service.deleteSession(1L);
+
+        assertThat(count("SELECT count(*) FROM event_session WHERE id = 1")).isZero();
+        assertThat(count("SELECT count(*) FROM seat_inventory WHERE session_id = 1")).isZero();
+        assertThat(count("SELECT count(*) FROM user_session_quota WHERE session_id = 1")).isZero();
+    }
+
+    @Test
+    @DisplayName("S-6 예약이 있으면 거절하고 아무것도 지우지 않는다")
+    void rejectsDeleteWhenReserved() {
+        givenConfirmedReservation();
+
+        assertThatThrownBy(() -> service.deleteSession(1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("CLOSED");
+
+        assertThat(count("SELECT count(*) FROM event_session WHERE id = 1")).isEqualTo(1);
+        assertThat(count("SELECT count(*) FROM seat_inventory WHERE session_id = 1")).isEqualTo(10);
+    }
+
+    /**
+     * <b>이 테스트가 S-6과 S-2를 가른다.</b> S-2의 조건
+     * ({@code status NOT IN ('CANCELLED','EXPIRED')})을 삭제에 그대로 쓰면
+     * 이 회차가 "지워도 된다"로 통과하고 {@code fk_reservation_session}에 걸린다.
+     */
+    @Test
+    @DisplayName("S-6 만료된 예약만 남아 있어도 거절한다 — S-2 조건을 쓰면 안 되는 이유")
+    void rejectsDeleteWhenOnlyExpiredReservationsRemain() {
+        jdbc.update("""
+                INSERT INTO reservation (session_id, user_id, hold_id, status)
+                VALUES (1, 1, 'hold-expired', 'EXPIRED')
+                """);
+
+        assertThatThrownBy(() -> service.deleteSession(1L))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(count("SELECT count(*) FROM event_session WHERE id = 1")).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("없는 회차를 지우면 거절한다")
+    void rejectsDeleteOfMissingSession() {
+        assertThatThrownBy(() -> service.deleteSession(999L))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    // ── 회차 목록의 좌석 수 ────────────────────────────────────────────
+
+    @Test
+    @DisplayName("회차 목록이 배치도 이름과 그 회차의 좌석 수를 보여준다")
+    void listShowsLayoutNameAndSeatCount() throws Exception {
+        mvc.perform(get("/admin/programs/1"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("시드 배치도")))
+                .andExpect(content().string(containsString("10석")));
+    }
+
+    /**
+     * <b>배치도의 좌석 수가 아니라 회차의 재고 수를 센다.</b> 시드가 배치도로
+     * 거르지 않고 재고를 넣으면 둘이 갈리는데, 그때 맞는 것은 사용자가 실제로
+     * 보는 좌석맵 쪽이다({@code SessionSeatInfo}).
+     */
+    @Test
+    @DisplayName("배치도 좌석 수와 회차 재고 수가 갈리면 재고 쪽을 보여준다")
+    void seatCountFollowsInventoryNotLayout() throws Exception {
+        // 배치도에는 좌석이 10개인데 이 회차의 재고는 3개만 남긴다.
+        jdbc.update("DELETE FROM seat_inventory WHERE session_id = 1 AND seat_id > 3");
+
+        mvc.perform(get("/admin/programs/1"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("3석")));
+    }
+
     // ── 화면 ───────────────────────────────────────────────────────────
 
     /**
@@ -426,7 +504,43 @@ class AdminCatalogFlowTest {
                 .andExpect(redirectedUrl("/admin/programs/1"));
     }
 
+    /**
+     * 삭제 거절도 리다이렉트하지 않고 <b>그 자리에서 목록을 다시 그린다</b>.
+     * 플래시는 못 쓴다 — 앱이 2대라 세션이 로드밸런서를 못 넘는다
+     * ({@code design-spec.md} 5.5). 그래서 "플래시가 살아 있나"가 아니라
+     * <b>"실패 응답이 그 자리에서 그린 화면인가"</b>를 본다.
+     */
+    @Test
+    @DisplayName("삭제가 거절되면 이유가 그 자리에 뜬다")
+    void deleteRejectionShowsWhy() throws Exception {
+        givenConfirmedReservation();
+
+        mvc.perform(post("/admin/sessions/1/delete").param("programId", "1"))
+                .andExpect(status().isOk())              // 리다이렉트가 아니다
+                .andExpect(view().name("admin/program-detail"))
+                .andExpect(model().attributeExists("error"))
+                .andExpect(model().attributeExists("program", "sessions", "layouts"))
+                .andExpect(content().string(containsString("지울 수 없습니다")));
+
+        assertThat(count("SELECT count(*) FROM event_session WHERE id = 1")).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("삭제가 성공하면 상대 경로로 리다이렉트한다")
+    void deleteSuccessRedirectsRelatively() throws Exception {
+        mvc.perform(post("/admin/sessions/1/delete").param("programId", "1"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/admin/programs/1"));
+
+        assertThat(count("SELECT count(*) FROM event_session WHERE id = 1")).isZero();
+    }
+
     // ── 도우미 ─────────────────────────────────────────────────────────
+
+    private long count(String sql) {
+        Long n = jdbc.queryForObject(sql, Long.class);
+        return n == null ? 0L : n;
+    }
 
     /** 시드가 만든 회차 1건 말고는 늘어나지 않았다. */
     private void assertNoSessionAdded() {
