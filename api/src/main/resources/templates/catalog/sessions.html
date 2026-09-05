@@ -21,7 +21,7 @@
         </p>
 
         <a th:if="${s.saleState.name() == 'ON_SALE'}"
-           class="link-back" th:href="@{/sessions/{id}(id=${s.sessionId})}">좌석 선택 →</a>
+           class="link-back" th:href="@{/sessions/{id}(id=${s.sessionId}, userId=${userId})}">좌석 선택 →</a>
 
         <p class="meta" th:if="${s.saleState.name() == 'SOLD_OUT'}">매진</p>
 

@@ -41,9 +41,17 @@ public class ReservationPageController {
      *
      * <p><b>{@code ?userId=}를 받는 이유는 좌석맵과 같다</b>
      * ({@code SeatMapPageController#seatMap}). 여기서는 특히 필요하다 —
-     * {@code ReservationService#get}이 남의 예약을 404로 막으므로, 사용자 2로
-     * 예매한 뒤 이 화면을 열면 <b>기본값 1로는 404가 된다.</b> 시연 도중 흐름이
-     * 거기서 끊긴다.
+     * {@code ReservationService#get}이 남의 예약을 404로 막으므로, 이 화면은
+     * <b>누구로 보는지가 정해져야</b> 열린다.
+     *
+     * <p><b>보내는 쪽이 그 값을 싣는다.</b> 결제 승인 뒤 이 화면으로 오는 것은
+     * {@code static/js/seatmap.js}이고 거기서 {@code ?userId=}를 붙인다. 관리자
+     * 예약 현황의 링크는 그 예약의 소유자 id를 싣는다({@code scope-m4.md} 8절).
+     *
+     * <p>한동안 {@code seatmap.js}가 그 값을 빠뜨려 <b>사용자 2로 예매하면 결제
+     * 직후 404</b>가 났다. 이 주석은 그 사실을 적어 두기만 하고 고치지는 않아
+     * 결함이 코드에 미해결로 남아 있었다 — {@code workflow.md} 1번이 지목한
+     * 형태다. #126에서 보내는 쪽을 고쳤고, 이 문단은 그 기록이다.
      */
     @GetMapping("/reservations/{reservationId}")
     public String show(@PathVariable long reservationId,

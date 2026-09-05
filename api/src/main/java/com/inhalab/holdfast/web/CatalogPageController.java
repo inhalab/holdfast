@@ -14,6 +14,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -63,8 +64,31 @@ public class CatalogPageController {
     }
 
     /** 한 프로그램의 회차 목록. 회차마다 잔여 좌석을 함께 보여준다. */
+    /**
+     * 회차 목록.
+     *
+     * <h3>{@code ?userId=}를 받아 좌석맵으로 넘긴다</h3>
+     *
+     * <p>이 화면 자체는 그 값을 쓰지 않는다 — 회차 목록은 누가 보든 같다.
+     * <b>받는 이유는 좌석맵 왕복에서 잃지 않기 위해서다.</b>
+     *
+     * <p>좌석맵에는 {@code ← 회차 목록}이 있고 이 화면에는 {@code 좌석 선택 →}이
+     * 있다. 그 왕복에서 값이 빠지면 <b>사용자 2로 보던 사람이 한 바퀴 돌아 1이
+     * 되는데 아무 표시도 없다.</b> 404라면 알아채지만 이쪽은 무증상이다.
+     *
+     * <p><b>그 상태가 시연을 조용히 망친다.</b> 창을 둘 띄워 사용자를 바꾸는 것이
+     * 동시성 시연의 수단인데({@code scope-m4.md} 6절), 둘 다 사용자 1이 되면
+     * CS-6이 할당량 행에서 직렬화해 <b>경합이 아예 일어나지 않는다.</b> 같은 결과를
+     * 8절이 "시연 중 가장 걸리기 쉬운 함정"이라 부른다.
+     *
+     * <p><b>프로그램 목록까지 나가면 잃는다.</b> 거기서 되돌아오는 경로는 값을
+     * 싣지 않는다 — 흐름을 벗어난 것이라 기본값으로 돌아오는 편이 맞다. 그 경계는
+     * {@code scope-m4.md} 8절 표에 적었다.
+     */
     @GetMapping("/programs/{programId}")
-    public String sessions(@PathVariable long programId, Model model) {
+    public String sessions(@PathVariable long programId,
+                           @RequestParam(name = "userId", defaultValue = "1") long userId,
+                           Model model) {
         Program program = programRepository.findById(programId)
                 .orElseThrow(() -> new IllegalArgumentException("프로그램을 찾을 수 없습니다: " + programId));
 
@@ -83,6 +107,7 @@ public class CatalogPageController {
 
         model.addAttribute("program", program);
         model.addAttribute("sessions", cards);
+        model.addAttribute("userId", userId);
         return "catalog/sessions";
     }
 
