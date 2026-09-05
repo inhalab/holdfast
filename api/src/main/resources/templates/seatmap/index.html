@@ -24,8 +24,9 @@
 
     <header class="page-head">
         <!-- 들어온 길로 되돌아가는 링크. programId를 못 읽었으면 프로그램 목록으로 보낸다. -->
+        <!-- userId를 실어 좌석맵 왕복에서 사용자가 조용히 바뀌지 않게 한다 (#126). -->
         <a class="link-back" th:if="${programId != null}"
-           th:href="@{/programs/{id}(id=${programId})}">← 회차 목록</a>
+           th:href="@{/programs/{id}(id=${programId}, userId=${userId})}">← 회차 목록</a>
         <a class="link-back" th:if="${programId == null}" th:href="@{/programs}">← 프로그램 목록</a>
         <h1 th:text="'회차 ' + ${seatMap.sessionId} + ' 좌석 선택'">좌석 선택</h1>
         <p class="meta">

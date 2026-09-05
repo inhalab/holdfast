@@ -436,8 +436,15 @@
                 if (data.status === "APPROVED") {
                     // 결제 승인 시 확정·티켓 발급까지 이미 끝났다. 예약 확인
                     // 화면(#81)으로 이동해 티켓을 보여준다.
+                    //
+                    // **userId를 함께 싣는다.** 예약 확인 화면은 소유자의 예약만
+                    // 보여주므로(ReservationService#get), 이 값이 빠지면 서버
+                    // 기본값 1로 열려 사용자 2로 예매한 사람이 자기 티켓 앞에서
+                    // 404를 만난다. 홀드·결제 요청은 이미 같은 값을 X-User-Id로
+                    // 보내고 있었다 — 들고 있으면서 안 넘긴 것이었다 (#126).
                     clearSavedHold();
-                    window.location.href = "/reservations/" + data.reservationId;
+                    window.location.href =
+                        "/reservations/" + data.reservationId + "?userId=" + userId;
                     return;
                 }
                 // DECLINED — 예약은 HELD로 남는다. 홀드는 그대로 유지되므로
