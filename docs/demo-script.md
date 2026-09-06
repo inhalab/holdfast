@@ -153,7 +153,7 @@ docker compose exec -T db psql -U holdfast -d holdfast < infra/demo-seed.sql
 
 | 없는 것 | 왜 |
 |---|---|
-| 인증·권한 | `X-User-Id` 헤더가 대신한다. 관리자 경로를 누구나 연다 |
+| 인증·권한 | `X-User-Id` 헤더가 대신한다. 관리자 경로를 누구나 연다 — **배포하면 그 경로를 끄기로 정했다**(`infra-decision.md` 3.1) |
 | 실제 PG·알림 발송 | Mock. 상태 전이와 재시도·중복 방지는 구현했다 |
 | AWS 배포 | 로컬 Docker Compose로 앱 2대 구성을 재현했다(#42 보류) |
 | UI 표준화 | `design-spec` 5.3 — 좌석맵에 시간을 쏟지 않는다고 처음에 정했다 |
