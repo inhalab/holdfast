@@ -13,12 +13,22 @@
 **`none`으로 시작한다.** 1절이 "락이 없으면 깨진다"를 먼저 보이기 때문이다. 1절
 끝에서 `pessimistic`으로 바꾸고, 2절부터는 그 상태로 간다.
 
+**시연 중에 코드를 고쳤다면 `--build`를 붙인다.**
+
+```bash
+./holdfast demo none --build
+```
+
 또는 직접:
 
 ```bash
 HOLDFAST_STRATEGY=none HOLD_TTL_SECONDS=300 docker compose up -d --build
 docker compose exec -T db psql -U holdfast -d holdfast < infra/demo-seed.sql
 ```
+
+**이 경로에는 점검이 없다.** `./holdfast`가 하는 두 가지 — 앱이 실제로 응답할
+때까지 기다리는 것과 멈춘 컨테이너를 알리는 것 — 이 빠진다. 시연 직전에
+`nginx`가 죽어 있으면 화면이 그냥 안 열린다(이슈 #128).
 
 **TTL 300초가 시연의 전제다.** 기본값 10초는 부하 측정용 고정 변수라
 (`concurrency-spec.md` 7.3) 설명하는 동안 선점이 풀린다. `./holdfast demo`가 이

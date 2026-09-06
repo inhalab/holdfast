@@ -34,6 +34,18 @@ docker compose up --build
 
 첫 빌드는 gradle 의존성을 받느라 몇 분 걸린다.
 
+**최초 구축은 이 명령을 그대로 둔다** — 빌드 로그를 눈으로 보는 것이 목적이다.
+**다만 이 경로에는 점검이 없다.** 한 번 뜬 뒤로는 `./holdfast`를 쓴다.
+
+```bash
+./holdfast up          # 기동 + 응답 확인 + nginx reload
+./holdfast rebuild     # 코드를 고쳤을 때
+```
+
+둘의 차이는 **앱이 실제로 응답할 때까지 확인하느냐**다. 생짜 compose는
+`Started`만 보고 끝나는데 Spring Boot는 그 뒤로 5~6초 더 걸리고, 컨테이너
+하나가 죽어 있어도 나머지가 running이라 스택이 떠 있는 것처럼 보인다(#128).
+
 ## 동작 확인
 
 PowerShell에서는 curl 대신 `curl.exe`를 쓰면 경고 없이 JSON만 나온다.
