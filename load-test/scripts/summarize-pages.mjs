@@ -9,9 +9,9 @@
 // 잡음 바닥이 비율보다 크면 아무것도 말할 수 없다(concurrency-spec 7.8.4).
 // 이쪽은 **절대 기준(3초)과의 대조**라 화면마다 통과·초과가 곧 결론이다.
 //
-// 그래서 여백(3000ms까지 몇 배 남았는가)을 함께 찍는다. **여백이 잡음 바닥보다
-// 크면 그 판정은 잡음에 흔들리지 않는다** — 관측된 잡음 바닥은 2.28배이므로
-// 여백이 2.28배를 넘는 화면은 안전하다고 말할 수 있다.
+// 그래서 여백(3000ms까지 몇 배 남았는가)과 **그 화면의 회차 간 폭**을 함께
+// 찍는다. 폭을 여백에 실어도 기준 아래면 그 판정은 잡음에 흔들리지 않는다.
+// 잡음을 다른 측정에서 빌려오지 않고 여기서 재는 이유는 spreadOf에 적었다.
 //
 // ## 3회 중앙값
 //
@@ -28,12 +28,21 @@ const RESULTS_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'results
 const BUDGET_MS = 3000;
 
 /**
- * 관측된 잡음 바닥. `none`을 여섯 번 아무것도 바꾸지 않고 재서 p95가
- * 17.6~40.2ms로 흔들린 값이다(concurrency-spec 7.8.4). 화면 측정의 잡음이
- * 그것과 같다는 보장은 없지만, **같은 스택에서 관측된 유일한 실측 잡음**이므로
- * 안전 여백의 기준으로 쓴다.
+ * 잡음을 **빌려오지 않고 이 측정에서 잰다.**
+ *
+ * 처음에는 7.8.4가 관측한 2.28배(`none` 여섯 번의 p95 폭)를 상수로 박아 뒀는데,
+ * 그것은 **다른 시나리오의 잡음**이다. 이 측정은 조건마다 3회를 같은 조건으로
+ * 돌리므로 **화면마다 자기 폭(최대/최소)이 그 자리에서 나온다.**
+ *
+ * 판정은 그 폭을 여백에 실어서 한다 — `p95 × 폭 < 3000`이면, 잡음이 최악으로
+ * 실린 회차를 잡았더라도 기준을 넘지 않는다. 회차가 셋뿐이라 이 폭은 잡음의
+ * 하한에 가깝지만, **빌려온 상수보다는 이 측정에 대해 말하는 값이다.**
  */
-const NOISE_FACTOR = 2.28;
+function spreadOf(values) {
+  const v = values.filter((x) => typeof x === 'number' && x > 0);
+  if (v.length < 2) return null;
+  return Math.max(...v) / Math.min(...v);
+}
 
 const CONDITION_LABEL = { none: '무부하', low: '부하 중(저경합)' };
 
@@ -83,7 +92,7 @@ console.log(`PER-002 화면별 응답시간 — 세션 ${session === 'all' ? '�
 const anyCfg = results[0].config;
 console.log(`커밋 ${anyCfg.commit}${anyCfg.dirty ? ' (dirty)' : ''} · 이미지 ${anyCfg.image}` +
   (anyCfg.imageStale === 'yes' ? ' ※ HEAD보다 오래됨' : ''));
-console.log(`검수 기준 ${BUDGET_MS}ms · 안전 여백 기준 ${NOISE_FACTOR}배(관측 잡음 바닥)`);
+console.log(`검수 기준 ${BUDGET_MS}ms · 판정은 화면마다 실측한 회차 간 폭을 여백에 실어서 한다`);
 
 // --- 측정 무결성이 먼저다 ----------------------------------------------------
 //
@@ -124,21 +133,30 @@ for (const condition of conditions) {
   console.log('');
   console.log(`── ${CONDITION_LABEL[condition] || condition} · ${runs.length}회 중앙값 ─────────────────`);
   console.log('');
-  console.log('화면                                        p95      최대     여백    판정');
+  console.log('화면                                        p95      최대    회차폭    여백    판정');
   let worst = null;
+  let widest = null;
   for (const id of screenIds) {
     const rows = runs.map((r) => r.screens.find((s) => s.id === id)).filter(Boolean);
     if (rows.length === 0) continue;
     const p95 = median(rows.map((s) => s.p95));
     const max = median(rows.map((s) => s.max));
+    const spread = spreadOf(rows.map((s) => s.p95));
     const label = rows[0].label;
     const headroom = p95 === null ? null : BUDGET_MS / p95;
+
+    // **폭을 여백에 실어서 판정한다.** 이 화면이 관측된 만큼 최악으로 흔들려도
+    // 기준 아래인가를 묻는 것이다.
+    const worstCase = p95 === null ? null : p95 * (spread ?? 1);
     const verdict = p95 === null ? '?'
       : p95 >= BUDGET_MS ? '초과'
-        : headroom >= NOISE_FACTOR ? '통과' : '통과(여백 좁음)';
-    if (p95 !== null && (worst === null || p95 > worst.p95)) worst = { label, p95, headroom };
+        : worstCase < BUDGET_MS ? '통과' : '통과(폭을 실으면 초과)';
+
+    if (p95 !== null && (worst === null || p95 > worst.p95)) worst = { label, p95, headroom, spread };
+    if (spread !== null && (widest === null || spread > widest.spread)) widest = { label, spread };
     console.log(
       `${label.padEnd(42)}${fmt(p95).padStart(8)} ${fmt(max).padStart(8)} ` +
+      `${(spread === null ? '-' : `${spread.toFixed(2)}배`).padStart(8)} ` +
       `${(headroom === null ? '-' : `${headroom.toFixed(0)}배`).padStart(7)}  ${verdict}`,
     );
   }
@@ -146,6 +164,13 @@ for (const condition of conditions) {
     console.log('');
     console.log(`  가장 느린 화면 — ${worst.label} ${fmt(worst.p95)} ` +
       `(기준의 ${((worst.p95 / BUDGET_MS) * 100).toFixed(1)}%, 여백 ${worst.headroom.toFixed(0)}배)`);
+  }
+  if (widest) {
+    // **가장 흔들리는 화면을 따로 알린다.** 빠른 화면일수록 폭이 크게 잡히는데,
+    // 그것은 그 화면이 불안정해서가 아니라 값이 작아 상대 폭이 커지는 것이다.
+    // 판정을 위협하지 않지만, 조건 간 차이를 읽으려 할 때 그 폭 안에 들어가는
+    // 차이는 해석하면 안 된다는 신호다.
+    console.log(`  회차 간 폭이 가장 큰 화면 — ${widest.label} ${widest.spread.toFixed(2)}배`);
   }
 }
 
