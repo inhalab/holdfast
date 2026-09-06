@@ -1,0 +1,538 @@
+{
+  "measurement": "per-002-page-timing",
+  "note": "이슈 #105. 원본 회차 JSON은 load-test/results/(gitignore)에 있고 여기 남는 것은 중앙값이다.",
+  "budgetMs": 3000,
+  "measureSession": "20260907-0108",
+  "commit": "e2ca7a6",
+  "dirty": false,
+  "image": "ab17c80c183a",
+  "imageStale": "yes",
+  "imageNote": "이미지는 1039bc6(main, #104 포함). 이후 두 커밋은 load-test/·docs/만 건드렸다",
+  "protocol": {
+    "warmupSec": 30,
+    "durationSec": 60,
+    "repeats": 3,
+    "interleaved": true,
+    "seed": "low (1000석 / 사용자 400)",
+    "fixtureReservations": 250,
+    "pageVus": 1
+  },
+  "conditions": {
+    "none": {
+      "label": "무부하",
+      "integrity": {
+        "runs": 3,
+        "samples": [
+          298,
+          298,
+          298
+        ],
+        "badStatus": [
+          0,
+          0,
+          0
+        ],
+        "badAsset": [
+          0,
+          0,
+          0
+        ]
+      },
+      "screens": [
+        {
+          "id": "catalog_programs",
+          "label": "프로그램 목록",
+          "rfp": "이용자 예약 신청",
+          "path": "/programs",
+          "p95Runs": [
+            17.8,
+            3.4,
+            10.5
+          ],
+          "p95": 10.5,
+          "max": 18.1,
+          "docP95": 1.9,
+          "spread": 5.2,
+          "headroom": 287,
+          "verdict": "PASS"
+        },
+        {
+          "id": "catalog_sessions",
+          "label": "회차 목록",
+          "rfp": "이용자 예약 신청",
+          "path": "/programs/1?userId=1",
+          "p95Runs": [
+            6.9,
+            6.7,
+            8.2
+          ],
+          "p95": 6.9,
+          "max": 8.4,
+          "docP95": 4.8,
+          "spread": 1.2,
+          "headroom": 438,
+          "verdict": "PASS"
+        },
+        {
+          "id": "seatmap",
+          "label": "좌석맵 (예약 신청)",
+          "rfp": "이용자 예약 신청",
+          "path": "/sessions/1?userId=1",
+          "p95Runs": [
+            22.9,
+            23.3,
+            20
+          ],
+          "p95": 22.9,
+          "max": 29.5,
+          "docP95": 20.4,
+          "spread": 1.2,
+          "headroom": 131,
+          "verdict": "PASS"
+        },
+        {
+          "id": "reservation_detail",
+          "label": "예약 상세 (확인·티켓)",
+          "rfp": "이용자 예약 조회",
+          "path": "/reservations/1?userId=1",
+          "p95Runs": [
+            7,
+            7.1,
+            6.4
+          ],
+          "p95": 7,
+          "max": 7.2,
+          "docP95": 5.2,
+          "spread": 1.1,
+          "headroom": 430,
+          "verdict": "PASS"
+        },
+        {
+          "id": "lookup_form",
+          "label": "비회원 조회 폼",
+          "rfp": "비회원 예약 조회",
+          "path": "/reservations/lookup",
+          "p95Runs": [
+            3.1,
+            3,
+            4.8
+          ],
+          "p95": 3.1,
+          "max": 5.3,
+          "docP95": 1.5,
+          "spread": 1.6,
+          "headroom": 980,
+          "verdict": "PASS"
+        },
+        {
+          "id": "lookup_result",
+          "label": "비회원 조회 결과 (리다이렉트 포함)",
+          "rfp": "비회원 예약 조회 — 조회 결과",
+          "path": "/reservations/lookup?reservationId=1&userId=1",
+          "p95Runs": [
+            5.9,
+            5.5,
+            6.9
+          ],
+          "p95": 5.9,
+          "max": 6.1,
+          "docP95": 4.3,
+          "spread": 1.3,
+          "headroom": 507,
+          "verdict": "PASS"
+        },
+        {
+          "id": "my_reservations",
+          "label": "마이페이지",
+          "rfp": "마이페이지 조회",
+          "path": "/my/reservations?userId=1",
+          "p95Runs": [
+            4.9,
+            8,
+            6.1
+          ],
+          "p95": 6.1,
+          "max": 7.6,
+          "docP95": 3.2,
+          "spread": 1.7,
+          "headroom": 488,
+          "verdict": "PASS"
+        },
+        {
+          "id": "admin_reservations",
+          "label": "관리자 예약 현황 (목록 200줄 + 회차별 통계)",
+          "rfp": "관리자 예약관리 · 신청현황 · 검표현황 · 통계조회",
+          "path": "/admin/reservations",
+          "p95Runs": [
+            46.5,
+            45.9,
+            43.4
+          ],
+          "p95": 45.9,
+          "max": 48.2,
+          "docP95": 41.4,
+          "spread": 1.1,
+          "headroom": 65,
+          "verdict": "PASS"
+        },
+        {
+          "id": "admin_programs",
+          "label": "관리자 프로그램 목록·등록",
+          "rfp": "관리자 프로그램 등록·수정",
+          "path": "/admin/programs",
+          "p95Runs": [
+            4.3,
+            3.6,
+            4.3
+          ],
+          "p95": 4.3,
+          "max": 4.6,
+          "docP95": 2.6,
+          "spread": 1.2,
+          "headroom": 705,
+          "verdict": "PASS"
+        },
+        {
+          "id": "admin_program_detail",
+          "label": "관리자 회차관리",
+          "rfp": "관리자 회차관리",
+          "path": "/admin/programs/1",
+          "p95Runs": [
+            6.2,
+            6.2,
+            5.7
+          ],
+          "p95": 6.2,
+          "max": 6.8,
+          "docP95": 4.4,
+          "spread": 1.1,
+          "headroom": 486,
+          "verdict": "PASS"
+        },
+        {
+          "id": "admin_layouts",
+          "label": "관리자 좌석배치도 목록",
+          "rfp": "(원문 목록 밖 — 참고)",
+          "path": "/admin/layouts",
+          "p95Runs": [
+            4.1,
+            4.3,
+            4.5
+          ],
+          "p95": 4.3,
+          "max": 4.8,
+          "docP95": 2.7,
+          "spread": 1.1,
+          "headroom": 694,
+          "verdict": "PASS"
+        },
+        {
+          "id": "admin_layout_detail",
+          "label": "관리자 좌석배치도 상세 (좌석 격자)",
+          "rfp": "(원문 목록 밖 — 참고)",
+          "path": "/admin/layouts/1",
+          "p95Runs": [
+            15.4,
+            19.6,
+            16.4
+          ],
+          "p95": 16.4,
+          "max": 22.4,
+          "docP95": 15.4,
+          "spread": 1.3,
+          "headroom": 183,
+          "verdict": "PASS"
+        },
+        {
+          "id": "scan",
+          "label": "검표 단말",
+          "rfp": "(원문 목록 밖 — 참고)",
+          "path": "/scan",
+          "p95Runs": [
+            1.4,
+            1.8,
+            1.4
+          ],
+          "p95": 1.4,
+          "max": 6.1,
+          "docP95": 1.4,
+          "spread": 1.3,
+          "headroom": 2090,
+          "verdict": "PASS"
+        }
+      ]
+    },
+    "low": {
+      "label": "부하 중 (저경합 1000석 / 100 VU)",
+      "integrity": {
+        "runs": 3,
+        "samples": [
+          297,
+          297,
+          297
+        ],
+        "badStatus": [
+          0,
+          0,
+          0
+        ],
+        "badAsset": [
+          0,
+          0,
+          0
+        ]
+      },
+      "screens": [
+        {
+          "id": "catalog_programs",
+          "label": "프로그램 목록",
+          "rfp": "이용자 예약 신청",
+          "path": "/programs",
+          "p95Runs": [
+            4.2,
+            3.1,
+            3.9
+          ],
+          "p95": 3.9,
+          "max": 4,
+          "docP95": 2.4,
+          "spread": 1.4,
+          "headroom": 766,
+          "verdict": "PASS"
+        },
+        {
+          "id": "catalog_sessions",
+          "label": "회차 목록",
+          "rfp": "이용자 예약 신청",
+          "path": "/programs/1?userId=1",
+          "p95Runs": [
+            5.3,
+            5.5,
+            6.8
+          ],
+          "p95": 5.5,
+          "max": 7.3,
+          "docP95": 4.1,
+          "spread": 1.3,
+          "headroom": 545,
+          "verdict": "PASS"
+        },
+        {
+          "id": "seatmap",
+          "label": "좌석맵 (예약 신청)",
+          "rfp": "이용자 예약 신청",
+          "path": "/sessions/1?userId=1",
+          "p95Runs": [
+            22,
+            19.5,
+            18.5
+          ],
+          "p95": 19.5,
+          "max": 31.8,
+          "docP95": 18.3,
+          "spread": 1.2,
+          "headroom": 154,
+          "verdict": "PASS"
+        },
+        {
+          "id": "reservation_detail",
+          "label": "예약 상세 (확인·티켓)",
+          "rfp": "이용자 예약 조회",
+          "path": "/reservations/1?userId=1",
+          "p95Runs": [
+            7.2,
+            6.8,
+            6.8
+          ],
+          "p95": 6.8,
+          "max": 7.3,
+          "docP95": 5.6,
+          "spread": 1.1,
+          "headroom": 443,
+          "verdict": "PASS"
+        },
+        {
+          "id": "lookup_form",
+          "label": "비회원 조회 폼",
+          "rfp": "비회원 예약 조회",
+          "path": "/reservations/lookup",
+          "p95Runs": [
+            4.2,
+            3,
+            4
+          ],
+          "p95": 4,
+          "max": 6.3,
+          "docP95": 2.7,
+          "spread": 1.4,
+          "headroom": 744,
+          "verdict": "PASS"
+        },
+        {
+          "id": "lookup_result",
+          "label": "비회원 조회 결과 (리다이렉트 포함)",
+          "rfp": "비회원 예약 조회 — 조회 결과",
+          "path": "/reservations/lookup?reservationId=1&userId=1",
+          "p95Runs": [
+            6.4,
+            4.9,
+            5.6
+          ],
+          "p95": 5.6,
+          "max": 6.6,
+          "docP95": 4.7,
+          "spread": 1.3,
+          "headroom": 531,
+          "verdict": "PASS"
+        },
+        {
+          "id": "my_reservations",
+          "label": "마이페이지",
+          "rfp": "마이페이지 조회",
+          "path": "/my/reservations?userId=1",
+          "p95Runs": [
+            3.6,
+            4.6,
+            3.7
+          ],
+          "p95": 3.7,
+          "max": 4.5,
+          "docP95": 2.6,
+          "spread": 1.3,
+          "headroom": 808,
+          "verdict": "PASS"
+        },
+        {
+          "id": "admin_reservations",
+          "label": "관리자 예약 현황 (목록 200줄 + 회차별 통계)",
+          "rfp": "관리자 예약관리 · 신청현황 · 검표현황 · 통계조회",
+          "path": "/admin/reservations",
+          "p95Runs": [
+            46.6,
+            43.4,
+            41.8
+          ],
+          "p95": 43.4,
+          "max": 51.6,
+          "docP95": 42.4,
+          "spread": 1.1,
+          "headroom": 69,
+          "verdict": "PASS"
+        },
+        {
+          "id": "admin_programs",
+          "label": "관리자 프로그램 목록·등록",
+          "rfp": "관리자 프로그램 등록·수정",
+          "path": "/admin/programs",
+          "p95Runs": [
+            3.6,
+            3.8,
+            4.4
+          ],
+          "p95": 3.8,
+          "max": 4.4,
+          "docP95": 2.4,
+          "spread": 1.2,
+          "headroom": 783,
+          "verdict": "PASS"
+        },
+        {
+          "id": "admin_program_detail",
+          "label": "관리자 회차관리",
+          "rfp": "관리자 회차관리",
+          "path": "/admin/programs/1",
+          "p95Runs": [
+            5.5,
+            5.1,
+            6.1
+          ],
+          "p95": 5.5,
+          "max": 5.9,
+          "docP95": 3.9,
+          "spread": 1.2,
+          "headroom": 547,
+          "verdict": "PASS"
+        },
+        {
+          "id": "admin_layouts",
+          "label": "관리자 좌석배치도 목록",
+          "rfp": "(원문 목록 밖 — 참고)",
+          "path": "/admin/layouts",
+          "p95Runs": [
+            3.9,
+            4.6,
+            4.1
+          ],
+          "p95": 4.1,
+          "max": 5.2,
+          "docP95": 2.9,
+          "spread": 1.2,
+          "headroom": 733,
+          "verdict": "PASS"
+        },
+        {
+          "id": "admin_layout_detail",
+          "label": "관리자 좌석배치도 상세 (좌석 격자)",
+          "rfp": "(원문 목록 밖 — 참고)",
+          "path": "/admin/layouts/1",
+          "p95Runs": [
+            15.8,
+            16,
+            22.3
+          ],
+          "p95": 16,
+          "max": 16.5,
+          "docP95": 14.9,
+          "spread": 1.4,
+          "headroom": 187,
+          "verdict": "PASS"
+        },
+        {
+          "id": "scan",
+          "label": "검표 단말",
+          "rfp": "(원문 목록 밖 — 참고)",
+          "path": "/scan",
+          "p95Runs": [
+            1.1,
+            1.6,
+            1.6
+          ],
+          "p95": 1.6,
+          "max": 1.7,
+          "docP95": 1.6,
+          "spread": 1.4,
+          "headroom": 1929,
+          "verdict": "PASS"
+        }
+      ]
+    }
+  },
+  "background": {
+    "tps": [
+      98.47,
+      98.79,
+      98.62
+    ],
+    "normalRejectionPct": [
+      99.19,
+      99.12,
+      99.24
+    ],
+    "errorPct": [
+      0,
+      0,
+      0
+    ],
+    "unclassified": [
+      0,
+      0,
+      0
+    ],
+    "successCounts": [
+      120,
+      130,
+      112
+    ],
+    "note": "409율이 높은 것은 픽스처가 386석을 미리 판 탓이다. 요청량은 진짜 부하지만 쓰기는 약하다"
+  }
+}
