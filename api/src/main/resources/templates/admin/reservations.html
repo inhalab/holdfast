@@ -16,29 +16,61 @@
     </p>
 
     <section class="card">
-        <h2>회차별 좌석 현황</h2>
-        <div class="table-scroll" th:if="${not #maps.isEmpty(seatSummary)}">
+        <h2>회차별 예약 현황</h2>
+        <!--
+          집계값만 둔다. 배치도 이름·총 정원 같은 정의값은 회차 등록 화면이
+          말한다(#123과 #104의 경계).
+        -->
+        <p class="meta">
+            <strong>잔여석은 <code>AVAILABLE</code>만 셉니다</strong> — 회차 목록의
+            매진 표시와 같은 정의입니다. <strong>만료 홀드</strong>는 시간이 지났지만
+            아직 <code>HELD</code>로 남은 좌석이라 잔여석에 들어가지 않습니다.
+            <strong>다음 예약 요청이 회수합니다</strong>(<code>none</code> 전략은
+            회수하지 않습니다).
+        </p>
+        <div class="table-scroll" th:if="${not #maps.isEmpty(sessionStats)}">
         <table class="admin-table">
             <thead>
                 <tr>
-                    <th>회차</th>
-                    <th>AVAILABLE</th>
-                    <th>HELD</th>
-                    <th>SOLD</th>
+                    <th rowspan="2">회차</th>
+                    <th colspan="5">좌석</th>
+                    <th colspan="4">예약</th>
+                    <th colspan="2">티켓</th>
+                </tr>
+                <tr>
+                    <th>전체</th>
+                    <th>잔여</th>
+                    <th>선점</th>
+                    <th>판매</th>
+                    <th>만료 홀드</th>
+                    <th>선점</th>
+                    <th>확정</th>
+                    <th>취소</th>
+                    <th>만료</th>
+                    <th>발권</th>
+                    <th>검표 완료</th>
                 </tr>
             </thead>
             <tbody>
-                <tr th:each="entry : ${seatSummary}">
+                <tr th:each="entry : ${sessionStats}" th:with="st=${entry.value}">
                     <td><a th:href="@{/sessions/{id}(id=${entry.key}, userId=1)}"
                            th:text="${entry.key}" target="_blank">1</a></td>
-                    <td th:text="${entry.value.get('AVAILABLE')} ?: 0">0</td>
-                    <td th:text="${entry.value.get('HELD')} ?: 0">0</td>
-                    <td th:text="${entry.value.get('SOLD')} ?: 0">0</td>
+                    <td th:text="${st.totalSeats}">0</td>
+                    <td th:text="${st.available}">0</td>
+                    <td th:text="${st.held}">0</td>
+                    <td th:text="${st.sold}">0</td>
+                    <td th:text="${st.expiredHolds}">0</td>
+                    <td th:text="${st.reservationsHeld}">0</td>
+                    <td th:text="${st.reservationsConfirmed}">0</td>
+                    <td th:text="${st.reservationsCancelled}">0</td>
+                    <td th:text="${st.reservationsExpired}">0</td>
+                    <td th:text="${st.ticketsIssued}">0</td>
+                    <td th:text="${st.ticketsUsed}">0</td>
                 </tr>
             </tbody>
         </table>
         </div>
-        <p th:if="${#maps.isEmpty(seatSummary)}">좌석 데이터가 없다.</p>
+        <p th:if="${#maps.isEmpty(sessionStats)}">회차 데이터가 없다.</p>
     </section>
 
     <section class="card">

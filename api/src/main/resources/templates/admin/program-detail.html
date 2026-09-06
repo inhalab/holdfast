@@ -122,7 +122,13 @@
 
     <p class="meta">
         <a class="link-back" th:href="@{/admin/programs}">← 프로그램 목록</a> ·
-        <a class="link-back" th:href="@{/admin/layouts}">좌석배치도 관리</a>
+        <a class="link-back" th:href="@{/admin/layouts}">좌석배치도 관리</a> ·
+        <!--
+          이 화면은 회차의 정의값(배치도·정원·시각)을 고친다. 그 회차가 실제로
+          얼마나 팔렸는지는 집계값이라 예약 현황에 있다(#123과 #104의 경계).
+          고치고 나서 결과를 보러 갈 곳이 화면에 없으면 주소를 외워야 한다.
+        -->
+        <a class="link-back" th:href="@{/admin/reservations}">회차별 예약 현황 →</a>
     </p>
 </main>
 <footer th:replace="~{fragments/page-foot :: foot}"></footer>
