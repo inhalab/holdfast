@@ -35,7 +35,12 @@
         <p th:if="${#lists.isEmpty(tickets)}">발급된 티켓이 없습니다. 결제가 아직 승인되지 않았습니다.</p>
     </section>
 
-    <a class="link-back" th:href="@{/scan}">검표 화면으로</a>
+    <p class="meta">
+        <!-- userId를 실어야 그 사용자의 목록이 열린다(#126과 같은 이유). -->
+        <a class="link-back"
+           th:href="@{/my/reservations(userId=${reservation.userId})}">← 내 예약</a> ·
+        <a class="link-back" th:href="@{/scan}">검표 화면으로</a>
+    </p>
 </main>
 <footer th:replace="~{fragments/page-foot :: foot}"></footer>
 </body>

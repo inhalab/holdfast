@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>내 예약</title>
+    <link rel="stylesheet" th:href="@{/css/reservation.css}">
+</head>
+<body>
+<main class="page">
+    <h1>내 예약</h1>
+    <p class="meta">
+        예약자 번호 <strong th:text="${userId}">1</strong>의 예약입니다.
+        <!--
+          남의 번호로 열리는 것은 의도된 동작이다(scope-m4 6절). 화면만 고정해도
+          API가 그대로 열려 있어 막지 못하고, 시연은 사용자를 바꿔 보이는 것이
+          수단이다. 그 사실을 감추지 않고 적는다.
+        -->
+        <strong>인증이 아닙니다</strong> — 아래 폼으로 다른 번호를 볼 수 있습니다.
+    </p>
+
+    <section class="card">
+        <form method="get" th:action="@{/my/reservations}" class="admin-form">
+            <label>예약자 번호
+                <input type="number" name="userId" min="1" required th:value="${userId}">
+            </label>
+            <button type="submit">보기</button>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>예약 목록</h2>
+
+        <p class="meta" th:if="${#lists.isEmpty(reservations)}">
+            이 번호로 된 예약이 없습니다. <strong>오류가 아닙니다</strong> —
+            아직 예약하지 않았거나 다른 번호로 예약한 것입니다.
+        </p>
+
+        <table class="admin-table" th:if="${not #lists.isEmpty(reservations)}">
+            <thead>
+            <tr>
+                <th>예약번호</th>
+                <th>회차</th>
+                <th>상태</th>
+                <th>좌석</th>
+                <th>예약 시각</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="r : ${reservations}">
+                <td th:text="${r.reservationId}">1</td>
+                <td>
+                    <a th:href="@{/sessions/{id}(id=${r.sessionId}, userId=${userId})}"
+                       th:text="${r.sessionId}">1</a>
+                </td>
+                <td>
+                    <span class="status-badge" th:classappend="${r.status}"
+                          th:text="${r.status}">CONFIRMED</span>
+                </td>
+                <td th:text="${r.seatCount} + '석'">2석</td>
+                <td th:text="${#temporals.format(r.createdAt, 'yyyy-MM-dd HH:mm')}">2026-09-06 19:00</td>
+                <td>
+                    <!-- 상세로 갈 때 userId를 싣는다. 안 실으면 기본값 1로 열려 404다(#126). -->
+                    <a class="link-back"
+                       th:href="@{/reservations/{id}(id=${r.reservationId}, userId=${userId})}">확인·티켓 →</a>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <p class="meta">
+        <a class="link-back" th:href="@{/reservations/lookup}">← 예약번호로 조회</a>
+    </p>
+</main>
+<footer th:replace="~{fragments/page-foot :: foot}"></footer>
+</body>
+</html>
