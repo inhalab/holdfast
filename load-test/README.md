@@ -20,6 +20,9 @@ scenarios/
   deadlock.js          데드락 회피 검증 (7.2.1). 3석을 뒤섞어 보낸다
   sustained.js         지속 경합 시나리오 (7.2.2). 좌석 1석에 계속 겨루게 해
                        4.5.1을 시험한다 (7.5.1)
+  pages.js             **PER-002 화면별 응답시간 (#105).** 서버렌더 화면을 하나씩
+                       열어 3초 기준과 대조한다. classify.js를 쓰지 않는다 —
+                       화면에는 정상 거절이 없다
   lib/
     classify.js        **응답 → 집계 버킷 분류. 측정 해석의 핵심**
     metrics.js         7.1 지표 중 k6가 정본인 것들의 커스텀 메트릭
@@ -34,17 +37,23 @@ sql/
   u2-drop.sql          U-2 삭제 (none 전용)
   verify.sql           **초과 예약 검증 (V-1~V-5) — 출처가 k6가 아니라 DB다**
   verify-sustained.sql V-6 점유 구간 중첩 (지속 경합 전용)
+  pages-fixture.sql    **화면 측정용 데이터 (#105).** 예약 250건·발권·검표.
+                       빈 표를 재면 "조회 결과"를 잰 것이 아니다
 scripts/
   run.sh               측정 프로토콜 실행기 (시드 → 워밍업 → 재초기화 → 측정
                        → 메트릭 캡처 → 검증, 3회 반복)
   run-deadlock.sh      데드락 회피 검증 실행기 (판정: 데드락 0건)
   run-sustained.sh     지속 경합 시나리오 실행기
+  run-pages.sh         **PER-002 화면 측정 실행기 (#105).** 무부하와 부하 중
+                       두 조건. 컨테이너 전수 점검을 중단으로 격상한다
   seed.sh              시드 초기화
   verify.sh            DB 검증 쿼리 실행
   metrics-snapshot.mjs **회차 직후 Actuator 스냅샷 (7.4.2).** 커넥션 풀 +
                        앱 커스텀 메트릭(재시도·소진·제약 위반)
   summarize.mjs        7.6 기록 양식 표 출력 (3회 중앙값)
-                       두 .mjs는 shebang으로 직접 실행한다 — Windows 주의 참조
+  summarize-pages.mjs  **화면별 판정 표 (#105).** 3초까지의 여백을 배수로 찍고
+                       잡음 바닥(2.28배)보다 좁으면 표시한다
+                       .mjs 셋은 shebang으로 직접 실행한다 — Windows 주의 참조
 results/               실행 결과 JSON·검증 출력 (gitignore 대상)
 ```
 
