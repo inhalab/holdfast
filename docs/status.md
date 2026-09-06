@@ -283,6 +283,7 @@ cd api && ./gradlew test                 # 100건
 | [`workflow.md`](workflow.md) | 협업 규칙. 문서 갱신 8개 규칙 |
 | [`infra-decision.md`](infra-decision.md) | AWS 판단. 4절이 "잘라도 되는 것" |
 | [`setup.md`](setup.md) · [`roles.md`](roles.md) · [`demo-script.md`](demo-script.md) | 환경 구축 · 역할 · 시연 대본 |
+| [`submissions/README.md`](submissions/README.md) | 수업 제출물 기록 — **파일은 저장소 밖**이고, 제출물이 담은 판단이 어느 문서에 대응하는지만 적는다 |
 
 **`results/` 아래의 나머지 다섯**은 결론이 아니라 **결론에 이르는 과정**이다.
 "왜 그렇게 판정했나"를 다시 물을 때 여는 것이지 먼저 읽을 것은 아니다.

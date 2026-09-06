@@ -34,6 +34,15 @@ crash.log
 load-test/results/*
 !load-test/results/.gitkeep
 
+# --- 제출물 ---
+# 수업 제출물(PPT 등)은 바이너리라 diff가 안 되고 저장소를 무겁게 만든다.
+# 파일은 저장소 밖에 두고, 무엇을 제출했고 그 판단이 어느 문서에 대응하는지만
+# docs/submissions/README.md에 남긴다.
+#
+# **확장자를 넓게 잡지 않는다.** docs/submissions/* 로 통째로 무시하면 그
+# README까지 걸린다. 새 형식이 오면 한 줄 더한다.
+docs/submissions/*.pptx
+
 # --- IDE / OS ---
 .idea/
 .vscode/
