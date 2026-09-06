@@ -61,7 +61,8 @@ results/               실행 결과 JSON·검증 출력 (gitignore 대상)
 
 ```bash
 # 1) 앱 기동 (앱 2대 + DB + Redis + nginx)
-docker compose up -d
+#    코드를 고쳤으면 ./holdfast rebuild — 다시 빌드하고 응답까지 확인한다 (#128)
+./holdfast up
 
 # 2') 무엇을 고를지 모르겠으면 실행기를 쓴다 (아래 참조)
 load-test/scripts/measure.sh
@@ -383,7 +384,8 @@ load-test/scripts/measure.sh --preset deadlock --yes  # 확인 생략(스크립�
 
 **앱은 이미지로 돌므로 `--build` 없이 `up -d`하면 이미지는 그대로다.** 이 값은
 "그때 트리가 무엇이었나"의 기록이지 이미지의 보증이 아니다. 측정 전에
-`docker compose up -d --build`로 맞춘다.
+`./holdfast rebuild`로 맞춘다 — 다시 빌드한 뒤 **앱이 실제로 응답하는지까지**
+확인한다(#128).
 
 **`summarize.mjs`는 지정이 없으면 가장 최근 세션만 읽는다.**
 

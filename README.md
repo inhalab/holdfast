@@ -114,9 +114,13 @@ docs/        설계 명세, ERD, 측정 결과
 화면에서 `좌석 선택 → 선점 → 결제 → QR 발급 → 검표`를 끝까지 돌려 보는 방법이다.
 
 ```bash
-HOLDFAST_STRATEGY=pessimistic HOLD_TTL_SECONDS=300 docker compose up -d --build
+./holdfast rebuild pessimistic
 docker compose exec -T db psql -U holdfast -d holdfast < infra/demo-seed.sql
 ```
+
+`rebuild`는 이미지를 다시 빌드하고 **앱이 실제로 응답할 때까지 확인한 뒤**
+nginx 설정을 reload한다. 생짜 `docker compose up -d --build`에는 그 확인이
+없어서, 컨테이너 하나가 죽어 있어도 초록불처럼 보인다(이슈 #128).
 
 - 좌석맵 <http://localhost:8080/sessions/1> — 선점하고 결제하면 예약 확인 화면으로 넘어간다
 - 검표 <http://localhost:8080/scan> — 예약 확인 화면의 QR 토큰을 붙여넣는다

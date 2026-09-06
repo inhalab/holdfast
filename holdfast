@@ -29,7 +29,8 @@ holdfast — 실행 진입점
   ./holdfast <커맨드> [인자...]
 
 스택
-  up [전략]            앱 2대 + DB + Redis + nginx 기동. 전략을 주면 그것으로 띄운다
+  up [전략] [--build]  앱 2대 + DB + Redis + nginx 기동. 전략을 주면 그것으로 띄운다
+  rebuild [전략]       up --build 와 같다. **코드를 고쳤으면 이쪽이다**
   down                 전부 내린다
   ps                   컨테이너 상태
   logs [서비스]        로그 (기본 app1)
@@ -50,7 +51,7 @@ holdfast — 실행 진입점
   bundle [출력파일]    판단에 필요한 문서만 zip으로 묶는다 (다른 세션에 넘길 용도)
 
 시연
-  demo [전략]          기동 + 시드 + 화면 주소 안내
+  demo [전략] [--build]  기동 + 시드 + 화면 주소 안내
   strategy <이름>      전략을 바꿔 앱만 다시 띄운다 (약 13초)
   race                 동시 요청 데모 주소를 알려준다
 
@@ -74,8 +75,27 @@ DEMO_HOLD_TTL_SECONDS="${DEMO_HOLD_TTL_SECONDS:-300}"
 # 파일이 바뀌었다고 컨테이너를 다시 만들지 않는다. **실제로 Host 헤더 수정이
 # 하루 넘게 적용되지 않아 리다이렉트에서 포트가 계속 빠졌다.**
 # 이미 최신 설정이면 reload는 아무 일도 하지 않으므로 매번 부른다.
+#
+# **`|| true`가 실패를 삼킨다 — 지금은 안전하지만 순서에 기댄다.** 호출자가
+# 모두 `wait_healthy`를 먼저 부르고, 그 검사는 nginx를 통해 나가므로 nginx가
+# 죽어 있으면 여기 오기 전에 멈춘다. 순서를 바꾸거나 wait_healthy를 건너뛰는
+# 경로가 생기면 그때부터는 조용한 실패가 된다(#128).
 reload_nginx() {
   docker compose exec -T nginx nginx -s reload >/dev/null 2>&1 || true
+}
+
+# **멈춘 컨테이너를 먼저 알린다.** #128의 사고가 이것이었다 — nginx가 내려간
+# 채로 app·db·redis만 running이라 스택이 "떠 있는" 것처럼 보였고, 그 상태로
+# 폐기 측정 4번은 15회 × 120초를 죽은 로드밸런서에 부었다.
+#
+# wait_healthy도 결국 잡아내지만 60초를 기다린 뒤다. 여기서 보면 즉시 보이고,
+# 무엇보다 **무엇이 죽었는지**를 이름으로 알려 준다.
+warn_stopped() {
+  local stopped
+  stopped=$(docker compose ps --all --format '{{.Service}} {{.State}}' 2>/dev/null               | awk '$2 != "running" { print $1 }' | paste -sd' ' -)
+  [ -z "$stopped" ] && return 0
+  echo "[holdfast] !! 이 서비스가 running이 아니다: $stopped" >&2
+  echo "[holdfast]    전체를 다시 올린다 — 골라 띄우면 죽은 채로 남는다." >&2
 }
 
 wait_healthy() {
@@ -104,13 +124,30 @@ cmd="${1:-}"
 case "$cmd" in
   ''|-h|--help|help) usage ;;
 
-  up)
-    strategy="${1:-}"
+  up|rebuild)
+    # **`rebuild`는 `up --build`의 다른 이름이다.** 커맨드 목록에 이름으로
+    # 올라와 있어야 사람이 찾는다 — #128의 원인은 다시 빌드하는 길이 없다는
+    # 것이 아니라 **`holdfast` 안에서 그 길이 보이지 않는다**는 것이었고,
+    # 그래서 점검이 없는 생짜 compose로 샜다.
+    build=""
+    [ "$cmd" = "rebuild" ] && build="--build"
+    strategy=""
+    for a in "$@"; do
+      case "$a" in
+        --build) build="--build" ;;
+        *) strategy="$a" ;;
+      esac
+    done
+
+    warn_stopped
+    # **서비스를 골라 띄우지 않는다.** 앱만 고쳤어도 전체를 올려야 죽어 있던
+    # 컨테이너가 함께 살아난다(#128).
     if [ -n "$strategy" ]; then
-      echo "[holdfast] 전략 $strategy 로 기동한다."
-      HOLDFAST_STRATEGY="$strategy" docker compose up -d
+      echo "[holdfast] 전략 $strategy 로 기동한다.${build:+ (다시 빌드)}"
+      HOLDFAST_STRATEGY="$strategy" docker compose up -d $build
     else
-      docker compose up -d
+      [ -n "$build" ] && echo "[holdfast] 이미지를 다시 빌드한다."
+      docker compose up -d $build
     fi
     wait_healthy
     reload_nginx
@@ -137,9 +174,21 @@ case "$cmd" in
   build) (cd api && ./gradlew build -x test) ;;
 
   demo)
-    strategy="${1:-none}"
-    echo "[holdfast] 시연 준비 — 전략 $strategy · 시나리오 $DEMO_SCENARIO"
-    HOLDFAST_STRATEGY="$strategy" HOLD_TTL_SECONDS="$DEMO_HOLD_TTL_SECONDS"       docker compose up -d
+    # **시연 중에 코드를 고치는 일이 실제로 있었다.** 그때 생짜 compose로 다시
+    # 띄우면 점검이 빠진다 — `--build`를 여기에도 둔다(#128).
+    build=""
+    strategy=""
+    for a in "$@"; do
+      case "$a" in
+        --build) build="--build" ;;
+        *) strategy="$a" ;;
+      esac
+    done
+    strategy="${strategy:-none}"
+
+    echo "[holdfast] 시연 준비 — 전략 $strategy · 시나리오 $DEMO_SCENARIO${build:+ (다시 빌드)}"
+    warn_stopped
+    HOLDFAST_STRATEGY="$strategy" HOLD_TTL_SECONDS="$DEMO_HOLD_TTL_SECONDS"       docker compose up -d $build
     wait_healthy
     reload_nginx
     "$S/seed.sh" "$DEMO_SCENARIO" "$strategy"
@@ -167,6 +216,9 @@ EOF
     case "$s" in none|pessimistic|optimistic|unique|redis) ;;
       *) echo "전략은 none|pessimistic|optimistic|unique|redis 중 하나다: $s" >&2; exit 2 ;; esac
     echo "[holdfast] 전략을 $s 로 바꾼다 — 앱 2대만 다시 띄운다."
+    # **이 경로만 서비스를 골라 띄운다.** 13초에 끝나는 것이 값이라 그렇게 두되,
+    # 골라 띄우면 나머지가 죽은 채로 남으므로 먼저 알린다(#128).
+    warn_stopped
     HOLDFAST_STRATEGY="$s" HOLD_TTL_SECONDS="$DEMO_HOLD_TTL_SECONDS"       docker compose up -d app1 app2
     wait_healthy
     # U-2는 전략에 따라 있고 없다(erd 3.1). 시드가 그 판단을 하므로 함께 돌린다.
