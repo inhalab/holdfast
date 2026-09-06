@@ -107,7 +107,7 @@ M4는 계획보다 두 달 앞당겨 끝났다. **M4의 남은 #42(AWS Fargate)�
 
 | 충족 | SFR-001(동시성) · PER-001 · SIR-004(오류 처리) · DAT-001(ERD) |
 |---|---|
-| 부분 | SFR-002~006 · PER-002 · SIR-002 · TER(테스트 113건) |
+| 부분 | SFR-002~006 · PER-002 · SIR-002 · TER(테스트 114건) |
 | 미구현 | SFR-007(인증) |
 
 ### 의도적으로 제외한 것
@@ -233,7 +233,7 @@ M4는 계획보다 두 달 앞당겨 끝났다. **M4의 남은 #42(AWS Fargate)�
 ./holdfast measure --preset m3-all       # 5전략 × 3시나리오 (45회)
 ./holdfast verify                        # DB 검증 쿼리 V-1~V-5
 ./holdfast summary                       # 결과 요약 (기본: 최신 세션)
-cd api && ./gradlew test                 # 113건
+cd api && ./gradlew test                 # 114건
 ```
 
 ### 화면 주소 (`./holdfast demo` 뒤)
