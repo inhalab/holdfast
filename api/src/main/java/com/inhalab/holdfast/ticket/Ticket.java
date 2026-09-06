@@ -16,8 +16,9 @@ import java.time.Instant;
  * 아니라 예약좌석당 1장인 이유는 erd.md 4절에 있다 — 그래야 검표 시 중복 사용
  * 차단이 {@link TicketScan}의 U-11 하나로 처리된다.
  *
- * <p>발권·검표 도메인은 이 문서 작성 시점에 API 계약이 아직 없다
- * (docs/state-transitions.md 4절 "부분 확정"). 여기서는 스키마 매핑만 정의한다.
+ * <p>발권·검표 계약은 {@code docs/openapi.yaml}에 있다 —
+ * {@code GET /api/reservations/{id}/tickets}와 {@code POST /api/tickets/scan}이다.
+ * 상태 전이는 {@code docs/state-transitions.md} 4절이 확정했다(#80·#87).
  */
 @Entity
 @Table(name = "ticket")
