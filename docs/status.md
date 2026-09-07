@@ -132,7 +132,7 @@ M4는 계획보다 두 달 앞당겨 끝났다. **M4의 남은 #42(AWS Fargate)�
 
 | 충족 | SFR-001(동시성) · PER-001 · SIR-004(오류 처리) · DAT-001(ERD) |
 |---|---|
-| 부분 | SFR-002~006 · **PER-002**(화면별로 다 쟀고 전부 통과 — 남은 것은 없는 화면 둘) · SIR-002 · TER(테스트 123건) |
+| 부분 | SFR-002~006 · **PER-002**(화면별로 다 쟀고 전부 통과 — 남은 것은 없는 화면 둘) · SIR-002 · TER(테스트 127건) |
 | 미구현 | SFR-007(인증) |
 
 ### 의도적으로 제외한 것
@@ -182,6 +182,7 @@ M4는 계획보다 두 달 앞당겨 끝났다. **M4의 남은 #42(AWS Fargate)�
 | **적용된 Flyway 마이그레이션은 주석도 안 고친다** | 체크섬이 바뀌어 기존 DB가 기동을 거부한다 |
 | **PR을 쌓지 않는다** (R8) | squash로 해시가 달라져 같은 내용이 충돌하고, base 브랜치가 지워지면 되살릴 수 없다 — [`workflow.md`](workflow.md) |
 | **`/demo/**`는 끌 수 있고 기본값은 켬이다** | `holdfast.demo.enabled=false`로 끈다. 되돌리기가 한 회차의 좌석·홀드·예약을 지우므로 **로컬 시연 밖에서 켜 두지 않는다**. 기본값이 켬인 것은 이 프로젝트의 실행 환경이 로컬 Docker Compose뿐이기 때문이다(`infra-decision.md` 2절) — [`scope-m4.md`](scope-m4.md) 7절 |
+| **실행기는 전략 이름을 검증한다** | `holdfast`가 전략 하나만 받고 다섯 중 하나인지 본다. 안 하면 없는 이름이 그대로 `HOLDFAST_STRATEGY`로 나가고 **조건에 맞는 빈이 0개가 되어 앱이 기동하지 못한다**. 실제로 `extreme`(경합도 시나리오)이 들어가 main이 안 떴다 — #143 |
 | **`/admin/**`은 아무나 연다. 배포하면 끈다** | 인증이 없다. 로컬은 노출이 없어 그대로 두고, #42(AWS)로 뜨면 `holdfast.admin.enabled=false`로 **경로 자체를 없앤다** — 잠그는 것이 아니다. 네 수단을 따져 그것을 고른 근거는 [`infra-decision.md`](infra-decision.md) 3.1. 구현은 #124 |
 
 ---
@@ -268,7 +269,7 @@ M4는 계획보다 두 달 앞당겨 끝났다. **M4의 남은 #42(AWS Fargate)�
 ./holdfast measure --preset m3-all       # 5전략 × 3시나리오 (45회)
 ./holdfast verify                        # DB 검증 쿼리 V-1~V-5
 ./holdfast summary                       # 결과 요약 (기본: 최신 세션)
-cd api && ./gradlew test                 # 123건
+cd api && ./gradlew test                 # 127건
 ```
 
 ### 화면 주소 (`./holdfast demo` 뒤)
