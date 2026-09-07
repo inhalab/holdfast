@@ -14,8 +14,13 @@
         <a th:href="@{/programs}">프로그램</a>
         <a th:href="@{/reservations/lookup}">예약 조회</a>
         <a th:href="@{/scan}">검표</a>
-        <a th:href="@{/demo/race}">동시성 데모</a>
-        <a th:href="@{/admin/programs}">관리자</a>
+        <!--
+          **로컬에서만 켜지는 화면이라 링크도 조건부다**(이슈 #124, 판정 #138).
+          컨트롤러가 @ConditionalOnProperty로 사라지므로, 링크만 남으면 404다.
+          두 값은 PageModelAdvice가 한 곳에서 읽어 넘긴다.
+        -->
+        <a th:if="${demoEnabled}" th:href="@{/demo/race}">동시성 데모</a>
+        <a th:if="${adminEnabled}" th:href="@{/admin/programs}">관리자</a>
     </nav>
     <span class="instance-badge" title="이 페이지를 처리한 앱 인스턴스">
         <span th:text="${instanceId}">app1</span>

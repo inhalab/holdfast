@@ -7,6 +7,7 @@ import com.inhalab.holdfast.admin.SeatRow;
 import com.inhalab.holdfast.seat.SeatLayout;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -36,6 +37,12 @@ import java.util.stream.Collectors;
  * 검증 실패는 그 응답에서 바로 그린다.
  */
 @Controller
+// **배포하면 끈다 - 잠그는 것이 아니라 없애는 것이다**(이슈 #124, 판정 #138).
+// 인증이 없어 이 경로는 누구나 여는데, 그 사실은 로컬에서 바뀌지 않는다.
+// false면 빈이 아예 만들어지지 않아 경로가 없다 - 측정 경로에 필터가
+// 붙지 않는 것이 Spring Security를 뺀 이유다.
+@ConditionalOnProperty(name = "holdfast.admin.enabled",
+        havingValue = "true", matchIfMissing = true)
 public class AdminSeatLayoutPageController {
 
     private final AdminSeatLayoutRepository layoutRepository;
