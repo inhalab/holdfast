@@ -34,9 +34,35 @@ public class PageModelAdvice {
     @Value("${holdfast.instance-id:unknown}")
     private String instanceId;
 
+    /**
+     * 로컬에서만 켜지는 화면(이슈 #124, 판정은 #138). 바닥 내비게이션이 이 값으로
+     * 링크를 감춘다.
+     *
+     * <p><b>같은 프로퍼티를 컨트롤러와 화면이 나눠 쓴다.</b> {@code DemoRaceController}와
+     * 관리자 컨트롤러 셋은 {@code @ConditionalOnProperty}로 빈 자체가 만들어지지 않고,
+     * 화면은 여기서 받은 값으로 링크를 지운다. <b>각자 읽게 두면 한쪽만 바뀌어
+     * "링크는 있는데 404"가 된다</b> — 그래서 화면이 읽는 자리를 이 클래스 하나로
+     * 모으고, 둘이 함께 움직이는지는 {@code LocalOnlyScreenTest}가 지킨다.
+     */
+    @Value("${holdfast.demo.enabled:true}")
+    private boolean demoEnabled;
+
+    @Value("${holdfast.admin.enabled:true}")
+    private boolean adminEnabled;
+
     /** 이 요청을 처리한 앱 인스턴스. 모든 화면의 바닥에 찍힌다. */
     @ModelAttribute("instanceId")
     public String instanceId() {
         return instanceId;
+    }
+
+    @ModelAttribute("demoEnabled")
+    public boolean demoEnabled() {
+        return demoEnabled;
+    }
+
+    @ModelAttribute("adminEnabled")
+    public boolean adminEnabled() {
+        return adminEnabled;
     }
 }

@@ -71,6 +71,11 @@ services:
       # 기본 approve는 7.3 고정 변수다. 락 측정 중에는 바꾸지 않는다.
       MOCK_PG_OUTCOME: ${MOCK_PG_OUTCOME:-approve}
       MOCK_PG_APPROVE_RATIO: ${MOCK_PG_APPROVE_RATIO:-0.8}
+      # 로컬 전용 화면(#124, 판정 #138). 기본 켬이고 배포에서 끈다.
+      # **앱 2대가 반드시 같아야 한다** — 한쪽만 끄면 nginx가 어느 쪽으로
+      # 보냈는지에 따라 200과 404가 번갈아 나온다.
+      HOLDFAST_DEMO_ENABLED: ${HOLDFAST_DEMO_ENABLED:-true}
+      HOLDFAST_ADMIN_ENABLED: ${HOLDFAST_ADMIN_ENABLED:-true}
       REDIS_HOST: redis
       REDIS_PORT: 6379
     depends_on:
@@ -103,6 +108,11 @@ services:
       # 기본 approve는 7.3 고정 변수다. 락 측정 중에는 바꾸지 않는다.
       MOCK_PG_OUTCOME: ${MOCK_PG_OUTCOME:-approve}
       MOCK_PG_APPROVE_RATIO: ${MOCK_PG_APPROVE_RATIO:-0.8}
+      # 로컬 전용 화면(#124, 판정 #138). 기본 켬이고 배포에서 끈다.
+      # **앱 2대가 반드시 같아야 한다** — 한쪽만 끄면 nginx가 어느 쪽으로
+      # 보냈는지에 따라 200과 404가 번갈아 나온다.
+      HOLDFAST_DEMO_ENABLED: ${HOLDFAST_DEMO_ENABLED:-true}
+      HOLDFAST_ADMIN_ENABLED: ${HOLDFAST_ADMIN_ENABLED:-true}
       REDIS_HOST: redis
       REDIS_PORT: 6379
     depends_on:

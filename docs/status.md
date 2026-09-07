@@ -183,7 +183,7 @@ M4는 계획보다 두 달 앞당겨 끝났다. **M4의 남은 #42(AWS Fargate)�
 | **PR을 쌓지 않는다** (R8) | squash로 해시가 달라져 같은 내용이 충돌하고, base 브랜치가 지워지면 되살릴 수 없다 — [`workflow.md`](workflow.md) |
 | **`/demo/**`는 끌 수 있고 기본값은 켬이다** | `holdfast.demo.enabled=false`로 끈다. 되돌리기가 한 회차의 좌석·홀드·예약을 지우므로 **로컬 시연 밖에서 켜 두지 않는다**. 기본값이 켬인 것은 이 프로젝트의 실행 환경이 로컬 Docker Compose뿐이기 때문이다(`infra-decision.md` 2절) — [`scope-m4.md`](scope-m4.md) 7절 |
 | **실행기는 전략 이름을 검증한다** | `holdfast`가 전략 하나만 받고 다섯 중 하나인지 본다. 안 하면 없는 이름이 그대로 `HOLDFAST_STRATEGY`로 나가고 **조건에 맞는 빈이 0개가 되어 앱이 기동하지 못한다**. 실제로 `extreme`(경합도 시나리오)이 들어가 main이 안 떴다 — #143 |
-| **`/admin/**`은 아무나 연다. 배포하면 끈다** | 인증이 없다. 로컬은 노출이 없어 그대로 두고, #42(AWS)로 뜨면 `holdfast.admin.enabled=false`로 **경로 자체를 없앤다** — 잠그는 것이 아니다. 네 수단을 따져 그것을 고른 근거는 [`infra-decision.md`](infra-decision.md) 3.1. 구현은 #124 |
+| **`/admin/**`은 아무나 연다. 배포하면 끈다** | 인증이 없다. 로컬은 노출이 없어 그대로 두고, #42(AWS)로 뜨면 `holdfast.admin.enabled=false`로 **경로 자체를 없앤다** — 잠그는 것이 아니다. 네 수단을 따져 그것을 고른 근거는 [`infra-decision.md`](infra-decision.md) 3.1. **구현됐다(#124)** — `false`면 컨트롤러 셋의 빈이 만들어지지 않아 경로가 404이고, 바닥 내비의 링크도 같은 값으로 사라진다 |
 
 ---
 
