@@ -37,13 +37,31 @@ docker compose exec -T db psql -U holdfast -d holdfast < infra/demo-seed.sql
 **2절은 `pessimistic`에서 한다.** `none`은 만료된 홀드를 회수하지 않는 것이
 베이스라인의 정의라(`erd.md` 4.1), 예약 한 바퀴를 도는 동안 좌석 상태가 어긋난다.
 
-브라우저 탭을 미리 열어 둔다 — 시연 중 주소를 타이핑하지 않는다.
+**탭은 `./holdfast demo`가 연다.** 시연 중 주소를 타이핑하지 않는다. 아래 셋을
+이 순서로 열므로 **왼쪽부터 탭 1·2·3**이고, 이 문서가 부르는 번호와 같다.
 
-| 탭 | 주소 |
-|---|---|
-| 1 | <http://localhost:8080/> — 프로그램 목록. `/programs`도 같은 화면이다 |
-| 2 | <http://localhost:8080/demo/race> |
-| 3 | <http://localhost:8080/admin/programs> |
+| 탭 | 주소 | 쓰는 절 |
+|---|---|---|
+| 1 | <http://localhost:8080/> — 프로그램 목록. `/programs`도 같은 화면이다 | 2절 |
+| 2 | <http://localhost:8080/demo/race> | **1절 — 여기서 시작한다** |
+| 3 | <http://localhost:8080/admin/programs> | 3절 |
+
+**대본도 함께 열린다.** `docs/demo-script.md`를 HTML로 만들어 띄운다 —
+표와 코드 블록이 원문보다 훨씬 읽힌다. 렌더링은 의존성이 없어 네트워크가 없어도
+된다(`tools/render-md.mjs`).
+
+**여는 것이 기본이고 끄는 길이 있다.**
+
+```bash
+./holdfast demo none --no-open       # 주소만 출력한다
+```
+
+**열기에 실패해도 준비는 끝난다.** 브라우저를 여는 명령(`start`·`open`·
+`xdg-open`)이 없거나 `node`가 없으면 그 사실을 알리고 주소·경로를 출력한 채
+넘어간다. 편의 하나 때문에 준비 명령이 멈추지는 않는다.
+
+**전략만 바꿀 때는 `./holdfast strategy`를 쓴다** — `demo`를 다시 부르면 탭이
+세 개씩 늘어난다.
 
 ---
 

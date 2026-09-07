@@ -40,6 +40,7 @@ docker compose up --build
 ```bash
 ./holdfast up          # 기동 + 응답 확인 + nginx reload
 ./holdfast rebuild     # 코드를 고쳤을 때
+./holdfast demo        # 시연 준비 — 위에 더해 시드 + 대본 탭 셋과 대본을 연다
 ```
 
 둘의 차이는 **앱이 실제로 응답할 때까지 확인하느냐**다. 생짜 compose는

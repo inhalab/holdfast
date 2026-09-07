@@ -106,6 +106,7 @@ DB 제약이 받아냈다. 분산락은 성능 최적화이지 정합성 보장�
 api/         애플리케이션 (Thymeleaf 템플릿 포함)
 infra/       Terraform, 배포
 load-test/   k6 시나리오
+tools/       저장소 도구 — 의존성 없는 마크다운 렌더러 (시연 대본용)
 docs/        설계 명세, ERD, 측정 결과
 ```
 
@@ -138,7 +139,8 @@ nginx 설정을 reload한다. 생짜 `docker compose up -d --build`에는 그 �
 ```bash
 ./holdfast                       # 서브커맨드 목록
 ./holdfast up                    # 스택 기동 (앱이 응답할 때까지 기다린다)
-./holdfast demo none             # 시연 준비 — 기동 + 시드 + 화면 주소 안내
+./holdfast demo none             # 시연 준비 — 기동 + 시드 + **대본 탭 셋과 대본을 연다**
+./holdfast demo none --no-open   # 열지 않고 주소만 출력한다
 ./holdfast measure               # 측정 실행기 (대화형)
 ./holdfast test                  # cd api && ./gradlew test
 ./holdfast summary               # 결과 요약 표
