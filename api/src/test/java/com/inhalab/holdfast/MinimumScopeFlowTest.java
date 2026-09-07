@@ -429,6 +429,89 @@ class MinimumScopeFlowTest {
         assertSeatInventory("AVAILABLE");
     }
 
+    /**
+     * <b>취소는 결제 이력을 바꾸지 않는다.</b> 이슈 #106의 판정을 행동으로 고정한다.
+     *
+     * <p>#106은 취소 시 결제를 환불 상태로 전이시키자는 이슈였고, <b>두지 않기로
+     * 판정됐다</b>({@code erd.md} 4절). 요지는 환불 상태가
+     * {@code reservation.status='CANCELLED'}와 {@code payment.status='APPROVED'}의
+     * <b>순수 함수라 새 사실을 담지 않는다</b>는 것이다.
+     *
+     * <p><b>그 판정이 코드에만 있으면 다음 사람이 다르게 고친다.</b> 취소 경로에
+     * 결제 상태 전이를 넣으면 이 테스트가 깨지고, 깨진 사람이 그 문단으로 온다 —
+     * 바로 위 {@code scanAfterCancellationIsRejected}가 {@code VOID}를 두지 않은
+     * 판단을 "티켓은 여전히 ISSUED다"로 고정하는 것과 같은 자리다.
+     */
+    @Test
+    @DisplayName("취소해도 결제 행은 APPROVED 그대로다 — 환불 상태를 두지 않는다 (#106)")
+    void cancellationDoesNotTouchPayment() throws Exception {
+        when(gateway.decide()).thenReturn(PaymentStatus.APPROVED);
+        String holdId = createHold(SESSION_ID).get("holdId").asText();
+        long reservationId = pay(holdId).get("reservationId").asLong();
+        assertThat(one("SELECT status FROM payment WHERE reservation_id = ?", reservationId))
+                .isEqualTo("APPROVED");
+
+        mvc.perform(post("/api/reservations/{id}/cancel", reservationId)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .header("X-User-Id", USER_ID))
+                .andExpect(status().isOk());
+
+        // 예약 쪽에만 취소가 적힌다. 같은 사실을 두 곳에서 지키지 않는다(erd 4절).
+        assertThat(one("SELECT status FROM reservation WHERE id = ?", reservationId))
+                .isEqualTo("CANCELLED");
+        assertThat(one("SELECT status FROM payment WHERE reservation_id = ?", reservationId))
+                .isEqualTo("APPROVED");
+
+        // **행이 늘지도 않는다.** 환불을 새 결제 시도로 표현하는 것도 같은 판정에
+        // 걸린다 — 결제는 예약당 N건이라(erd 4절) 행을 더하는 길이 열려 있다.
+        assertThat(count("SELECT count(*) FROM payment WHERE reservation_id = " + reservationId))
+                .isEqualTo(1);
+    }
+
+    /**
+     * <b>재취소는 200과 기존 결과를 낸다.</b> {@code api-spec.md} 6.1의 설계이며,
+     * <b>CS-4의 이중 반환을 막는 것도 이 성질이다</b> — 예약이 이미
+     * {@code CANCELLED}면 그 앞에서 돌아가므로 좌석 반환도 할당량 복구도 두 번
+     * 일어나지 않는다.
+     *
+     * <p>{@code requirements.md} 3절이 "CS-4에 별도 REQ가 필요한지"를 열어 두었고,
+     * 취소 경로를 다시 여는 이 PR이 그 조건을 판정하는 자리다({@code workflow.md}
+     * R6). <b>취소 흐름에 상태가 늘지 않았으므로 여전히 REQ-04 안에서 다뤄진다.</b>
+     */
+    @Test
+    @DisplayName("재취소는 200과 기존 결과 — 좌석도 할당량도 두 번 돌아오지 않는다")
+    void secondCancelIsIdempotent() throws Exception {
+        when(gateway.decide()).thenReturn(PaymentStatus.APPROVED);
+        String holdId = createHold(SESSION_ID).get("holdId").asText();
+        long reservationId = pay(holdId).get("reservationId").asLong();
+
+        cancel(reservationId);
+        String cancelledAt = one("SELECT cancelled_at::text FROM reservation WHERE id = ?", reservationId);
+        long quotaAfterFirst = Long.parseLong(one(
+                "SELECT held_count::text FROM user_session_quota WHERE session_id = ? AND user_id = ?",
+                SESSION_ID, Long.valueOf(USER_ID)));
+
+        // 두 번째 취소도 200이다. 재시도가 실패로 보이면 안 된다(api-spec 6.1).
+        cancel(reservationId);
+
+        assertSeatInventory("AVAILABLE");
+        // **취소 시각이 덮이지 않는다.** 덮이면 두 번째 호출이 실제로 취소를 다시
+        // 수행했다는 뜻이고, 그러면 좌석 반환도 다시 돌았을 것이다.
+        assertThat(one("SELECT cancelled_at::text FROM reservation WHERE id = ?", reservationId))
+                .isEqualTo(cancelledAt);
+        // 할당량이 음수로 내려가지 않는다 — 이중 반환이 없다는 것이 여기서 보인다.
+        assertThat(one("SELECT held_count::text FROM user_session_quota WHERE session_id = ? AND user_id = ?",
+                SESSION_ID, Long.valueOf(USER_ID)))
+                .isEqualTo(String.valueOf(quotaAfterFirst));
+    }
+
+    private void cancel(long reservationId) throws Exception {
+        mvc.perform(post("/api/reservations/{id}/cancel", reservationId)
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .header("X-User-Id", USER_ID))
+                .andExpect(status().isOk());
+    }
+
     @Test
     @DisplayName("없는 QR 토큰은 REJECTED_INVALID이고 이력을 남기지 않는다")
     void unknownTokenIsRejectedAsInvalid() throws Exception {
