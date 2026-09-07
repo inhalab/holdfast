@@ -43,6 +43,14 @@ load-test/results/*
 # README까지 걸린다. 새 형식이 오면 한 줄 더한다.
 docs/submissions/*.pptx
 
+# --- 시연 대본 렌더링 결과 ---
+# `./holdfast demo`가 docs/demo-script.md를 HTML로 만들어 build/에 둔다(#146).
+# **생성물이라 커밋하지 않는다** — 원문이 바뀌면 달라지고, 원문이 정본이다.
+#
+# 위 `build/` 한 줄에 이미 걸리지만 그 줄은 Gradle 산출물을 위한 것이다.
+# 우연히 걸리는 것과 그러기로 정한 것은 다르므로 여기 적는다.
+build/demo-script.html
+
 # --- IDE / OS ---
 .idea/
 .vscode/
