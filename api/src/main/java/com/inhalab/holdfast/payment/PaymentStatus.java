@@ -6,6 +6,22 @@ package com.inhalab.holdfast.payment;
  * <p>{@code CANCELLED}는 없다 — {@code payment} 행은 한 번 종결되면 바뀌지 않는
  * 이력이고, 결제 취소는 {@code reservation.status}가 담당한다(erd.md 4절).
  *
+ * <h2>환불 상태도 없다 — 이슈 #106에서 다시 검토하고 유지했다</h2>
+ *
+ * <p>#106이 요구한 것이 이 열거형에 환불 상태를 더하는 일이었고, <b>더하지 않기로
+ * 판정했다.</b> 근거 넷은 erd.md 4절에 있으며 요지는 하나다 — <b>환불 상태는
+ * {@code reservation.status='CANCELLED'}와 이 행의 {@code APPROVED}의 순수
+ * 함수라 새 사실을 담지 않는다.</b> 부분취소가 없어 금액이 갈리지 않고, 실제
+ * PG가 없어 환불이 실패할 수 없으며, 시각은 {@code cancelled_at}이 들고 있다.
+ *
+ * <p><b>{@link com.inhalab.holdfast.ticket.TicketStatus}의 {@code VOID}와 같은
+ * 모양이다.</b> 둘 다 설계 단계에 잡았다가 뺐고, 뺀 자리를 조회 시점의 판정이
+ * 메우며, 둘 다 취소 트랜잭션에 쓰기를 더하지 않아 CS-4의 임계 구역을 늘리지
+ * 않는다.
+ *
+ * <p>이 판단은 {@code MinimumScopeFlowTest#cancellationDoesNotTouchPayment}가
+ * 고정한다 — 취소해도 이 행은 {@code APPROVED} 그대로다.
+ *
  * <p>다섯 값을 모두 선언하지만 <b>최소 완결에서 실제로 도달하는 것은
  * {@code REQUESTED → APPROVED|DECLINED}뿐</b>이다(#79). 나머지 둘을 지금 빼면
  * 여유 항목을 구현할 때 열거형을 고쳐야 하고, DB {@code payment.status}는 이미

@@ -31,7 +31,7 @@
 | REQ-01 | 동시 예약 요청 시 정원·좌석 초과 확정 방지 | 국립 SFR-001 | `seat_inventory`, `seat_hold`, `reservation`, `reservation_seat` | `POST /api/holds`, `POST /api/reservations` | 단위 경합 테스트 5종(`*SeatHoldStrategyConcurrencyTest`) + 부하 측정 60회 + DB 검증 V-1 | **초과 예약 0건** | **충족** — `none` 제외 4개 전략 V-1 0(각 9회 전부). `none`은 고경합 4석으로 실패 증거를 냈다 |
 | REQ-02 | 실시간 잔여 좌석 검증 및 표시 | 국립 SFR-001, SFR-006 | `program`, `event_session`, `seat_inventory` | `GET /api/sessions/{id}/seats`, `GET /api/sessions/{id}/seats/status` | `SeatMapPageControllerTest`(렌더) + 단위 흐름 테스트 `MinimumScopeFlowTest`(좌석맵 렌더 + AVAILABLE→HELD→SOLD 전이) | — | **부분** — 조회 API·`ETag`/304·htmx fragment가 구현됐고 상태 전이가 화면에 반영되는 것까지 확인했다. **폴링 부하는 측정에 넣지 않았다**(`api-spec.md` 8.1). 접수종료 노출 정책은 `design-spec` 5.6에 정하고 `catalog/SaleState`로 구현했다(#108) |
 | REQ-03 | 중복 예약 방지 / 1인 최대 매수 제한 | 국립 SFR-001 | `seat_hold`, `user_session_quota`, `reservation`, `idempotency_record` | `POST /api/holds`, `POST /api/reservations` (둘 다 `Idempotency-Key` 필수) | 부하 측정 + DB 검증 V-3 | — | **충족(부하 측정 기준)** — 60회 전부 V-3 0. 전용 단위 경합 테스트는 없다(REQ-11 참조) |
-| REQ-04 | 예약·결제 상태 정합성 검증 | 국립 SFR-002 | `reservation`, `payment`, `idempotency_record` | `POST /api/reservations`, `GET /api/reservations/{id}`, `POST /api/reservations/{id}/cancel` | DB 검증 V-4(재고-예약 불일치)가 예약 축만 덮는다 + 단위 흐름 테스트 `MinimumScopeFlowTest`(승인·거절·재시도 경로) | — | **충족** — 승인 시 예약 `CONFIRMED`, 거절 시 `HELD` 유지, 재시도가 새 `payment` 행을 만드는 것까지 확인했다. 콜백·`TIMEOUT`은 여유 항목이라 미구현 |
+| REQ-04 | 예약·결제 상태 정합성 검증 | 국립 SFR-002 | `reservation`, `payment`, `idempotency_record` | `POST /api/reservations`, `GET /api/reservations/{id}`, `POST /api/reservations/{id}/cancel` | DB 검증 V-4(재고-예약 불일치)가 예약 축만 덮는다 + 단위 흐름 테스트 `MinimumScopeFlowTest`(승인·거절·재시도 경로, **취소가 결제 이력을 바꾸지 않는 것과 재취소 멱등** — #106) | — | **충족** — 승인 시 예약 `CONFIRMED`, 거절 시 `HELD` 유지, 재시도가 새 `payment` 행을 만드는 것까지 확인했다. 콜백·`TIMEOUT`은 여유 항목이라 미구현 |
 | REQ-05 | 알림 발송 재시도 및 중복 발송 방지 | 국립 SFR-003 | `outbox` | 없음 — Outbox는 서버 내부 워커이며 외부 API가 아니다 (`api-spec.md` 7절) | 단위 경합 테스트 `OutboxConcurrencyTest` — 워커 8개 동시 실행 / 재시도 / 상한 소진 / 확정 트랜잭션과의 원자성 + 단위 흐름 테스트 `MinimumScopeFlowTest`(확정 트랜잭션이 `outbox` 행을 넣는지) | **중복 발송 0건** | **충족** — 알림 200건이 정확히 한 번씩 발송된다. 확정 시 INSERT는 확정과 같은 트랜잭션이며 롤백으로 확인한다(이슈 #78, `concurrency-spec.md` 6.1) |
 | REQ-06 | 회차별 입장 가능시간 검증 및 검표 처리 | 국립 SFR-004 | `event_session`, `ticket_scan` | `POST /api/tickets/scan`, `GET /scan`(검표 화면) | 단위 흐름 테스트 `MinimumScopeFlowTest`(입장 창 밖 스캔 `REJECTED_TIME`, 중복 스캔 `REJECTED_DUPLICATE`) | **중복 사용 0건** | **충족** — U-11이 티켓당 `ADMITTED` 1건으로 제한하고 거절은 이력으로 남는다 |
 | REQ-07 | QR 모바일 티켓 발급 | 궁능 SFR-03 | `ticket` | `GET /api/reservations/{id}/tickets`, `GET /reservations/{id}`(예약 확인 화면) | 단위 흐름 테스트 `MinimumScopeFlowTest`(발급 → 조회 → 스캔) | — | **충족** — 결제 승인과 같은 트랜잭션에서 발급되고, 화면과 API로 조회되며, 스캔에 쓰인다 |
@@ -143,8 +143,21 @@ REQ-04의 결제 축) — **구현하고 `MinimumScopeFlowTest`로 검증했다.
 임계 구역 표에는 있지만, CS-6·erd 4.1과 달리 별도의 확정된 해결 절차 문서가 없다.
 이중 반환 방지는 REQ-04(예약·결제 상태 정합성 검증)의 취소 흐름 안에서 이미 다뤄지는
 것으로 본다. `POST /api/reservations/{id}/cancel`이 멱등하게 설계된 것(재취소 시 200과
-기존 결과 반환, `api-spec.md` 6.1절)이 그 처리다. 별도 REQ가 필요하다고 판단되면 이후
-갱신한다.
+기존 결과 반환, `api-spec.md` 6.1절)이 그 처리다.
+
+> **이 조건을 #106에서 판정했다 — 여전히 REQ-04 안에서 다뤄진다.** 위 문단은
+> "별도 REQ가 필요하다고 판단되면 이후 갱신한다"로 열려 있었고, 취소 경로를 다시
+> 여는 PR이 그 조건을 판정할 자리다(`workflow.md` R6).
+>
+> **판정 근거는 취소 흐름에 상태가 늘지 않았다는 것이다.** #106은 환불 상태를 더하는
+> 이슈였으나 **두지 않기로 판정됐다**(`erd.md` 4절). 취소 트랜잭션이 건드리는 것은
+> 그대로 넷이다 — `seat_inventory`·`seat_hold`·`reservation`·`user_session_quota`.
+> **이중 반환을 막는 것도 그대로 하나다** — 예약이 이미 `CANCELLED`면 그 앞에서
+> 돌아가므로 좌석 반환이 두 번 일어나지 않는다. 그 성질을 `MinimumScopeFlowTest`가
+> 재취소 테스트로 고정했다.
+>
+> **다시 열어야 할 조건은 취소 경로에 쓰기가 늘어날 때다.** 그때는 "이미 취소됐는가"
+> 하나로 전부를 막을 수 없게 되고, CS-4가 자기 절차를 갖게 된다.
 
 ---
 
