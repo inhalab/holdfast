@@ -22,6 +22,61 @@ export MSYS_NO_PATHCONV=1
 # (load-test/README의 Windows 주의). env는 셸 별칭을 지나지 않는다.
 node_run() { env -u MSYS_NO_PATHCONV node "$@"; }
 
+# **전략 다섯.** 정본은 각 구현의 `@ConditionalOnProperty(havingValue = ...)`이고
+# 이 목록은 그것을 옮긴 것이다. 둘이 어긋나면
+# `api/.../reservation/StrategyArgumentTest`가 깨진다 — 유효 값을 두 곳에서
+# 지키게 됐으므로 그것을 테스트로 묶는다(erd.md 4절의 원칙).
+STRATEGIES="none pessimistic optimistic unique redis"
+
+# **전략 인자를 검증한다.** 안 하면 없는 이름이 그대로 HOLDFAST_STRATEGY로 나가고,
+# 앱은 조건에 맞는 빈이 하나도 없어 기동에 실패한다(#143).
+#
+# **위치 인자를 하나로 제한하는 것이 절반이다.** 예전 파싱은 몇 개든 받아
+# **마지막 것이 앞의 것을 조용히 덮었다.** `seed <시나리오> <전략>`은 인자를 둘
+# 받고 순서도 반대라, 그 손버릇으로 `up none extreme`을 치면 전략이 `extreme`이
+# 된다 — `extreme`은 전략이 아니라 경합도 시나리오다(concurrency-spec 7.2).
+#
+# 전역 `strategy`·`build`를 채운다.
+parse_strategy_args() {
+  build=""
+  strategy=""
+  for a in "$@"; do
+    case "$a" in
+      --build) build="--build" ;;
+      -*)
+        echo "[holdfast] !! 모르는 옵션이다: $a" >&2
+        exit 2
+        ;;
+      *)
+        if [ -n "$strategy" ]; then
+          echo "[holdfast] !! 인자가 둘이다: '$strategy' 와 '$a'" >&2
+          echo "[holdfast]    이 커맨드는 전략 하나만 받는다. 시나리오는 받지 않는다." >&2
+          echo "[holdfast]    seed·measure 는 시나리오를 받으므로 인자 수가 다르다:" >&2
+          echo "[holdfast]      ./holdfast seed <시나리오> <전략>   (시나리오가 먼저다)" >&2
+          exit 2
+        fi
+        strategy="$a"
+        ;;
+    esac
+  done
+
+  [ -z "$strategy" ] && return 0
+  case " $STRATEGIES " in
+    *" $strategy "*) return 0 ;;
+  esac
+
+  echo "[holdfast] !! '$strategy' 는 전략이 아니다." >&2
+  echo "[holdfast]    전략: $STRATEGIES" >&2
+  case " low high extreme sustained " in
+    *" $strategy "*)
+      echo "[holdfast]    '$strategy' 는 **경합도 시나리오**다(concurrency-spec 7.2)." >&2
+      echo "[holdfast]    시나리오를 쓰는 곳은 seed·measure·deadlock 쪽이다." >&2
+      ;;
+  esac
+  echo "[holdfast]    그대로 띄우면 조건에 맞는 전략 빈이 없어 앱이 기동하지 못한다(#143)." >&2
+  exit 2
+}
+
 usage() {
   cat <<'USAGE'
 holdfast — 실행 진입점
@@ -31,6 +86,8 @@ holdfast — 실행 진입점
 스택
   up [전략] [--build]  앱 2대 + DB + Redis + nginx 기동. 전략을 주면 그것으로 띄운다
   rebuild [전략]       up --build 와 같다. **코드를 고쳤으면 이쪽이다**
+                       전략은 하나만 받는다 — none|pessimistic|optimistic|unique|redis
+                       시나리오(low·high·extreme)를 여기 주면 거부한다(#143)
   down                 전부 내린다
   ps                   컨테이너 상태
   logs [서비스]        로그 (기본 app1)
@@ -129,15 +186,8 @@ case "$cmd" in
     # 올라와 있어야 사람이 찾는다 — #128의 원인은 다시 빌드하는 길이 없다는
     # 것이 아니라 **`holdfast` 안에서 그 길이 보이지 않는다**는 것이었고,
     # 그래서 점검이 없는 생짜 compose로 샜다.
-    build=""
+    parse_strategy_args "$@"
     [ "$cmd" = "rebuild" ] && build="--build"
-    strategy=""
-    for a in "$@"; do
-      case "$a" in
-        --build) build="--build" ;;
-        *) strategy="$a" ;;
-      esac
-    done
 
     warn_stopped
     # **서비스를 골라 띄우지 않는다.** 앱만 고쳤어도 전체를 올려야 죽어 있던
@@ -176,14 +226,7 @@ case "$cmd" in
   demo)
     # **시연 중에 코드를 고치는 일이 실제로 있었다.** 그때 생짜 compose로 다시
     # 띄우면 점검이 빠진다 — `--build`를 여기에도 둔다(#128).
-    build=""
-    strategy=""
-    for a in "$@"; do
-      case "$a" in
-        --build) build="--build" ;;
-        *) strategy="$a" ;;
-      esac
-    done
+    parse_strategy_args "$@"
     strategy="${strategy:-none}"
 
     echo "[holdfast] 시연 준비 — 전략 $strategy · 시나리오 $DEMO_SCENARIO${build:+ (다시 빌드)}"
