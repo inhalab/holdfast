@@ -307,6 +307,11 @@ URL을 만드는 문제와는** 무관하다. Thymeleaf의 `@{...}`도 컨텍스
 > 그 결과 `Location`을 nginx 너머에서 읽는 확인은 이제 `curl` 한 줄이면 된다.
 > **하지 않기로 한 판단은 위 문장(대응이 곧지 않다)만으로 성립하므로 유지한다.**
 
+**ALB 줄은 아직 비어 있다.** 배포하면 한 줄이 더 붙는다 —
+`infra-decision.md` 3.2가 그 자리를 만들어 두었다. ALB는 `Location`을 그대로
+흘리므로 앱이 낸 상대 경로가 곧 정답이 되고, `use-relative-redirects`가 **값을
+하는 곳이 거기다**.
+
 **대신 표를 남긴다.** nginx의 `Host`를 고칠 일이 생기면 이 표의 네 줄을 손으로
 다시 확인한다 — 명령은 `curl -s -i -X POST http://localhost:8080/admin/programs
 --data-urlencode "name=x"` 한 줄이다.
