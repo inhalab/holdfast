@@ -192,6 +192,7 @@ docker compose exec -T db psql -U holdfast -d holdfast < infra/demo-seed.sql
 | 일어날 수 있는 일 | 대응 |
 |---|---|
 | 선점이 시연 중 만료 | TTL이 300초인지 확인. `HOLD_TTL_SECONDS=300` |
-| 좌석이 다 팔림 | 시드를 다시 돌린다 — `docker compose exec -T db psql -U holdfast -d holdfast < infra/demo-seed.sql` |
+| 좌석이 다 팔림 (1절) | **화면에서 [시드 실행]을 누른다.** 터미널로 나가지 않는다 — 그 버튼이 A구역 좌석을 다시 만든다. `demo-seed.sql`을 돌린 뒤에 눌러도 된다(#154) |
+| 좌석이 다 팔림 (2절) | 시드를 다시 돌린다 — `docker compose exec -T db psql -U holdfast -d holdfast < infra/demo-seed.sql`. 2절은 24석·입장 창이 열린 회차가 필요하다 |
 | 검표가 "입장 시간이 아닙니다" | 부하 측정용 시드(`load-test/sql/seed.sql`)를 쓴 것이다. 입장 창이 내일로 잡혀 있다 |
 | 좌석맵이 비어 있음 | 그 회차에 `seat_inventory`가 없다. 관리자 화면으로 회차를 새로 만든다 |

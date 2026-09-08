@@ -1,6 +1,9 @@
 package com.inhalab.holdfast.web;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DuplicateKeyException;
+import com.inhalab.holdfast.api.ApiException;
+import com.inhalab.holdfast.api.ErrorCode;
 import com.inhalab.holdfast.support.IdentitySequences;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -219,18 +222,58 @@ public class DemoRaceController {
     /**
      * 좌석 {@code 1..n}과 그 재고 행을 만든다.
      *
+     * <h3>id와 좌석번호가 <b>동시에</b> 맞아야 한다</h3>
+     *
+     * <p>화면이 {@code seatId}를 1부터 세어 홀드를 쏘므로(race.html의 발사
+     * 루프) <b>id가 그 값이어야 하고</b>, 좌석번호는 U-4가
+     * {@code (zone_id, seat_no)}로 잠근다(erd.md 3절). <b>두 축 중 하나만
+     * 맞추면 나머지가 깨진다.</b>
+     *
+     * <p>예전에는 {@code WHERE NOT EXISTS (SELECT 1 FROM seat WHERE id = ?)}로
+     * <b>id 축만 보고 건너뛰었다.</b> {@code infra/demo-seed.sql}이 같은 구역에
+     * {@code A-1}~{@code A-12}를 <b>다른 id(100~111)로</b> 넣어 두므로,
+     * id는 안 겹치는데 좌석번호가 겹쳐 U-4에 걸려 500이 났다(이슈 #154).
+     * <b>대본이 2절(그 시드) → 1절(이 화면) 순서라 시연에서 그대로 났다.</b>
+     *
+     * <h3>없으면 만드는 대신 자리를 비우고 다시 만든다</h3>
+     *
+     * <p>"정적 데이터라 없을 때만 만든다"는 <b>이 엔드포인트의 성격과 맞지
+     * 않았다.</b> 바로 위에서 회차·재고·할당량을 지우고 처음부터 다시 만들면서
+     * 좌석만 남의 것을 물려받으면, 그 좌석의 id와 좌석번호가 화면이 기대하는
+     * 것과 어긋난다. <b>가드를 U-4에 맞추는 것으로는 부족하다</b> — 그러면
+     * {@code A-1}이 id 100으로 남아 재고 INSERT가 외래키에 걸리고, 화면은
+     * 있지도 않은 1번 좌석에 쏜다.
+     *
+     * <p><b>재고가 걸린 좌석은 건드리지 않는다.</b> 다른 회차의 것이다.
+     * 정상 경로에서는 {@code clearSession()}이 이 회차 재고를 이미 비웠으므로
+     * A구역이 통째로 비워진다.
+     *
      * <p>id를 명시하므로 끝에 시퀀스를 맞춘다 — 안 맞추면 관리자 등록 화면이
      * duplicate key로 500을 낸다({@link IdentitySequences}).
      */
     private void createSeats(int n) {
-        for (long seatId = 1; seatId <= n; seatId++) {
-            // seat는 배치도에 속한 정적 데이터라 없을 때만 만든다.
-            jdbc.update("INSERT INTO seat (id, zone_id, seat_no, row_index, col_index)"
-                    + " SELECT ?, 1, 'A-' || ?, 1, ?"
-                    + " WHERE NOT EXISTS (SELECT 1 FROM seat WHERE id = ?)",
-                    seatId, seatId, seatId, seatId);
-            jdbc.update("INSERT INTO seat_inventory (session_id, seat_id, status, version)"
-                    + " VALUES (?, ?, 'AVAILABLE', 0)", SESSION_ID, seatId);
+        jdbc.update("DELETE FROM seat WHERE zone_id = 1"
+                + " AND NOT EXISTS (SELECT 1 FROM seat_inventory si WHERE si.seat_id = seat.id)");
+
+        try {
+            for (long seatId = 1; seatId <= n; seatId++) {
+                jdbc.update("INSERT INTO seat (id, zone_id, seat_no, row_index, col_index)"
+                        + " VALUES (?, 1, 'A-' || ?, 1, ?)", seatId, seatId, seatId);
+                jdbc.update("INSERT INTO seat_inventory (session_id, seat_id, status, version)"
+                        + " VALUES (?, ?, 'AVAILABLE', 0)", SESSION_ID, seatId);
+            }
+        } catch (DuplicateKeyException e) {
+            // 위 DELETE가 비우지 못한 좌석이 자리를 막고 있다 — 재고가 걸려
+            // 있다는 뜻이고, 그것은 다른 회차가 이 배치도를 쓰고 있다는 뜻이다.
+            //
+            // **읽을 수 있는 문장으로 바꾼다.** 그대로 두면 화면에
+            // INTERNAL_ERROR만 뜨고 무엇을 하라는 말이 없어, 좌석 수를 바꿔
+            // 가며 다시 누르게 된다(#154). AdminSeatLayoutService가 같은 제약을
+            // 같은 방식으로 다룬다.
+            throw new ApiException(ErrorCode.VALIDATION_FAILED,
+                    "A구역 좌석이 다른 회차의 재고에 묶여 있어 시연 좌석을 다시 만들 수 없습니다."
+                            + " 그 회차를 지우거나, 터미널에서 시드를 다시 돌리십시오"
+                            + " — ./holdfast strategy <전략>");
         }
         IdentitySequences.resync(jdbc);
     }
