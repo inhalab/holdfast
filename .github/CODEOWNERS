@@ -11,5 +11,6 @@
 /api/src/main/resources/db/migration/                  @Asirante @F3ZLoV
 /infra/                                                @F3ZLoV
 /load-test/                                            @Asirante
+/tools/                                                @Asirante @F3ZLoV
 /.github/                                              @F3ZLoV
 /docs/                                                 @Asirante @F3ZLoV

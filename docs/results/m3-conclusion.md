@@ -25,8 +25,10 @@
 | unique | 0 · 0 · 0 ✓ | 0 | 35ms | 20ms | 1.79 | — | — | **11** |
 | redis | 0 · 0 · 0 ✓ | 0 | 18ms | 18ms | **1.01** | 0.00% | — | **0** ※ |
 
-측정 무결성: 60회 전부 5xx 0건 · 미분류 0건. 폐기한 실행 세 벌은
-[`discarded-measurements.md`](discarded-measurements.md)에 있다.
+측정 무결성: 60회 전부 5xx 0건 · 미분류 0건. **이 60회에 앞서 폐기한 실행
+세 벌**(M3 기준)은 [`discarded-measurements.md`](discarded-measurements.md)에
+있다 — **그 문서에는 네 벌이 있고, 넷째는 M4의 7.8 확장 측정이라 이 60회와
+무관하다.**
 
 **데드락 회피(5.1)도 다섯 전략 전부 0건이다**(7.2.1). 요청당 3석을 무작위 순서로
 보내 서버의 좌석 ID 정렬이 실제로 도는지 시험했고, `pg_stat_database.deadlocks`가
