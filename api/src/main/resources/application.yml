@@ -29,6 +29,20 @@ server:
 spring:
   application:
     name: holdfast
+  autoconfigure:
+    # **Redisson 자동설정을 뺀다**(이슈 #155). 그것이 기동 시 Redis에 접속하는데,
+    # 다섯 전략 중 Redis를 쓰는 것은 하나뿐이다. 넣어 두면 `pessimistic`을 잴
+    # 때도 Redis가 떠 있어야 하고, AWS에서는 60회 측정 중 48회를 놀고 있는
+    # ElastiCache에 과금한다.
+    #
+    # 클라이언트는 reservation/RedissonLockConfig 가 `holdfast.strategy=redis`
+    # 일 때만 만든다 — 전략 빈과 같은 조건이라 둘이 함께 있고 함께 없다.
+    #
+    # **두 이름을 모두 적는다.** 4.7.0의 imports 파일이 V2·V4를 등록한다.
+    # 하나만 빼면 다른 하나가 그대로 접속한다.
+    exclude:
+      - org.redisson.spring.starter.RedissonAutoConfigurationV2
+      - org.redisson.spring.starter.RedissonAutoConfigurationV4
   datasource:
     # 로컬: db 컨테이너. AWS: RDS 엔드포인트로 DB_HOST만 교체.
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:holdfast}
