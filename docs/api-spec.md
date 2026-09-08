@@ -38,7 +38,7 @@ GET  /api/sessions/1001/seats              좌석맵을 받아 그린다
 
 POST /api/holds                            좌석 3석 선점 → holdId, heldUntil
   ├─ 사용자가 취소 → DELETE /api/holds/{holdId}
-  ├─ TTL 만료      → 서버가 자동 회수 (클라이언트는 카운트다운만 표시)
+  ├─ TTL 만료      → 다음 홀드 시도가 회수 (조회는 HELD_EXPIRED로 보여만 준다)
   └─ POST /api/reservations {holdId}       확정 → reservationId
 
 GET  /api/reservations/{id}                예약 확인

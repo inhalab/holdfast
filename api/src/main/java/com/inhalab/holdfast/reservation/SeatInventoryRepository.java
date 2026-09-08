@@ -24,6 +24,32 @@ import java.util.Optional;
  *
  * <p>락을 잡는 조회는 {@link #findForUpdate} 하나뿐이며 {@code pessimistic}
  * 전략만 쓴다(concurrency-spec.md 4.2).
+ *
+ * <h2>만료된 홀드를 조회가 드러낸다 — 회수하지는 않는다 (이슈 #157)</h2>
+ *
+ * <p>{@link #findSeatMapRows}·{@link #findStatusRows}가 {@code status = 'HELD'}
+ * 이면서 {@code held_until}이 지난 행을 <b>{@code HELD_EXPIRED}로 계산해
+ * 내보낸다.</b> 저장된 값은 그대로 {@code HELD}다 — state-transitions.md 0절이
+ * 적은 대로 <b>{@code seat_inventory.status}는 이미 파생값</b>이고, 이것은 그
+ * 파생을 화면 쪽으로 한 겹 더 미는 것이다.
+ *
+ * <p><b>왜 {@code AVAILABLE}로 덮지 않는가.</b> 그 좌석을 실제로 잡을 수 있는지가
+ * <b>전략마다 다르다.</b> 넷은 홀드 경로가 만료를 인수하지만(erd.md 4.1),
+ * {@code none}은 <b>회수하는 경로가 아예 없다</b> — 그것이 베이스라인의
+ * 정의다(concurrency-spec.md 3절). {@code AVAILABLE}로 덮으면 {@code none}에서
+ * <b>못 잡는 좌석을 잡을 수 있다고 말하게 된다.</b> 전략별로 다르게 보여주는 것은
+ * "전략 밖 코드에 전략별 분기를 넣지 않는다"를 어긴다.
+ *
+ * <p><b>{@code HELD_EXPIRED}는 다섯 전략 모두에 참인 사실만 말한다</b> — "이
+ * 좌석의 홀드는 만료됐다". 잡을 수 있는지는 말하지 않고, 그 판정은 요청을 받은
+ * 서버가 한다.
+ *
+ * <p><b>쓰지 않는다.</b> 조회가 만료 행을 {@code AVAILABLE}로 되돌리지 않는다.
+ * 그러면 {@code none}의 "회수 경로가 없다"가 깨져 7.2.2의 지속 경합 결과가
+ * 설명을 잃고, 3초 폴링이 매번 쓰기를 하게 되어 측정 경로에 닿는다.
+ *
+ * <p>기준 시각은 {@code CURRENT_TIMESTAMP}(DB {@code now()})다 — 앱 2대의 시계가
+ * 어긋나면 만료 판정이 인스턴스마다 달라진다(concurrency-spec.md 3절).
  */
 public interface SeatInventoryRepository extends JpaRepository<SeatInventory, Long> {
 
@@ -37,7 +63,10 @@ public interface SeatInventoryRepository extends JpaRepository<SeatInventory, Lo
             SELECT new com.inhalab.holdfast.seat.SeatMapRow(
                 z.id, z.name, z.sortOrder,
                 s.id, s.seatNo, s.rowIndex, s.colIndex,
-                si.status)
+                CASE WHEN si.status = 'HELD'
+                          AND si.heldUntil IS NOT NULL
+                          AND si.heldUntil <= CURRENT_TIMESTAMP
+                     THEN 'HELD_EXPIRED' ELSE si.status END)
             FROM SeatInventory si
             JOIN Seat s ON s.id = si.seatId
             JOIN Zone z ON z.id = s.zoneId
@@ -51,7 +80,11 @@ public interface SeatInventoryRepository extends JpaRepository<SeatInventory, Lo
      * 않으므로 {@code Seat}·{@code Zone}에 닿지 않는다.
      */
     @Query("""
-            SELECT new com.inhalab.holdfast.seat.SeatStatusRow(si.seatId, si.status)
+            SELECT new com.inhalab.holdfast.seat.SeatStatusRow(si.seatId,
+                CASE WHEN si.status = 'HELD'
+                          AND si.heldUntil IS NOT NULL
+                          AND si.heldUntil <= CURRENT_TIMESTAMP
+                     THEN 'HELD_EXPIRED' ELSE si.status END)
             FROM SeatInventory si
             WHERE si.sessionId = :sessionId
             ORDER BY si.seatId

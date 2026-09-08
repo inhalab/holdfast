@@ -7,6 +7,8 @@
  *  - 409는 정상 거절이다. 오류가 아니라 code로 사유를 구분해 사용자에게 보여준다.
  *  - 모든 시각은 서버 기준. 카운트다운은 hold 응답의 expiresInSeconds로 시작한다.
  *  - HELD status는 내 홀드/남 홀드를 구분하지 않는다. 내가 보관한 홀드 좌석 목록과 대조한다.
+ *  - HELD_EXPIRED는 "홀드가 걸려 있으나 TTL이 지났다"는 사실이다(#157). 고를 수
+ *    있게 두되 잡히는지는 서버가 정한다 — none에서는 409로 거절된다.
  */
 (function () {
     "use strict";
@@ -24,53 +26,15 @@
     let countdownTimer = null;
     let lastEtag = null;                     // 폴링 조건부 요청용
 
-    // 내 홀드가 만료된 좌석. **다시 고를 수 있어야 한다.**
+    // **만료된 홀드는 서버가 알려준다(#157).** 조회가 status='HELD'이면서
+    // held_until이 지난 좌석을 HELD_EXPIRED로 계산해 내보낸다.
     //
-    // 만료 정리는 "누군가 그 좌석에 홀드를 시도할 때" 일어나고(lazy 검증,
-    // concurrency-spec 3절 — 청소 스케줄러는 M4에도 만들지 않는다), 재고
-    // 상태는 그때까지 HELD로 남는다. 그런데 HELD 좌석의 클릭을 막으면
-    // 시도 자체가 일어나지 않아 좌석이 화면에서 영영 회색으로 굳는다.
-    //
-    // 폴링 응답에는 heldUntil이 없어(openapi: 매초 바뀌면 ETag가 무의미해진다)
-    // 클라이언트가 남의 홀드의 만료 여부는 알 수 없다. 하지만 **내 홀드의
-    // 만료는 안다** — 그 좌석만 다시 열어 준다. 실제로 아직 살아 있으면
-    // 홀드 요청이 409로 거절되고 그 사유가 화면에 나온다.
-    // **이 집합도 새로고침을 견뎌야 한다.** 홀드 기록(HOLD_STORAGE_KEY)에
-    // 얹으면 안 된다 — 만료 시 leaveHold()가 그 기록을 지우므로, 페이지를
-    // 켜둔 채 만료된 사용자는 새로고침 순간 기록을 잃고 좌석이 다시 굳는다.
-    // 그래서 별도 키에 따로 남긴다.
-    const expiredMine = new Set();
-    const EXPIRED_STORAGE_KEY = "holdfast:expired:" + sessionId;
-
-    /** 하루가 지난 기록은 버린다 — 그 사이 좌석이 어떻게 됐는지 알 수 없다. */
-    const EXPIRED_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-
-    function saveExpiredMine() {
-        try {
-            if (expiredMine.size === 0) {
-                localStorage.removeItem(EXPIRED_STORAGE_KEY);
-                return;
-            }
-            localStorage.setItem(EXPIRED_STORAGE_KEY, JSON.stringify({
-                seatIds: [...expiredMine],
-                savedAt: Date.now(),
-            }));
-        } catch (e) { /* 저장 실패해도 이번 세션 동작에는 지장 없음 */ }
-    }
-
-    function loadExpiredMine() {
-        try {
-            const raw = localStorage.getItem(EXPIRED_STORAGE_KEY);
-            if (!raw) return;
-            const parsed = JSON.parse(raw);
-            if (!parsed || !Array.isArray(parsed.seatIds)
-                    || Date.now() - (parsed.savedAt || 0) > EXPIRED_MAX_AGE_MS) {
-                localStorage.removeItem(EXPIRED_STORAGE_KEY);
-                return;
-            }
-            for (const id of parsed.seatIds) expiredMine.add(Number(id));
-        } catch (e) { /* no-op */ }
-    }
+    // 예전에는 이 자리에 expiredMine이 있었다 — 폴링 응답에 heldUntil이 없어
+    // (openapi: 매초 바뀌면 ETag가 무의미해진다) 클라이언트가 **자기 홀드의
+    // 만료만** 기억해 그 좌석을 다시 열어 주는 방식이었다(#90~#92).
+    // **남의 만료 홀드는 끝내 회색으로 굳었다.** 서버가 남의 것까지 알려주는
+    // 지금 그 덧칠은 덮이는 범위가 더 좁아 남길 이유가 없다 — 지웠다.
+    // localStorage 키(holdfast:expired:*)도 함께 사라진다.
 
     // openapi: "holdId는 클라이언트가 보관한다"는 페이지 새로고침에도 유효해야
     // 한다. 서버 세션이 아니라 이 브라우저의 localStorage에 두므로 concurrency-spec
@@ -92,9 +56,11 @@
     }
 
     /**
-     * 저장된 홀드를 읽는다. 이미 만료됐으면 버리되, **그 좌석은
-     * expiredMine에 남긴다** — 그러지 않으면 만료 후 새로고침한 사용자에게는
-     * 좌석이 다시 회색으로 굳는다(이 파일의 expiredMine 설명 참고).
+     * 저장된 홀드를 읽는다. 이미 만료됐으면 버린다.
+     *
+     * <p>그 좌석을 따로 기억하지 않는다 — 다음 폴링이 서버에서
+     * {@code HELD_EXPIRED}를 받아 오고, 그 값이 내 홀드든 남의 홀드든 똑같이
+     * 다시 고를 수 있게 만든다(#157).
      */
     function loadSavedHold() {
         try {
@@ -106,10 +72,8 @@
                 return null;
             }
             if (parsed.expiresAt <= Date.now()) {
-                // 페이지가 꺼져 있는 동안 만료된 경우. 카운트다운이 돌지
-                // 못했으므로 여기서 대신 기록한다.
-                for (const id of parsed.seatIds || []) expiredMine.add(Number(id));
-                saveExpiredMine();
+                // 페이지가 꺼져 있는 동안 만료된 경우. 좌석은 서버가
+                // HELD_EXPIRED로 알려주므로 여기서 기억할 것이 없다.
                 localStorage.removeItem(HOLD_STORAGE_KEY);
                 return null;
             }
@@ -211,11 +175,21 @@
 
     // --- 서버 status fragment 교체 후, 내 선택/내 홀드 표시를 다시 덧입힌다 ---
 
-    /** 이 좌석을 고를 수 있는가. 만료된 내 홀드의 좌석도 포함한다. */
+    /**
+     * 이 좌석을 고를 수 있는가. **만료된 홀드가 걸린 좌석도 포함한다** —
+     * 내 것이든 남의 것이든 같다(#157).
+     *
+     * **화면은 전략을 모른다.** HELD_EXPIRED를 고를 수 있게 두는 것은 "잡힌다"는
+     * 뜻이 아니라 "시도할 수 있다"는 뜻이다. 네 전략은 홀드 경로가 만료를
+     * 인수하고(erd.md 4.1), none은 회수 경로가 없어 409로 거절한다. 어느 쪽인지는
+     * **서버의 응답이 말하고**, 이 파일 머리말대로 409는 오류가 아니라 사유와
+     * 함께 화면에 뜬다. 막아 두면 넷에서 잡을 수 있는 좌석을 못 잡는다.
+     */
     function isSelectable(el) {
         if (!el) return false;
         if (!onSale) return false;
-        return el.dataset.status === "AVAILABLE" || expiredMine.has(Number(el.dataset.seatId));
+        const st = el.dataset.status;
+        return st === "AVAILABLE" || st === "HELD_EXPIRED";
     }
 
     function applyOverlay() {
@@ -232,9 +206,6 @@
             const id = Number(el.dataset.seatId);
             el.classList.toggle("is-selected", selected.has(id));
             el.classList.toggle("is-held-mine", !!hold && hold.seatIds.has(id));
-            // 만료된 내 좌석은 회색이지만 다시 고를 수 있다는 것을 보여준다.
-            el.classList.toggle("is-expired-mine", expiredMine.has(id));
-            if (expiredMine.has(id) && onSale) el.disabled = false;
         });
         renderSelection();
     }
@@ -245,13 +216,17 @@
     // (fragments/seat-status.html)다. seatId+status만 있는 <li> 목록이며 좌석
     // 위치·번호는 없다(openapi: 폴링 응답은 6필드 중 2필드만). 격자를 통째로
     // 다시 그리지 않고, 이미 렌더된 좌석 버튼의 상태만 여기서 patch한다.
-    const STATUS_CLASS = { AVAILABLE: "is-available", HELD: "is-held", SOLD: "is-sold" };
+    const STATUS_CLASS = {
+        AVAILABLE: "is-available",
+        HELD: "is-held",
+        HELD_EXPIRED: "is-held-expired",   // 홀드가 걸려 있으나 TTL이 지났다(#157)
+        SOLD: "is-sold",
+    };
 
     function applyStatusFeed() {
         const feed = document.getElementById("status-feed");
         const g = grid();
         if (!feed || !g) return;
-        let expiredChanged = false;
         feed.querySelectorAll("li[data-seat-id]").forEach((li) => {
             const id = li.dataset.seatId;
             const match = li.className.match(/status-(\w+)/);
@@ -260,17 +235,12 @@
             const el = seatEl(id);
             if (!el) return;
             el.dataset.status = status;
-            el.classList.remove("is-available", "is-held", "is-sold");
+            el.classList.remove("is-available", "is-held", "is-held-expired", "is-sold");
             el.classList.add(STATUS_CLASS[status] || "is-held");
-            el.disabled = status !== "AVAILABLE" || !onSale;
-
-            // 서버가 회수했거나(AVAILABLE) 남에게 팔린(SOLD) 좌석은 더 이상
-            // "만료된 내 좌석"이 아니다. HELD로 남아 있는 동안만 열어 둔다.
-            if (status !== "HELD" && expiredMine.delete(Number(id))) {
-                expiredChanged = true;
-            }
+            // 고를 수 있는 상태와 disabled 판정을 한 곳에서 쓴다 — 둘이 갈리면
+            // 누를 수 없는데 선택되거나 그 반대가 된다.
+            el.disabled = !isSelectable(el);
         });
-        if (expiredChanged) saveExpiredMine();
         applyOverlay();
     }
 
@@ -333,9 +303,6 @@
             seatIds: new Set(data.seatIds),
             expiresAt: Date.now() + Number(data.expiresInSeconds) * 1000,
         };
-        // 다시 잡는 데 성공했으면 "만료된 내 좌석"이 아니다.
-        for (const id of hold.seatIds) expiredMine.delete(id);
-        saveExpiredMine();
         saveHold();
         showHoldPanel();
     }
@@ -379,10 +346,8 @@
         const remainMs = hold.expiresAt - Date.now();
         if (remainMs <= 0) {
             countdownEl.textContent = "00:00";
-            // 만료된 좌석을 기억해 둔다. 재고는 아직 HELD이지만(lazy 검증)
-            // 다시 고를 수 있어야 한다 — expiredMine 선언부 참고.
-            for (const id of hold.seatIds) expiredMine.add(id);
-            saveExpiredMine();
+            // 좌석을 기억하지 않는다. 다음 폴링(최대 3초)이 서버에서
+            // HELD_EXPIRED를 받아 와 다시 고를 수 있게 만든다(#157).
             showMessage("선점이 만료되었습니다. 같은 좌석을 다시 선택할 수 있습니다.", "warn");
             leaveHold();
             return;
@@ -471,8 +436,7 @@
     document.addEventListener("click", (e) => {
         const btn = e.target.closest(".seat");
         if (!btn || !grid() || !grid().contains(btn)) return;
-        // HELD/SOLD는 무시한다. 단 만료된 내 홀드의 좌석은 다시 고를 수 있다
-        // (expiredMine 선언부의 설명 참고).
+        // HELD/SOLD는 무시한다. 단 HELD_EXPIRED는 고를 수 있다 — isSelectable 참고.
         if (!isSelectable(btn)) return;
         toggleSelect(Number(btn.dataset.seatId));
     });
@@ -502,9 +466,6 @@
         if (e.detail.target.id !== "status-feed") return;
         applyStatusFeed();
     });
-
-    // 만료된 내 좌석 기록을 먼저 복원한다 — 새로고침해도 다시 고를 수 있어야 한다.
-    loadExpiredMine();
 
     // 만료 전 홀드가 저장돼 있으면 새로고침 후에도 이어받는다.
     const saved = loadSavedHold();

@@ -593,8 +593,15 @@ components:
         - AVAILABLE — 선택 가능
         - HELD — 누군가 선점 중. 내 홀드인지 남의 홀드인지는 이 값으로 구분되지 않는다.
           클라이언트는 자신이 보관한 좌석 목록과 대조해 판단한다.
+        - HELD_EXPIRED — 선점이 걸려 있으나 **그 홀드의 TTL이 지났다.**
+          저장된 값은 여전히 HELD이고 이것은 조회가 계산해 내보내는 값이다
+          (state-transitions.md 0절 — seat_inventory.status는 원래 파생값이다).
+          **"잡을 수 있다"는 뜻이 아니다.** 인수 여부는 전략이 정한다 —
+          네 전략은 홀드 경로가 만료를 인수하고(erd.md 4.1), none은 회수하는
+          경로가 없다(concurrency-spec.md 3절). 클라이언트는 이 좌석을 고를 수
+          있게 두고, 실제 가부는 POST /api/holds의 응답이 말한다.
         - SOLD — 판매 완료
-      enum: [AVAILABLE, HELD, SOLD]
+      enum: [AVAILABLE, HELD, HELD_EXPIRED, SOLD]
 
     ErrorCode:
       type: string
