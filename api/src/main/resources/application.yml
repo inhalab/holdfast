@@ -207,4 +207,16 @@ management:
         # metrics — 7.1이 커넥션 풀 대기의 출처로 못박은
         # hikaricp.connections.pending / .acquire 를 읽기 위해 연다.
         # 응답시간의 정본은 k6이므로(7.1) HTTP 히스토그램은 켜지 않는다.
-        include: health,info,metrics
+        #
+        # **기본값은 측정용이다. 시연에서만 좁힌다**(이슈 #156).
+        # 인증이 없어 이 경로는 누구나 여는데, 지금까지는 로컬 Docker Compose
+        # 안이라 노출이 없었다(infra-decision 2절). **터널을 열면 그 전제가
+        # 깨진다**(#172) — 개발 PC가 인터넷에 나가고 힙·커넥션 풀·JVM 정보가
+        # 함께 나간다.
+        #
+        # **끄지 않고 실행 모드로 가른다.** #156은 측정이 못 읽게 된다는 이유로
+        # 좁히는 안을 기각했는데, **시연과 측정은 같은 실행이 아니다.**
+        # metrics-snapshot.mjs는 app1·app2(:18081·:18082)에 직접 붙고
+        # run.sh는 ./holdfast demo 를 거치지 않으므로, 시연에서 좁혀도
+        # 측정 경로는 그대로다.
+        include: ${HOLDFAST_ACTUATOR_EXPOSURE:health,info,metrics}

@@ -340,7 +340,13 @@ case "$cmd" in
 
     echo "[holdfast] 시연 준비 — 전략 $strategy · 시나리오 $DEMO_SCENARIO${build:+ (다시 빌드)}"
     warn_stopped
-    HOLDFAST_STRATEGY="$strategy" HOLD_TTL_SECONDS="$DEMO_HOLD_TTL_SECONDS"       docker compose up -d $build
+    # **시연은 actuator를 좁혀 띄운다**(#156). 터널을 열면 개발 PC가 인터넷에
+    # 나가는데(#172), metrics 75개에 힙·커넥션 풀·JVM 정보가 다 들어 있다.
+    #
+    # **측정은 이 경로를 지나지 않는다** — run.sh는 이 서브커맨드를 쓰지 않고
+    # metrics-snapshot.mjs는 app1·app2에 직접 붙는다. 그래서 여기서 좁혀도
+    # 7.1이 못박은 hikaricp.connections.pending 은 그대로 읽힌다.
+    HOLDFAST_STRATEGY="$strategy" HOLD_TTL_SECONDS="$DEMO_HOLD_TTL_SECONDS"       HOLDFAST_ACTUATOR_EXPOSURE="health"       docker compose up -d $build
     wait_healthy
     reload_nginx
     "$S/seed.sh" "$DEMO_SCENARIO" "$strategy"
