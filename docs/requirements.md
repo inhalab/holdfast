@@ -28,7 +28,7 @@
 
 | REQ | 요구사항 | 출처 | 대응 테이블 | 대응 엔드포인트 | 검증 방법 | 검수 기준 | 상태 |
 |---|---|---|---|---|---|---|---|
-| REQ-01 | 동시 예약 요청 시 정원·좌석 초과 확정 방지 | 국립 SFR-001 | `seat_inventory`, `seat_hold`, `reservation`, `reservation_seat` | `POST /api/holds`, `POST /api/reservations` | 단위 경합 테스트 5종(`*SeatHoldStrategyConcurrencyTest`) + 부하 측정 60회 + DB 검증 V-1 | **초과 예약 0건** | **충족** — `none` 제외 4개 전략 V-1 0(각 9회 전부). `none`은 고경합 4석으로 실패 증거를 냈다 |
+| REQ-01 | 동시 예약 요청 시 정원·좌석 초과 확정 방지 | 국립 SFR-001, PER-001 | `seat_inventory`, `seat_hold`, `reservation`, `reservation_seat` | `POST /api/holds`, `POST /api/reservations` | 단위 경합 테스트 5종(`*SeatHoldStrategyConcurrencyTest`) + 부하 측정 60회 + DB 검증 V-1 | **초과 예약 0건** | **충족** — `none` 제외 4개 전략 V-1 0(각 9회 전부). `none`은 고경합 4석으로 실패 증거를 냈다 |
 | REQ-02 | 실시간 잔여 좌석 검증 및 표시 | 국립 SFR-001, SFR-006 | `program`, `event_session`, `seat_inventory` | `GET /api/sessions/{id}/seats`, `GET /api/sessions/{id}/seats/status` | `SeatMapPageControllerTest`(렌더) + 단위 흐름 테스트 `MinimumScopeFlowTest`(좌석맵 렌더 + AVAILABLE→HELD→SOLD 전이) | — | **부분** — 조회 API·`ETag`/304·htmx fragment가 구현됐고 상태 전이가 화면에 반영되는 것까지 확인했다. **폴링 부하는 측정에 넣지 않았다**(`api-spec.md` 8.1). 접수종료 노출 정책은 `design-spec` 5.6에 정하고 `catalog/SaleState`로 구현했다(#108) |
 | REQ-03 | 중복 예약 방지 / 1인 최대 매수 제한 | 국립 SFR-001 | `seat_hold`, `user_session_quota`, `reservation`, `idempotency_record` | `POST /api/holds`, `POST /api/reservations` (둘 다 `Idempotency-Key` 필수) | 부하 측정 + DB 검증 V-3 | — | **충족(부하 측정 기준)** — 60회 전부 V-3 0. 전용 단위 경합 테스트는 없다(REQ-11 참조) |
 | REQ-04 | 예약·결제 상태 정합성 검증 | 국립 SFR-002 | `reservation`, `payment`, `idempotency_record` | `POST /api/reservations`, `GET /api/reservations/{id}`, `POST /api/reservations/{id}/cancel` | DB 검증 V-4(재고-예약 불일치)가 예약 축만 덮는다 + 단위 흐름 테스트 `MinimumScopeFlowTest`(승인·거절·재시도 경로, **취소가 결제 이력을 바꾸지 않는 것과 재취소 멱등** — #106) | — | **충족** — 승인 시 예약 `CONFIRMED`, 거절 시 `HELD` 유지, 재시도가 새 `payment` 행을 만드는 것까지 확인했다. 콜백·`TIMEOUT`은 여유 항목이라 미구현 |
@@ -70,14 +70,17 @@
 **검산: 9 + 2 + 3 = 14.** 각 REQ의 **근거 요구사항 열이 정본**이며 이 표는 그
 열을 센 것이다. 어긋나면 그 열을 따른다.
 
-**국립 쪽이 인용하는 원본은 일곱이다** — SFR-001~006(여섯)과 PER-002.
+**국립 쪽이 인용하는 원본은 여덟이다** — SFR-001~006(여섯)과 PER-001·PER-002.
 REQ가 아홉인 것은 **한 SFR이 여러 REQ로 갈리기 때문**이다: SFR-001이
 REQ-01·02·03으로, SFR-006이 REQ-02·14로 나뉜다.
 
-> **PER-001은 어느 REQ의 근거 열에도 없다.** 그런데 `rfp-scope.md` 3장은 그것을
-> **충족**으로 적는다("동시성 제어 5종 구현 및 측정"). **이 표를 만들면서
-> 드러난 것**이고 여기서 고치지 않는다 — REQ의 근거 열을 바꾸는 것은 추적표의
-> 정본을 바꾸는 일이라 별도로 판정할 자리다.
+> **`PER-001`은 한때 어느 REQ의 근거 열에도 없었다.** 이 표를 만들면서 드러났고
+> `#162`에서 **`REQ-01`에 더했다** — 그 원문("동시접속 환경에서 정원 초과 예약
+> 미발생, 동시성 제어 방안 적용")이 `REQ-01`의 이름·검수 기준·검증 방법과
+> 하나씩 대응한다. **새 REQ를 세우지 않은 이유**는 3절이 `REQ-11`·`12`를 따로
+> 세운 기준과 같다 — **별도의 검증 수단이 붙지 않는다.** 검증이 `REQ-01`의
+> 것(60회 + V-1)과 같은 것 하나라, 새 줄을 세우면 같은 검증을 가리키는 줄이
+> 둘이 된다.
 
 #### 자체 확장 셋 — 없으면 프로젝트가 성립하지 않는다
 
