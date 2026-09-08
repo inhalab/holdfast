@@ -27,10 +27,29 @@
 | `POST` | `/api/reservations` | 예약 확정 | 필수 | 필수 |
 | `GET` | `/api/reservations/{reservationId}` | 예약 조회 | — | 필수 |
 | `POST` | `/api/reservations/{reservationId}/cancel` | 예약 취소 | 필수 | 필수 |
+| `POST` | `/api/payments` | 결제 시도 (Mock PG). **승인이면 그 안에서 확정 + 발권까지 끝난다** — 2절 | 필수 | 필수 |
+| `GET` | `/api/reservations/{reservationId}/tickets` | 예약의 티켓 목록 | — | 필수 |
+| `POST` | `/api/tickets/scan` | 검표. **거절도 200이다** — `result`로 구분한다 | — | — |
+
+**열이 세 개 비어 있는 것도 계약이다.** `/api/tickets/scan`이 멱등키와 사용자
+헤더를 **둘 다 요구하지 않는 이유**는 `openapi.yaml`의 그 경로 설명에 있다 —
+스캔은 재시도를 눌러야 할 요청이 아니라 **물리적 사건의 기록**이고, 스캔하는
+주체는 티켓 소유자가 아니라 **게이트 단말**이다.
 
 폴링 엔드포인트는 지정된 6개에 더해 추가한 것이다. 근거는 5절에 있다.
 
-### 1.1 정상 흐름
+> **이 표는 한때 일곱 줄이었다.** `openapi.yaml`에는 열이 있는데 결제·발권·검표
+> 셋이 빠져 있었고, 7절 "범위 밖"이 그 셋을 걷어 낸 뒤에도 1절은 그대로였다
+> (#134). **정본이 열인데 요약이 일곱이면 요약이 뒤처진 것이다.**
+
+**상세는 여기 옮기지 않는다.** 요청·응답 스키마와 헤더 규격은
+[`openapi.yaml`](openapi.yaml)이 갖는다 — 이 문서는 **요약과 근거**다. 같은
+것을 두 곳에서 지키면 어긋나고, 어긋나면 **기계가 읽지 않는 쪽이 조용히
+틀린다.** `erd.md` 4절이 U-2의 조건을 두고 한 판단과 같은 형태다.
+
+### 1.1 정상 흐름 — 확정 경로가 둘이다
+
+**둘 중 하나를 쓰지 둘 다 쓰지 않는다.** 이 구분의 정본은 `scope-m4.md` 2절이다.
 
 ```
 GET  /api/sessions/1001/seats              좌석맵을 받아 그린다
@@ -39,11 +58,30 @@ GET  /api/sessions/1001/seats              좌석맵을 받아 그린다
 POST /api/holds                            좌석 3석 선점 → holdId, heldUntil
   ├─ 사용자가 취소 → DELETE /api/holds/{holdId}
   ├─ TTL 만료      → 다음 홀드 시도가 회수 (조회는 HELD_EXPIRED로 보여만 준다)
-  └─ POST /api/reservations {holdId}       확정 → reservationId
+  │
+  ├─ (가) POST /api/payments {holdId}      결제를 거친 확정 → reservationId
+  │        └─ 승인이면 그 트랜잭션 안에서 확정 + 발권까지 끝난다
+  │           GET /api/reservations/{id}/tickets   QR 토큰을 받는다
+  │           POST /api/tickets/scan               게이트에서 검표
+  │
+  └─ (나) POST /api/reservations {holdId}  결제 없는 확정 → reservationId
 
 GET  /api/reservations/{id}                예약 확인
 POST /api/reservations/{id}/cancel         취소 → 좌석 반환
 ```
+
+| 경로 | 무엇인가 | 누가 쓰나 |
+|---|---|---|
+| **(가)** `POST /api/payments` | **결제를 거친 확정.** 발권이 여기 붙어 있다 | **최소 완결선** — `scope-m4.md` 1절이 M4의 완료 판정으로 못박은 흐름 |
+| (나) `POST /api/reservations` | **결제 없는 확정** | M3 측정 시나리오. 결제 지연이 섞이면 락 전략 비교가 오염된다(concurrency-spec 7.3) |
+
+**(가)가 화면이 쓰는 길이다.** 이 그림은 한때 (나)만 그려 놓고 "정상 흐름"이라
+불렀다 — 틀린 그림은 아니었지만 **결제·발권·검표를 지나지 않아**
+`scope-m4.md` 1절의 완료 판정과 어긋났다(#134).
+
+**순서를 뒤집지 않는다.** `holds → reservations → payments`로 부르면 확정이 두 번
+일어나 두 번째가 409다 — 실제로 그렇게 읽고 네 테스트가 깨진 적이 있다
+(`scope-m4.md` 2절).
 
 ### 1.2 `holdId`와 `reservationId`
 
