@@ -332,7 +332,7 @@ cd api && ./gradlew test                 # 140건
 
 | 문서 | 무엇 |
 |---|---|
-| [`concurrency-spec.md`](concurrency-spec.md) | **본체.** 임계 구역 CS-1~CS-6, 전략 5종, 측정 프로토콜 7장 |
+| [`concurrency-spec.md`](concurrency-spec.md) | **본체.** 임계 구역 CS-1~CS-6, 전략 5종, **왜 이 넷인가(4.6)**, 측정 프로토콜 7장 |
 | [`results/m3-conclusion.md`](results/m3-conclusion.md) | 60회 측정 종합 결론 |
 | [`results/discarded-measurements.md`](results/discarded-measurements.md) | 폐기한 측정 4건 · 회수한 판정과 전제 |
 | [`results/per-002-page-timing.md`](results/per-002-page-timing.md) | **화면별 응답시간 판정 (PER-002).** 전략 비교가 아니라 검수 기준과의 대조다. 중앙값은 같은 이름의 `-median.json` |
@@ -342,7 +342,7 @@ cd api && ./gradlew test                 # 140건
 | [`state-transitions.md`](state-transitions.md) | 예약·결제·티켓 상태 전이 |
 | [`api-spec.md`](api-spec.md) | API 계약, 오류 코드 19종, 분류표 |
 | [`scope-m4.md`](scope-m4.md) | 최소 완결선, 시연 수단, 전략 전환을 웹에서 안 하는 이유 |
-| [`requirements.md`](requirements.md) | 요구사항 추적표 — REQ 번호와 구현·테스트 대응 |
+| [`requirements.md`](requirements.md) | 요구사항 추적표 — REQ 번호와 구현·테스트 대응, **표가 어디서 왔나(1.1)** |
 | [`openapi.yaml`](openapi.yaml) | API 계약의 기계 판독본. `api-spec.md`와 짝이다 |
 | [`workflow.md`](workflow.md) | 협업 규칙. 문서 갱신 8개 규칙 |
 | [`infra-decision.md`](infra-decision.md) | AWS 판단. 4절이 "잘라도 되는 것" |
