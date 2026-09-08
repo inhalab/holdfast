@@ -981,6 +981,7 @@ WHERE t.prev_end IS NOT NULL AND t.created_at < t.prev_end;
 | **측정 대상 커밋** | **결과에 기록한다** (아래) | `row.commit` · `row.dirty` |
 | **측정 대상 이미지** | **결과에 기록한다** — 실제로 돈 바이너리 | `row.image` · `row.imageStale` |
 | k6 실행 위치 | 앱과 분리된 호스트 | **미충족 — 아래 참조** |
+| **측정 프로토콜** | **HTTP/1.1 고정** | nginx `:80`. AWS 스모크도 ALB `:80` (`infra-decision.md` 3.3) |
 | 세션 어피니티 | 사용하지 않음 (무상태 유지) | nginx 기본 라운드로빈 |
 | Mock PG (`holdfast.mock-pg.outcome`) | `approve`, 지연 0 (`state-transitions.md` 5.2) | 미구현 (결제 경로 미사용) |
 
