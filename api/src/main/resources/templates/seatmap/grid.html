@@ -5,8 +5,14 @@
   폴링 시 seat/ 컨트롤러가 같은 fragment를 렌더해 반환하고, htmx가 #seat-grid를 통째로 교체한다.
 
   design-spec 5.3: 격자 형태 최소 구현. SVG 좌석 배치에 시간 쏟지 말 것.
-  좌석 status(AVAILABLE/HELD/SOLD)만 서버가 칠하고, 내 선택·내 홀드 표시는 seatmap.js가
-  클라이언트 보관 목록과 대조해 덧입힌다 (openapi: HELD는 내 홀드/남 홀드를 구분하지 않는다).
+  좌석 status(AVAILABLE/HELD/HELD_EXPIRED/SOLD)만 서버가 칠하고, 내 선택·내 홀드 표시는
+  seatmap.js가 클라이언트 보관 목록과 대조해 덧입힌다 (openapi: HELD는 내 홀드/남 홀드를
+  구분하지 않는다).
+
+  **HELD_EXPIRED는 여기서도 고를 수 있어야 한다**(#157). 첫 페인트는 이 fragment가
+  만들고 폴링은 3초 뒤에야 오므로, 여기서 disable하면 그동안 좌석이 굳는다 —
+  이 이슈가 없애려던 상태 그대로다. "고를 수 있다"가 "잡힌다"는 뜻은 아니며,
+  인수 가부는 전략이 정하고(erd 4.1) 서버 응답이 말한다.
 -->
 <body>
 <div th:fragment="grid(zones)" id="seat-grid">
@@ -15,12 +21,14 @@
         <div class="seats">
             <button type="button" class="seat"
                     th:each="seat : ${zone.seats}"
-                    th:classappend="${seat.status == 'AVAILABLE' ? 'is-available' : (seat.status == 'HELD' ? 'is-held' : 'is-sold')}"
+                    th:classappend="${seat.status == 'AVAILABLE' ? 'is-available'
+                                        : (seat.status == 'HELD' ? 'is-held'
+                                        : (seat.status == 'HELD_EXPIRED' ? 'is-held-expired' : 'is-sold'))}"
                     th:attr="data-seat-id=${seat.seatId},
                              data-status=${seat.status},
                              data-seat-no=${seat.seatNo}"
                     th:style="|grid-row:${seat.rowIndex}; grid-column:${seat.colIndex}|"
-                    th:disabled="${seat.status != 'AVAILABLE'}"
+                    th:disabled="${seat.status != 'AVAILABLE' and seat.status != 'HELD_EXPIRED'}"
                     th:text="${seat.seatNo}">A-1</button>
         </div>
     </div>

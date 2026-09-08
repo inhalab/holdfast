@@ -19,6 +19,11 @@
 
 **`seat_hold`가 정본이고, `seat_inventory.status`는 파생이다.**
 
+**조회는 그 파생을 한 겹 더 민다.** 좌석 조회·폴링이 `status = 'HELD'`이면서
+`held_until`이 지난 행을 **`HELD_EXPIRED`로 계산해 내보낸다**(#157). 저장된 값은
+그대로 `HELD`이며 조회는 아무것도 쓰지 않는다 — 이 절이 이미 "파생"이라고 적은
+값에 표시용 파생을 하나 더 얹은 것이고, 상태 기계에 새 상태가 생긴 것이 아니다.
+
 근거는 `concurrency-spec.md` 2.2절이다.
 
 > `seat_inventory.status`와 `seat_hold`는 중복이 아니라 역할이 다르다. 전자는 좌석의
