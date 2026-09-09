@@ -982,7 +982,7 @@ WHERE t.prev_end IS NOT NULL AND t.created_at < t.prev_end;
 | **측정 대상 커밋** | **결과에 기록한다** (아래) | `row.commit` · `row.dirty` |
 | **측정 대상 이미지** | **결과에 기록한다** — 실제로 돈 바이너리 | `row.image` · `row.imageStale` |
 | k6 실행 위치 | 앱과 분리된 호스트 | **미충족 — 아래 참조** |
-| **측정 프로토콜** | **HTTP/1.1 고정** | k6는 nginx `:80` / ALB `:80` 직결. **시연도 로컬 `localhost:8080` HTTP/1.1이라 같은 조건이다**(`infra-decision.md` 2.1 — 터널을 재고 뺐다). AWS를 Cloudflare 뒤에 두어도 **엣지의 HTTP/2는 브라우저 쪽이고 k6는 ALB에 직결한다.** **AWS 스모크는 정본이 아니다**(3.3) |
+| **측정 프로토콜** | **HTTP/1.1 고정** | k6는 nginx `:80` / ALB `:80` 직결. **시연은 조건이 다르다** — Cloudflare Tunnel을 지나 브라우저↔엣지가 HTTP/2다(`infra-decision.md` 2.1). **그래도 측정에 닿지 않는다**: k6는 터널도 Cloudflare도 지나지 않고 컨테이너 네트워크에서 nginx에 직결한다. AWS도 같다 — **엣지의 HTTP/2는 브라우저 쪽이고 k6는 ALB에 직결한다.** **AWS 스모크는 정본이 아니다**(3.3) |
 | 세션 어피니티 | 사용하지 않음 (무상태 유지) | nginx 기본 라운드로빈 |
 | Mock PG (`holdfast.mock-pg.outcome`) | `approve`, 지연 0 (`state-transitions.md` 5.2) | 미구현 (결제 경로 미사용) |
 
