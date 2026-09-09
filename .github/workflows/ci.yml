@@ -137,3 +137,114 @@ jobs:
       - name: 정리
         if: always() && steps.check.outputs.exists == 'true'
         run: docker compose down -v
+
+  # ───────────────────────────────────────────────────────────────────────
+  # 시연 경로가 도는가 (이슈 #181)
+  #
+  # **위 boot 잡은 기본 프로젝트 한 벌만 띄운다.** #179가 만든 두 스택 경로
+  # (`./holdfast demo`)는 거기를 지나지 않는다. 그런데 그것이 **발표 당일에 쓰는
+  # 유일한 명령**이다 — infra-decision 2.1이 시연을 그 경로 하나로 몰아 놨고
+  # #179가 전략 전환까지 넣었다. **가장 값이 큰 경로가 가장 안 검증됐다.**
+  #
+  # #144가 boot 잡을 만든 이유가 그대로 여기 걸린다 — "CI만 초록이고 사람이 쓰는
+  # 경로는 깨질 수 있다".
+  #
+  # **보는 것은 넷이고, 둘째가 본체다.**
+  #   1. 두 스택이 다 뜨나
+  #   2. **U-2가 갈리나** — 안 갈리면 none이 unique처럼 보이고 1절이 죽는데
+  #      화면은 멀쩡해 보인다(erd 3.1). 나머지 셋은 눈으로 아는데 이것은 아니다
+  #   3. 화면이 뜨나
+  #   4. 측정 보호가 듣나
+  #
+  # **build·boot와 병렬로 돈다.** #144가 boot를 그렇게 둔 근거와 같다.
+  # ───────────────────────────────────────────────────────────────────────
+  demo:
+    name: 시연 스택
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 애플리케이션 존재 여부 확인
+        id: check
+        run: |
+          if [ -f api/gradlew ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "스캐폴딩 전입니다. 시연 경로 확인을 건너뜁니다."
+          fi
+
+      # **사람이 치는 명령을 그대로 친다.** CI 전용 경로를 만들면 이 잡의 뜻이
+      # 없어진다 — 확인하려는 것이 그 명령 자체다.
+      - name: 시연 스택 둘을 띄운다
+        if: steps.check.outputs.exists == 'true'
+        run: ./holdfast demo --no-open
+
+      - name: 두 스택이 모두 running인가
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          docker compose ls
+          for p in holdfast-none holdfast-pess; do
+            n=$(COMPOSE_PROJECT_NAME=$p docker compose ps --format '{{.State}}' | grep -c '^running$' || true)
+            echo "$p: running $n / 5"
+            if [ "$n" != "5" ]; then
+              echo "::error::$p 의 서비스 5개가 모두 running이 아니다 ($n)"
+              exit 1
+            fi
+          done
+
+      # **이 잡의 본체다.** U-2는 스키마 객체이고 none에서만 없다(erd 3.1).
+      # 한 DB를 공유하면 none이 unique처럼 보이는데 **화면은 멀쩡하다** —
+      # 눈으로 못 잡는 유일한 항목이라 여기서 잡는다.
+      - name: U-2가 스택마다 갈리나
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          q="SELECT count(*) FROM pg_indexes WHERE indexname='ux_seat_hold_active'"
+          none=$(COMPOSE_PROJECT_NAME=holdfast-none docker compose exec -T db psql -U holdfast -d holdfast -tAc "$q")
+          pess=$(COMPOSE_PROJECT_NAME=holdfast-pess docker compose exec -T db psql -U holdfast -d holdfast -tAc "$q")
+          echo "none=$none  pess=$pess  (0 과 1 이어야 한다)"
+          if [ "$none" != "0" ] || [ "$pess" != "1" ]; then
+            echo "::error::U-2가 갈리지 않았다 — none=$none pess=$pess. 1절이 성립하지 않는다"
+            exit 1
+          fi
+
+      - name: 시연 화면이 뜨나
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          fail=0
+          check() {
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$1")
+            printf '%-46s %s\n' "$1" "$code"
+            [ "$code" = "$2" ] || { echo "::error::$1 가 $code 를 냈다 ($2 여야 한다)"; fail=1; }
+          }
+          check http://localhost:8080/demo/race       200
+          check http://localhost:8090/demo/race       200
+          check http://localhost:8090/               200
+          check http://localhost:8090/admin/programs 200
+          # #156 — 시연은 actuator를 좁혀 띄운다. 두 스택 다 적용돼야 한다.
+          check http://localhost:18081/actuator/metrics 404
+          check http://localhost:18091/actuator/metrics 404
+          exit $fail
+
+      # **경고가 아니라 중단이어야 한다**(#179 c · #132). 두 스택이 뜬 채로
+      # 측정을 돌리면 7.3의 고정 변수가 통제되지 않는다.
+      - name: 측정 보호가 듣나
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          if ./holdfast measure >/dev/null 2>&1; then
+            echo "::error::시연 스택이 떠 있는데 measure 가 그냥 돌았다"
+            exit 1
+          fi
+          echo "measure 가 막혔다 — 정상"
+
+      - name: 실패하면 로그를 남긴다
+        if: failure() && steps.check.outputs.exists == 'true'
+        run: |
+          for p in holdfast-none holdfast-pess; do
+            echo "──────── $p ────────"
+            COMPOSE_PROJECT_NAME=$p docker compose logs --tail 120 || true
+          done
+
+      - name: 정리
+        if: always() && steps.check.outputs.exists == 'true'
+        run: ./holdfast demo-down || true
