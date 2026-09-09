@@ -56,3 +56,9 @@ build/demo-script.html
 .vscode/
 *.iml
 .DS_Store
+
+# --- Cloudflare Tunnel (이거 빠지면 터널 자격증명이 통째로 공개됩니다) ---
+infra/tunnel/credentials.json
+infra/tunnel/*.json
+!infra/tunnel/credentials.example.json
+.env

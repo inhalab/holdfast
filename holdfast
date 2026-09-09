@@ -253,6 +253,45 @@ use_stack() {
   esac
 }
 
+# ── 터널 검증 (#174) ─────────────────────────────────────────────────────
+TUNNEL_HOSTS="${TUNNEL_HOSTS:-demo-none.inhalab.cloud demo-pess.inhalab.cloud demo-admin.inhalab.cloud}"
+
+# **밖에서 익명으로 쳐 본다.** 안에서 보는 것은 의미가 없다 — 2.1이 적은 대로
+# **발표자는 자기 화면으로 보므로 정상으로 보이고**, 틀린 것은 밖에서만 드러난다.
+#
+# **보는 것은 "앱이 나오느냐" 하나다.** 세 호스트명 모두 Cloudflare Access 뒤에
+# 있으므로, 인증 없이 앱 화면이 오면 **Access가 안 걸린 것**이다. 302(로그인으로
+# 보냄)·403·404는 정상이고 **200에 앱 HTML이면 실패**다.
+#
+# **경로 허용 목록은 이 검사가 못 본다.** Access를 지나야 앱에 닿는데 스크립트에는
+# 세션이 없다. 그쪽은 리허설에서 브라우저로 확인한다 — 이 함수가 지키는 것은
+# **"밖에서 아무나 들어오느냐"** 한 겹이다.
+tunnel_verify() {
+  local host code body failed=0
+  echo "[holdfast] 밖에서 확인한다 — 인증 없이 앱이 나오면 실패다."
+  for host in $TUNNEL_HOSTS; do
+    code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "https://$host/" 2>/dev/null || echo 000)"
+    case "$code" in
+      000)
+        echo "[holdfast]   $host  응답 없음 ($code) — 전파 중이거나 터널이 안 붙었다" >&2
+        failed=1 ;;
+      200)
+        # 200이어도 Access 로그인 화면일 수 있다. 앱인지 본문으로 가른다.
+        body="$(curl -s --max-time 15 "https://$host/" 2>/dev/null | head -c 4000)"
+        if printf '%s' "$body" | grep -qi 'holdfast'; then
+          echo "[holdfast]   $host  **앱이 그대로 나온다 (200)** — Access가 안 걸렸다" >&2
+          failed=1
+        else
+          echo "[holdfast]   $host  200 (Access 화면) — 정상"
+        fi ;;
+      *)
+        echo "[holdfast]   $host  $code — 정상 (앱에 못 닿는다)" ;;
+    esac
+  done
+  [ "$failed" = "0" ] && { echo "[holdfast] 확인 통과."; return 0; }
+  return 1
+}
+
 # 떠 있는 시연 스택 이름들. **서브셸이라 use_stack의 export가 새지 않는다.**
 demo_stacks_up() {
   (
@@ -483,6 +522,53 @@ EOF
       fi
       open_script
     fi
+    ;;
+
+  # ── 터널 (#174) ───────────────────────────────────────────────────────
+  #
+  # **`demo` 에 붙이지 않는다.** 2.1이 "시연 직전에 열고 직후에 닫는다"로 정했고,
+  # `demo` 는 리허설에서 여러 번 부른다. 함께 띄우면 상시로 두는 것과 같아진다.
+  tunnel)
+    sub="${1:-up}"
+    case "$sub" in
+      up)
+        [ -f infra/tunnel/credentials.json ] || {
+          echo "[holdfast] !! infra/tunnel/credentials.json 이 없다." >&2
+          echo "[holdfast]    infra/tunnel/README.md 의 준비 절차를 먼저 한다." >&2
+          exit 1; }
+        [ -n "${TUNNEL_ID:-}" ] || {
+          echo "[holdfast] !! TUNNEL_ID 가 없다. .env 에 넣거나 앞에 붙여 부른다." >&2
+          exit 1; }
+
+        # **오리진이 먼저 서 있어야 한다.** 터널만 뜨면 밖에서 502가 보이고,
+        # 그것을 "Access가 막았다"로 착각한다.
+        up="$(demo_stacks_up)"
+        case " $up " in
+          *" holdfast-none "*) ;;
+          *) echo "[holdfast] !! 시연 스택이 안 떠 있다. ./holdfast demo 를 먼저 한다." >&2; exit 1 ;;
+        esac
+
+        echo "[holdfast] 터널을 띄운다."
+        COMPOSE_PROJECT_NAME=holdfast-tunnel docker compose -f docker-compose.tunnel.yml up -d
+        echo "[holdfast] 엣지에 전파될 때까지 기다린다."
+        sleep 10
+        tunnel_verify || {
+          echo "[holdfast] !! 확인에 실패했다. **터널을 닫는다.**" >&2
+          echo "[holdfast]    열린 채로 멈추는 것이 최악이다(#174)." >&2
+          COMPOSE_PROJECT_NAME=holdfast-tunnel docker compose -f docker-compose.tunnel.yml down >/dev/null 2>&1
+          exit 1; }
+        echo
+        echo "[holdfast] 터널 준비됐다. 발표장에서 열 주소:"
+        for h in $TUNNEL_HOSTS; do echo "[holdfast]   https://$h/"; done
+        echo "[holdfast] 시연이 끝나면: ./holdfast tunnel down"
+        ;;
+      down)
+        COMPOSE_PROJECT_NAME=holdfast-tunnel docker compose -f docker-compose.tunnel.yml down
+        echo "[holdfast] 터널을 닫았다."
+        ;;
+      verify) tunnel_verify ;;
+      *) echo "tunnel up|down|verify" >&2; exit 2 ;;
+    esac
     ;;
 
   strategy)
