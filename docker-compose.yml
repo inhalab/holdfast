@@ -21,7 +21,7 @@ services:
       POSTGRES_USER: holdfast
       POSTGRES_PASSWORD: holdfast
     ports:
-      - "5432:5432"
+      - "${DB_PORT_HOST:-5432}:5432"
     volumes:
       # postgres:18 이미지는 PGDATA가 /var/lib/postgresql/18/docker (버전별 하위 디렉터리)라 옛 관례인
       # .../data가 아닌 부모 경로를 마운트해야 메이저 버전이 바뀌어도 볼륨이 실제 데이터 위치를 계속 포함한다.
@@ -35,7 +35,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT_HOST:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -48,7 +48,7 @@ services:
     # 풀 대기"를 확정할 수 없다. 인스턴스별 관측(concurrency-spec 7.1, 이슈 #44)을
     # 위해 컨테이너를 직접 찌를 수 있게 호스트 포트를 연다.
     ports:
-      - "18081:8080"
+      - "${APP1_PORT_HOST:-18081}:8080"
     environment:
       PORT: 8080
       INSTANCE_ID: app1
@@ -90,7 +90,7 @@ services:
   app2:
     build: ./api
     ports:
-      - "18082:8080"
+      - "${APP2_PORT_HOST:-18082}:8080"
     environment:
       PORT: 8080
       INSTANCE_ID: app2
@@ -130,7 +130,14 @@ services:
   nginx:
     image: nginx:1.27-alpine
     ports:
-      - "8080:80"
+      # **호스트 포트가 변수인 이유는 시연이다**(#179). 발표장에 터미널이 없어
+      # `./holdfast strategy`를 못 쓰므로, `none`과 `pessimistic` 스택을 **미리 둘
+      # 띄워 두고 주소로 가른다.** 두 벌이 같은 호스트 포트를 쓸 수 없다.
+      #
+      # **기본값이 지금 값이라 측정 경로는 그대로다.** `./holdfast up`도
+      # `run.sh`도 `metrics-snapshot.mjs`(:18081·:18082)도 바뀌지 않는다 —
+      # 7.3의 고정 변수에 닿지 않는다.
+      - "${NGINX_PORT_HOST:-8080}:80"
     volumes:
       - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:

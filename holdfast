@@ -221,6 +221,71 @@ DEMO_SCENARIO="${DEMO_SCENARIO:-extreme}"
 # 설명하는 사이에 좌석이 풀려 버린다. 3절이 정한 운영값 5분을 쓴다.
 DEMO_HOLD_TTL_SECONDS="${DEMO_HOLD_TTL_SECONDS:-300}"
 
+# ── 시연 스택 둘 (#179) ──────────────────────────────────────────────────
+# **발표장에 터미널이 없다.** 서버는 집 PC에 있고 발표자는 발표장에 있어
+# (infra-decision.md 2.1), 1절 끝에서 `./holdfast strategy pessimistic` 을 칠
+# 셸이 없다(#178이 남긴 미결). 그래서 **두 전략을 미리 띄워 두고 주소로
+# 가른다** — 전환이 탭 전환이 된다.
+#
+# **DB를 반드시 나눈다. 이것은 선택이 아니다.** U-2(ux_seat_hold_active)는
+# 스키마 객체이고 none에서만 없다(erd.md 3.1). 한 DB가 그 인덱스를 갖고 동시에
+# 안 가질 수는 없어서, 공유하면 none이 unique처럼 보이고 **1절이 통째로 죽는다.**
+# scope-m4 8절이 위임 프록시를 기각한 근거와 같은 자리다.
+#
+# **가르는 수단은 COMPOSE_PROJECT_NAME 하나다.** docker compose를 부르는 모든
+# 곳이 그 값을 따른다 — warn_stopped·wait_healthy·reload_nginx는 물론
+# seed.sh(load-test/, 최건 소유)도 그대로 동작한다. **고칠 파일이 없다.**
+DEMO_STACKS="${DEMO_STACKS:-none pessimistic}"
+
+use_stack() {
+  case "$1" in
+    none)
+      export COMPOSE_PROJECT_NAME="holdfast-none"
+      export NGINX_PORT_HOST=8080 APP1_PORT_HOST=18081 APP2_PORT_HOST=18082
+      export DB_PORT_HOST=5432 REDIS_PORT_HOST=6379
+      ;;
+    pessimistic)
+      export COMPOSE_PROJECT_NAME="holdfast-pess"
+      export NGINX_PORT_HOST=8090 APP1_PORT_HOST=18091 APP2_PORT_HOST=18092
+      export DB_PORT_HOST=5442 REDIS_PORT_HOST=6389
+      ;;
+    *) echo "[holdfast] 시연 스택이 아니다: $1" >&2; return 2 ;;
+  esac
+}
+
+# 떠 있는 시연 스택 이름들. **서브셸이라 use_stack의 export가 새지 않는다.**
+demo_stacks_up() {
+  (
+    for st in $DEMO_STACKS; do
+      use_stack "$st" || continue
+      [ -n "$(docker compose ps -q 2>/dev/null)" ] && printf '%s ' "$COMPOSE_PROJECT_NAME"
+    done
+  )
+}
+
+# **측정 중에 시연 스택이 떠 있으면 안 된다**(#179 (c)). 포트가 갈려도
+# CPU와 메모리를 나눠 쓰므로 concurrency-spec 7.3이 통제하려는 조건이 깨진다.
+# **경고가 아니라 중단이다** — #132가 warn_stopped를 그렇게 만든 것과 같은
+# 자리이고, 여기서 새는 것은 컨테이너 하나가 아니라 측정 회차 전체다.
+refuse_if_demo_up() {
+  local up
+  up="$(demo_stacks_up)"
+  [ -z "$up" ] && return 0
+  echo "[holdfast] !! 시연 스택이 떠 있다: $up" >&2
+  echo "[holdfast]    측정은 한 스택에서만 한다. 포트가 갈려도 CPU·메모리를" >&2
+  echo "[holdfast]    나눠 쓰면 7.3의 고정 변수가 통제되지 않는다." >&2
+  echo "[holdfast]    내리려면: ./holdfast demo-down" >&2
+  exit 1
+}
+
+# 그 스택의 nginx 호스트 포트. 안내 문구와 터널 ingress가 이 값을 쓴다(#174).
+stack_port() {
+  case "$1" in
+    none)        echo 8080 ;;
+    pessimistic) echo 8090 ;;
+  esac
+}
+
 # nginx는 기동 시 읽은 설정으로 계속 돈다. infra/nginx/nginx.conf는 바인드
 # 마운트라 컨테이너 안 파일은 바로 바뀌지만, `docker compose up -d`는 마운트된
 # 파일이 바뀌었다고 컨테이너를 다시 만들지 않는다. **실제로 Host 헤더 수정이
@@ -298,13 +363,23 @@ case "$cmd" in
     ;;
 
   down) docker compose down ;;
+
+  # **시연 스택은 프로젝트가 달라 `down`이 안 건드린다**(#179). 내리는 길이
+  # 이름으로 보여야 한다 — #128·#132가 같은 이유로 `rebuild`를 서브커맨드로 뒀다.
+  demo-down)
+    for st in $DEMO_STACKS; do
+      use_stack "$st"
+      echo "[holdfast] $COMPOSE_PROJECT_NAME 내린다."
+      docker compose down
+    done
+    ;;
   ps)   docker compose ps ;;
   logs) docker compose logs -f --tail 100 "${1:-app1}" ;;
 
   seed)     "$S/seed.sh" "$@" ;;
-  measure)  "$S/measure.sh" "$@" ;;
-  deadlock) "$S/run-deadlock.sh" "$@" ;;
-  sustained) "$S/run-sustained.sh" "$@" ;;
+  measure)   refuse_if_demo_up; "$S/measure.sh" "$@" ;;
+  deadlock)  refuse_if_demo_up; "$S/run-deadlock.sh" "$@" ;;
+  sustained) refuse_if_demo_up; "$S/run-sustained.sh" "$@" ;;
   verify)   "$S/verify.sh" "$@" ;;
   summary)  node_run "$S/summarize.mjs" "$@" ;;
 
@@ -322,47 +397,66 @@ case "$cmd" in
     # 띄우면 점검이 빠진다 — `--build`를 여기에도 둔다(#128).
     #
     # **여는 것이 기본이고 `--no-open`으로 끈다.** 플래그를 켜야 열리게 두면
-    # 발표자가 그것을 잊고, 그러면 지금과 똑같이 손으로 다섯을 열게 된다 —
-    # 이 이슈가 없애려던 상태 그대로다. 끄는 길은 남긴다: 전략만 바꾸려고 다시
-    # 부를 때 탭이 세 개씩 늘어나면 그게 더 나쁘다(그 용도의 정식 경로는
-    # `./holdfast strategy <전략>`이고, 그쪽은 열지 않는다).
+    # 발표자가 그것을 잊고, 그러면 손으로 넷을 열게 된다.
     no_open=""
-    demo_args=""
+    build=""
     for a in "$@"; do
       case "$a" in
         --no-open) no_open="yes" ;;
-        *) demo_args="$demo_args $a" ;;
+        --build)   build="--build" ;;
+        none|pessimistic|optimistic|unique|redis)
+          # **전략 인자를 받지 않는다**(#179). 두 스택을 모두 띄우므로 고를 것이
+          # 없고, 받으면 "한쪽만 떴나"를 의심하게 된다.
+          echo "[holdfast] demo 는 전략 인자를 받지 않는다 — $DEMO_STACKS 를 모두 띄운다." >&2
+          echo "[holdfast]    시연 중 전환은 탭으로 한다(#179)." >&2
+          echo "[holdfast]    한 전략만 띄우려면: ./holdfast up $a" >&2
+          exit 2 ;;
+        *) echo "[holdfast] 모르는 인자: $a" >&2; exit 2 ;;
       esac
     done
-    # shellcheck disable=SC2086
-    parse_strategy_args $demo_args
-    strategy="${strategy:-none}"
 
-    echo "[holdfast] 시연 준비 — 전략 $strategy · 시나리오 $DEMO_SCENARIO${build:+ (다시 빌드)}"
-    warn_stopped
-    # **시연은 actuator를 좁혀 띄운다**(#156). 터널을 열면 개발 PC가 인터넷에
-    # 나가는데(#172), metrics 75개에 힙·커넥션 풀·JVM 정보가 다 들어 있다.
-    #
-    # **측정은 이 경로를 지나지 않는다** — run.sh는 이 서브커맨드를 쓰지 않고
-    # metrics-snapshot.mjs는 app1·app2에 직접 붙는다. 그래서 여기서 좁혀도
-    # 7.1이 못박은 hikaricp.connections.pending 은 그대로 읽힌다.
-    HOLDFAST_STRATEGY="$strategy" HOLD_TTL_SECONDS="$DEMO_HOLD_TTL_SECONDS"       HOLDFAST_ACTUATOR_EXPOSURE="health"       docker compose up -d $build
-    wait_healthy
-    reload_nginx
-    "$S/seed.sh" "$DEMO_SCENARIO" "$strategy"
+    echo "[holdfast] 시연 준비 — 스택 둘($DEMO_STACKS) · 시나리오 $DEMO_SCENARIO${build:+ (다시 빌드)}"
+
+    # **한 스택씩 끝까지 세운다.** 둘을 동시에 올리면 어느 쪽이 실패했는지
+    # 로그가 섞이고, seed.sh가 어느 DB를 잡았는지도 흐려진다.
+    for st in $DEMO_STACKS; do
+      use_stack "$st"
+      echo
+      echo "[holdfast] ── $st  ($COMPOSE_PROJECT_NAME · nginx :$(stack_port "$st"))"
+      warn_stopped
+      # **시연은 actuator를 좁혀 띄운다**(#156). 터널이 집 PC를 인터넷에 내놓는데
+      # (2.1), metrics 75개에 힙·커넥션 풀·JVM 정보가 다 들어 있다.
+      HOLDFAST_STRATEGY="$st" HOLD_TTL_SECONDS="$DEMO_HOLD_TTL_SECONDS" HOLDFAST_ACTUATOR_EXPOSURE="health" docker compose up -d $build
+      wait_healthy
+      reload_nginx
+      # U-2는 전략에 따라 있고 없다(erd 3.1). 시드가 그 판단을 하므로 스택마다 돈다.
+      "$S/seed.sh" "$DEMO_SCENARIO" "$st"
+    done
+
+    none_port="$(stack_port none)"
+    pess_port="$(stack_port pessimistic)"
+    # **탭이 넷이 됐다.** 1절이 none 탭에서 시작해 pess 탭으로 넘어간다 —
+    # 그 전환이 이 이슈가 터미널을 대신하는 방식이다.
+    DEMO_TABS="http://localhost:${none_port}/demo/race http://localhost:${pess_port}/demo/race http://localhost:${pess_port}/ http://localhost:${pess_port}/admin/programs"
     cat <<EOF
 
 ════ 시연 주소 ════
   홀드 TTL은 시연용 ${DEMO_HOLD_TTL_SECONDS}초다(측정 기본값 10초는 설명 중에 풀린다).
 
-  좌석맵            http://localhost:8080/sessions/1?userId=1
-                    http://localhost:8080/sessions/1?userId=2   ← 창을 둘 띄운다
-  동시 요청 데모    http://localhost:8080/demo/race
-  검표              http://localhost:8080/scan
-  예약 현황(관리자) http://localhost:8080/admin/reservations
+  **전략 전환은 탭 전환이다.** 두 스택이 같이 떠 있다(#179).
 
-  전략을 바꾸려면:  ./holdfast demo pessimistic
-  현재 전략은 데모 페이지 상단에 표시된다.
+  [1절 전반] none        http://localhost:${none_port}/demo/race
+  [1절 후반·2절] pess    http://localhost:${pess_port}/demo/race
+  좌석맵(pess)           http://localhost:${pess_port}/sessions/1?userId=1
+                         http://localhost:${pess_port}/sessions/1?userId=2
+  검표(pess)             http://localhost:${pess_port}/scan
+  프로그램·회차(pess)    http://localhost:${pess_port}/admin/programs
+
+  **3절은 pess 스택이다.** 거기서 만든 회차라야 같은 DB의 사용자 화면에 보인다.
+  none 쪽 /admin 은 쓰지 않는다.
+
+  **DB가 갈려 있다.** none에서 깨뜨린 상태가 그대로 남으므로 탭을 되돌리면
+  "아까 그것"을 다시 보일 수 있다.
 
   **첫 실행은 한 번 눌러 버리고 시작하라.** JVM이 데워지기 전 첫 묶음은
   일부 요청이 연결 단계에서 실패한다(실측에서 첫 시도만 그랬다).
@@ -379,10 +473,11 @@ EOF
         echo "[holdfast]   !! 브라우저를 여는 명령이 없다(start·open·xdg-open)." >&2
         echo "[holdfast]      위 주소를 직접 연다. 준비 자체는 끝났다." >&2
       elif open_demo_tabs; then
-        echo "[holdfast]   탭 1  프로그램 목록   http://localhost:8080/"
-        echo "[holdfast]   탭 2  동시 요청 데모  http://localhost:8080/demo/race"
-        echo "[holdfast]   탭 3  프로그램·회차    http://localhost:8080/admin/programs"
-        echo "[holdfast]   번호는 대본의 탭 번호와 같다. **1절은 탭 2에서 시작한다.**"
+        echo "[holdfast]   탭 1  동시 요청(none)  http://localhost:${none_port}/demo/race"
+        echo "[holdfast]   탭 2  동시 요청(pess)  http://localhost:${pess_port}/demo/race"
+        echo "[holdfast]   탭 3  프로그램 목록    http://localhost:${pess_port}/"
+        echo "[holdfast]   탭 4  프로그램·회차    http://localhost:${pess_port}/admin/programs"
+        echo "[holdfast]   번호는 대본의 탭 번호와 같다. **1절은 탭 1에서 시작해 탭 2로 넘어간다.**"
       else
         echo "[holdfast]   !! 탭을 다 열지 못했다. 위 주소를 직접 연다." >&2
       fi
