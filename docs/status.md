@@ -181,10 +181,10 @@ M4는 계획보다 두 달 앞당겨 끝났다. **M4의 남은 #42(AWS Fargate)�
 | **id를 명시하는 시드는 IDENTITY 시퀀스를 맞춘다** | 안 맞추면 앱의 자동 생성 INSERT가 이미 있는 id를 받는다 — [`erd.md`](erd.md) 2.1 |
 | **적용된 Flyway 마이그레이션은 주석도 안 고친다** | 체크섬이 바뀌어 기존 DB가 기동을 거부한다 |
 | **PR을 쌓지 않는다** (R8) | squash로 해시가 달라져 같은 내용이 충돌하고, base 브랜치가 지워지면 되살릴 수 없다 — [`workflow.md`](workflow.md) |
-| **`/demo/**`는 끌 수 있고 기본값은 켬이다** | `holdfast.demo.enabled=false`로 끈다. 되돌리기가 한 회차의 좌석·홀드·예약을 지우므로 **로컬 시연 밖에서 켜 두지 않는다**. 기본값이 켬인 것은 **측정과 시연이 둘 다 로컬 Docker Compose에서 돌기** 때문이다(`infra-decision.md` 2절·2.1). **시연에서도 켠다** — 청중이 쓰는 화면이 `/demo/race`다(#168) — [`scope-m4.md`](scope-m4.md) 7절 |
+| **`/demo/**`는 끌 수 있고 기본값은 켬이다** | `holdfast.demo.enabled=false`로 끈다. 되돌리기가 한 회차의 좌석·홀드·예약을 지우므로 **배포에서는 켜 두지 않는다**. 기본값이 켬인 것은 **측정과 시연이 둘 다 같은 Docker Compose에서 돌기** 때문이다(`infra-decision.md` 2절·2.1). **시연에서도 켠다** — **발표자가 1절에서 쓰는 화면이 `/demo/race`**다. 시연은 터널을 지나므로 그 경로가 ingress 허용 목록에 든다(2.1) — [`scope-m4.md`](scope-m4.md) 7절 |
 | **CI가 이미지 기동까지 본다** | `boot` 잡이 `./holdfast rebuild`로 스택을 띄우고 **다섯 컨테이너 전수 + 앱 두 대 응답 + 화면 렌더**를 확인한다. 테스트는 `properties=`로 값을 직접 주므로 `application.yml`의 자리표시자 경로를 건너뛴다 — 그래서 **테스트가 전부 통과해도 컨테이너가 못 뜬 적이 두 번 있다**(#143, #148) — #144 |
 | **실행기는 전략 이름을 검증한다** | `holdfast`가 전략 하나만 받고 다섯 중 하나인지 본다. 안 하면 없는 이름이 그대로 `HOLDFAST_STRATEGY`로 나가고 **조건에 맞는 빈이 0개가 되어 앱이 기동하지 못한다**. 실제로 `extreme`(경합도 시나리오)이 들어가 main이 안 떴다 — #143 |
-| **`/admin/**`은 아무나 연다. 배포하면 끈다** | 인증이 없다. 로컬은 그대로 둔다(**시연도 `localhost`라 노출이 없다** — `infra-decision.md` 2.1이 터널을 재고 뺐다). #42(AWS)로 뜨면 `holdfast.admin.enabled=false`로 **경로 자체를 없앤다** — 잠그는 것이 아니다. 네 수단을 따져 그것을 고른 근거는 [`infra-decision.md`](infra-decision.md) 3.1. **구현됐다(#124)** — `false`면 컨트롤러 셋의 빈이 만들어지지 않아 경로가 404이고, 바닥 내비의 링크도 같은 값으로 사라진다 |
+| **`/admin/**`은 아무나 연다. 배포하면 끈다** | 인증이 없다. 로컬은 그대로 둔다. **시연은 터널로 인터넷에 나가므로 프로퍼티가 아니라 터널 ingress가 경로를 가른다** — `infra-decision.md` 2.1, 확인 절차는 #174. #42(AWS)로 뜨면 `holdfast.admin.enabled=false`로 **경로 자체를 없앤다** — 잠그는 것이 아니다. 네 수단을 따져 그것을 고른 근거는 [`infra-decision.md`](infra-decision.md) 3.1. **구현됐다(#124)** — `false`면 컨트롤러 셋의 빈이 만들어지지 않아 경로가 404이고, 바닥 내비의 링크도 같은 값으로 사라진다 |
 
 ---
 
@@ -345,7 +345,7 @@ cd api && ./gradlew test                 # 140건
 | [`requirements.md`](requirements.md) | 요구사항 추적표 — REQ 번호와 구현·테스트 대응, **표가 어디서 왔나(1.1)** |
 | [`openapi.yaml`](openapi.yaml) | API 계약의 기계 판독본. `api-spec.md`와 짝이다 |
 | [`workflow.md`](workflow.md) | 협업 규칙. 문서 갱신 8개 규칙 |
-| [`infra-decision.md`](infra-decision.md) | AWS 판단. 4절이 "잘라도 되는 것", **2.1이 시연 환경**(개발 PC 로컬 · 터널 회수) |
+| [`infra-decision.md`](infra-decision.md) | AWS 판단. 4절이 "잘라도 되는 것", **2.1이 시연 환경**(집 PC + 터널 + 도메인) |
 | [`setup.md`](setup.md) · [`roles.md`](roles.md) · [`demo-script.md`](demo-script.md) | 환경 구축 · 역할 · 시연 대본 |
 | [`submissions/README.md`](submissions/README.md) | 수업 제출물 기록 — **파일은 저장소 밖**이고, 제출물이 담은 판단이 어느 문서에 대응하는지만 적는다 |
 
