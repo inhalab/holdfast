@@ -179,6 +179,15 @@ k6를 돌리더라도 스모크이고, 정본을 갱신하지 않는다. `concur
 
 #### 청중에게 여는 경로 — 이 목록이 정본이다
 
+**호스트명이 셋이다**(#179 — 시연 스택을 둘 띄운다). 경로 목록은 같고
+**어디로 보내는지가 다르다.**
+
+| 호스트명 | 오리진 | 여는 경로 |
+|---|---|---|
+| `demo-none.inhalab.cloud` | `holdfast-none` nginx (`:8080`) | 아래 목록 |
+| `demo-pess.inhalab.cloud` | `holdfast-pess` nginx (`:8090`) | 아래 목록 |
+| `demo-admin.inhalab.cloud` | **`holdfast-pess` nginx** (`:8090`) | `/admin/**` — **Cloudflare Access**(#174) |
+
 | 경로 | 왜 |
 |---|---|
 | `/` · `/programs` · `/sessions/**` | 좌석맵 |
@@ -187,7 +196,12 @@ k6를 돌리더라도 스모크이고, 정본을 갱신하지 않는다. `concur
 | `/api/**` | 위 화면이 부른다. 막으면 화면이 안 돈다 |
 
 **여는 것보다 안 여는 것이 중요하다** — `/actuator/**` · `/scan`, 그리고
-**`/admin/**`은 위 미결 갈래가 정하기 전까지 열지 않는다.**
+**`/admin/**`은 `demo-none`·`demo-pess`에서 열지 않는다.** 관리자는 `demo-admin`
+하나뿐이고 그쪽에 Access가 걸린다.
+
+**`demo-admin`이 `pess` 오리진인 것은 대본이 정한다.** 3절 마지막이 *"방금 만든
+회차가 바로 팔린다"*인데 **같은 DB라야 보인다.** 2절이 `pessimistic`에서 도므로
+관리자도 그쪽이다.
 
 **`cloudflared`의 ingress 설정 파일은 이 표의 구현이지 정본이 아니다.** 설정에만
 있으면 **"왜 이 경로만 열었나"가 남지 않는다.** `erd.md` 4절이 U-2를 두고 적은
