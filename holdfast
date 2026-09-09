@@ -263,6 +263,21 @@ demo_stacks_up() {
   )
 }
 
+# **반대 방향도 막는다**(#181에서 찾았다). 시연 스택의 `none` 은 측정 스택과
+# **같은 호스트 포트**(8080·18081·18082·5432·6379)를 쓴다 — 기본값을 그대로
+# 물려받게 두어 측정 경로를 안 건드린 결과다(#179). 그래서 측정 스택이 떠 있으면
+# `demo` 가 포트를 못 잡고 **절반만 뜬 채로 실패한다.**
+#
+# 겹쳐 띄우는 것은 어차피 (c)가 막는다 — 같이 못 도는 것이 정상이고,
+# **먼저 알려 주는 것이 반쯤 뜬 것을 뒤늦게 발견하는 것보다 낫다.**
+refuse_if_measure_up() {
+  [ -n "$(COMPOSE_PROJECT_NAME=holdfast docker compose ps -q 2>/dev/null)" ] || return 0
+  echo "[holdfast] !! 측정 스택(holdfast)이 떠 있다." >&2
+  echo "[holdfast]    시연 스택의 none 이 같은 호스트 포트를 쓴다 — 함께 못 뜬다." >&2
+  echo "[holdfast]    내리려면: ./holdfast down" >&2
+  exit 1
+}
+
 # **측정 중에 시연 스택이 떠 있으면 안 된다**(#179 (c)). 포트가 갈려도
 # CPU와 메모리를 나눠 쓰므로 concurrency-spec 7.3이 통제하려는 조건이 깨진다.
 # **경고가 아니라 중단이다** — #132가 warn_stopped를 그렇게 만든 것과 같은
@@ -414,6 +429,8 @@ case "$cmd" in
         *) echo "[holdfast] 모르는 인자: $a" >&2; exit 2 ;;
       esac
     done
+
+    refuse_if_measure_up
 
     echo "[holdfast] 시연 준비 — 스택 둘($DEMO_STACKS) · 시나리오 $DEMO_SCENARIO${build:+ (다시 빌드)}"
 
