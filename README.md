@@ -149,6 +149,34 @@ nginx 설정을 reload한다. 생짜 `docker compose up -d --build`에는 그 �
 PATH에 넣고 싶으면 저장소 루트를 넣는다 — `export PATH="$PATH:$(pwd)"`.
 넣지 않아도 `./holdfast`로 그대로 실행된다.
 
+### 테스트는 저장소 전체가 보이는 데서 돌린다
+
+**작업 디렉터리는 `api/`여도 된다** — CI가 그렇게 돈다(`cd api && ./gradlew test`).
+**조건은 `load-test/`와 `infra/`가 조상 디렉터리 어딘가에 함께 보이는 것**이다.
+
+테스트 넷이 저장소 루트의 파일을 읽는다. 경로를 하드코딩하지 않고 **`load-test/`가
+보일 때까지 부모로 올라가서** 루트를 찾는다.
+
+| 테스트 | 읽는 것 |
+|---|---|
+| `admin/SeedScriptSequenceTest` | `load-test/sql/seed.sql` · `infra/demo-seed.sql` |
+| `reservation/StrategyArgumentTest` | `holdfast`의 전략 목록 |
+| `web/DemoSeedFlowTest` | `infra/demo-seed.sql` |
+| `web/SeatMapScriptNavigationTest` | 정적 자원 |
+
+**루트 판별 기준은 `load-test/` 디렉터리다.** `DemoSeedFlowTest` 하나만 `infra/`를
+보는데 둘 다 루트에 있어 결과가 같다 — **둘이 갈리는 날 기준은 `load-test/`다.**
+
+클론 전체에서 돌리면 신경 쓸 일이 없다. **컨테이너로 돌릴 때만 걸린다.**
+
+```bash
+# 루트를 걸고 -w 로 api 를 가리킨다
+docker run --rm -v "$PWD:/repo" -w /repo/api <이미지> ./gradlew test
+
+# api/ 만 걸면 넷이 함께 죽는다 — 부모로 올라가도 load-test/ 가 없다
+#   IllegalStateException: load-test/ 가 있는 저장소 루트를 찾지 못했다.
+```
+
 ## 동시성을 화면으로 보이기
 
 **손으로 두 창을 클릭하는 것으로는 동시성을 보여줄 수 없다.** 홀드 트랜잭션이
