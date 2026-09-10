@@ -30,8 +30,12 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 @ControllerAdvice(basePackages = "com.inhalab.holdfast.web")
 public class PageModelAdvice {
 
-    /** {@code INSTANCE_ID} 환경변수. docker-compose가 app1/app2로 준다. */
-    @Value("${holdfast.instance-id:unknown}")
+    /**
+     * 이 요청을 처리한 인스턴스. <b>결정 규칙은 {@code InstanceIdentityInitializer} 하나에 있다</b>
+     * — 로컬은 {@code docker-compose}가 준 {@code app1}/{@code app2}, Fargate는 태스크
+     * 메타데이터에서 읽은 값이다(이슈 #151).
+     */
+    @Value("${holdfast.instance-id:local}")
     private String instanceId;
 
     /**

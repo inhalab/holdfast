@@ -1,0 +1,4 @@
+# EnvironmentPostProcessor 는 컨텍스트보다 먼저 도는 자리라 컴포넌트 스캔에 안 잡힌다.
+# 여기에 등록해야 실행된다. 근거는 support/InstanceIdentityInitializer 주석에 있다(#151).
+org.springframework.boot.env.EnvironmentPostProcessor=\
+  com.inhalab.holdfast.support.InstanceIdentityInitializer
