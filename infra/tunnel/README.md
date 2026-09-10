@@ -38,6 +38,15 @@ TUNNEL_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 > **`credentials.json`과 `.env`는 `.gitignore`에 있다.** 이 파일이 있으면 누구나
 > 이 터널로 트래픽을 받을 수 있다.
 
+> **이 절차는 «계정 작업을 하는 기계»와 «터널을 돌릴 기계»가 같다고 전제한다.**
+> `tunnel login`은 로그인한 계정에 터널을 묶고 자격증명을 `$PWD/infra/tunnel`에
+> 쓴다. **지금은 둘이 같다** — 데모가 도는 기계와 도메인 계정이 같은 쪽이다(#183).
+>
+> **둘이 갈리면** 계정 쪽에서 `login`·`create`·`route dns`를 하고
+> `credentials.json`과 `TUNNEL_ID`를 데모 기계로 옮긴다. **그 파일이 있으면 누구나
+> 이 터널로 트래픽을 받으므로 옮기는 경로에 주의한다** — 채팅이나 저장소에
+> 올리지 않는다.
+
 ### 3. DNS 세 개를 터널로 보낸다
 
 ```bash

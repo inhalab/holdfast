@@ -188,13 +188,29 @@ k6를 돌리더라도 스모크이고, 정본을 갱신하지 않는다. `concur
 | `demo-pess.inhalab.cloud` | `holdfast-pess` nginx (`:8090`) | 아래 목록 |
 | `demo-admin.inhalab.cloud` | **`holdfast-pess` nginx** (`:8090`) | `/admin/**` — **Cloudflare Access**(#174) |
 
+**화면 이름이 아니라 엔드포인트로 적는다.** 이 표가 «화면 이름»으로 적혀 있어서
+정적 자원이 빠졌고, 그 다음에 `/demo/seed`가 또 빠졌다. **화면이 무엇을 더 부르는지는
+엔드포인트를 세어야만 보인다.**
+
 | 경로 | 왜 |
 |---|---|
 | `/` · `/programs` · `/sessions/**` | 좌석맵 |
-| `/demo/race` (+ `/state` · `/reset`) | 동시 요청 발사. **1절이 이것을 쓴다** |
+| `/demo/race` · `/demo/race/state` · `/demo/race/reset` · `/demo/race/seats` | 동시 요청 발사. **1절이 이것을 쓴다** |
+| **`/demo/seed`** | **`/demo/race`의 하위가 아니라 형제다.** 아래 |
 | `/my/reservations` · `/reservations/**` | 예약 확인·조회 |
 | `/api/**` | 위 화면이 부른다. 막으면 화면이 안 돈다 |
 | **`/css/**` · `/js/**` · `/webjars/**`** | **빠뜨리면 시연이 깨진다.** 아래 |
+
+> **`/demo/seed`가 빠져 있었다(#174 리뷰에서 찾았다).** 정규식 대안에 `demo/race`만
+> 있어 형제 경로가 안 걸렸다. `/demo/race`의 **시드 패널**이 이것을 부른다.
+>
+> **정상 흐름에서는 안 눌러도 된다** — `./holdfast demo`가 이미 시드를 넣는다.
+> 그런데 **DB가 이상해졌을 때 발표장에서 되돌릴 유일한 수단이 이것이다.**
+> `scope-m4.md` 8절이 시드 실행을 브라우저로 옮긴 이유가 «터미널로 안 나가려고»인데,
+> **이제 발표장에 터미널이 아예 없다.**
+>
+> **`/favicon.ico`는 404지만 그대로 둔다** — 앱에도 파일이 없어 어차피 404다.
+> 적어 두기만 하면 리허설에서 놀라지 않는다.
 
 > **정적 자원이 이 표에 없었다(#174에서 찾았다).** 화면이 실제로 부르는 것을
 > 세어 보니 `/css/reservation.css` · `/css/seatmap.css` · `/js/seatmap.js` ·
