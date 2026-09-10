@@ -293,7 +293,7 @@ lazy 검증)와 구현이 갈린 것이다. **#157은 #104의 잔여석 정의�
 ./holdfast measure --preset m3-all       # 5전략 × 3시나리오 (45회)
 ./holdfast verify                        # DB 검증 쿼리 V-1~V-5
 ./holdfast summary                       # 결과 요약 (기본: 최신 세션)
-cd api && ./gradlew test                 # 140건
+cd api && ./gradlew test                 # 155건 — 저장소 전체가 보이는 데서 (README)
 ```
 
 ### 화면 주소 (`./holdfast demo` 뒤)

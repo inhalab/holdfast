@@ -1,8 +1,5 @@
 package com.inhalab.holdfast.support;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -14,12 +11,16 @@ import java.util.regex.Pattern;
 /**
  * 이 요청을 처리한 앱 인스턴스의 이름. 이슈 #151.
  *
- * <h2>왜 한 곳에 모으나</h2>
+ * <h2>이 클래스는 빈이 아니다</h2>
  *
- * <p>{@code StatusController}(JSON)와 {@code PageModelAdvice}(화면 바닥)가 같은 값을
- * 읽는다. 둘이 각자 {@code @Value}로 읽으면 <b>대체값을 정하는 규칙이 두 곳에
- * 생긴다</b> — #124가 {@code demoEnabled}·{@code adminEnabled}를 한 클래스로 모은 것과
- * 같은 이유다.
+ * <p><b>이름을 정하는 규칙만 담는다.</b> 부르는 곳은
+ * {@link InstanceIdentityInitializer} 하나이고, 그것이 기동 직전에
+ * {@code holdfast.instance-id}를 확정한다. {@code StatusController}(JSON)와
+ * {@code PageModelAdvice}(화면 바닥)는 <b>그 프로퍼티를 {@code @Value}로 읽을 뿐</b>이다.
+ *
+ * <p><b>빈으로 두면 화면 슬라이스 테스트가 깨진다.</b> {@code @WebMvcTest}는 웹 계층
+ * 빈만 싣고 {@code support}의 {@code @Component}는 안 싣는다 — 그 사정과 판정은
+ * {@link InstanceIdentityInitializer}에 적었다.
  *
  * <h2>로컬이 이긴다</h2>
  *
@@ -56,8 +57,7 @@ import java.util.regex.Pattern;
  * <p><b>실패해도 앱은 뜬다.</b> 메타데이터를 못 읽는 것은 배지가 덜 예쁜 문제이지
  * 서비스가 못 도는 문제가 아니다 — 그 자리에서 죽으면 배포 자체가 실패한다.
  */
-@Component
-public class InstanceIdentity {
+public final class InstanceIdentity {
 
     /** ARN 뒤에서 이만큼만 쓴다. 화면 바닥에 들어가는 길이다. */
     private static final int SUFFIX_LENGTH = 8;
@@ -71,9 +71,7 @@ public class InstanceIdentity {
 
     private final String name;
 
-    public InstanceIdentity(
-            @Value("${holdfast.instance-id:}") String configured,
-            @Value("${ECS_CONTAINER_METADATA_URI_V4:}") String metadataUri) {
+    public InstanceIdentity(String configured, String metadataUri) {
         this.name = resolve(configured, metadataUri);
     }
 
