@@ -86,6 +86,11 @@ spring:
       enabled: true
 
 # 인스턴스 식별자 — 로드밸런싱 확인용
+#
+# **Fargate 에서는 이 방식이 안 통한다**(이슈 #151). 태스크 정의 하나를 desired
+# count 2로 띄우므로 두 태스크가 같은 INSTANCE_ID 를 받아 배지가 같아진다.
+# INSTANCE_ID 가 비어 있으면 support/InstanceIdentityInitializer 가 태스크
+# 메타데이터에서 읽어 이 값을 덮어쓴다. 로컬은 아래 기본값이 그대로 남는다.
 holdfast:
   instance-id: ${INSTANCE_ID:local}
   # 선점 유지 시간(초). concurrency-spec.md 3절: 운영 5분, 부하 측정 시 10초로

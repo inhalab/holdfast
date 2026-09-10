@@ -16,7 +16,8 @@ public class StatusController {
     private final JdbcTemplate jdbc;
     private final StringRedisTemplate redis;
 
-    @Value("${holdfast.instance-id:unknown}")
+    /** 값을 정하는 규칙은 {@code InstanceIdentityInitializer} 하나에 있다(이슈 #151). */
+    @Value("${holdfast.instance-id:local}")
     private String instanceId;
 
     public StatusController(JdbcTemplate jdbc, StringRedisTemplate redis) {
