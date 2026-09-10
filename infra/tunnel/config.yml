@@ -1,0 +1,63 @@
+# Cloudflare Tunnel — 시연용 (이슈 #174)
+#
+# **정본은 이 파일이 아니다.** 허용 목록의 정본은 `docs/infra-decision.md` 2.1의
+# 표이고, 이 파일은 그 구현이다. 설정에만 있으면 "왜 이 경로만 열었나"가
+# 남지 않는다(`erd.md` 4절과 같은 형태).
+#
+# **붙는 사람은 발표자 하나다.** 청중은 화면을 볼 뿐 붙지 않는다
+# (`demo-script.md` 0.1). 그런데 호스트명은 공개다 — 추측되고 인증서
+# 투명성 로그에 실린다. 그래서 **세 호스트명 모두에 Cloudflare Access를 건다.**
+# 아래 경로 목록은 그 위에 한 겹 더 두는 것이지 유일한 경계가 아니다.
+#
+# **규칙은 위에서부터 먼저 맞는 것이 이긴다.** 그래서 각 호스트명마다
+# "허용 목록 → 404" 순서다. 목록에 없으면 앱에 닿지 않는다.
+#
+# **`demo` 로 넓히지 않고 `demo/race`·`demo/seed` 를 따로 적는다.** 넓히면 나중에
+# `/demo` 아래 무엇이 생기든 자동으로 열린다 — 지금 막고 싶은 것이 정확히 그런
+# "모르는 사이에 열리는" 경로다. 엔드포인트가 늘면 이 줄과 2.1의 표를 함께 고친다.
+
+tunnel: ${TUNNEL_ID}
+credentials-file: /etc/cloudflared/credentials.json
+
+# 오리진이 컨테이너 밖(호스트의 8080·8090)이라 host.docker.internal 로 간다.
+# 두 스택이 서로 다른 compose 프로젝트라 컨테이너 네트워크로는 못 닿는다(#179).
+originRequest:
+  connectTimeout: 10s
+  noTLSVerify: true
+
+ingress:
+  # ── demo-none → holdfast-none (:8080) · 대본 1절 전반 ──────────────
+  - hostname: demo-none.inhalab.cloud
+    path: ^/(programs|sessions|demo/race|demo/seed|my/reservations|reservations|api|css|js|webjars)(/.*)?$
+    service: http://host.docker.internal:8080
+  - hostname: demo-none.inhalab.cloud
+    path: ^/$
+    service: http://host.docker.internal:8080
+  # **/admin·/actuator·/scan 은 여기서 안 열린다.** 아래 404가 받는다.
+  - hostname: demo-none.inhalab.cloud
+    service: http_status:404
+
+  # ── demo-pess → holdfast-pess (:8090) · 1절 후반 · 2절 ─────────────
+  - hostname: demo-pess.inhalab.cloud
+    path: ^/(programs|sessions|demo/race|demo/seed|my/reservations|reservations|scan|api|css|js|webjars)(/.*)?$
+    service: http://host.docker.internal:8090
+  - hostname: demo-pess.inhalab.cloud
+    path: ^/$
+    service: http://host.docker.internal:8090
+  - hostname: demo-pess.inhalab.cloud
+    service: http_status:404
+
+  # ── demo-admin → holdfast-pess 의 /admin (:8090) · 3절 ─────────────
+  #
+  # **pess 오리진인 것을 대본이 정한다.** 3절 마지막이 "방금 만든 회차가 바로
+  # 팔린다"인데 같은 DB라야 보인다. 2절이 pessimistic 에서 도므로 관리자도 그쪽이다.
+  #
+  # 정적 자원이 함께 필요하다 — 관리자 화면도 같은 CSS와 htmx 를 쓴다.
+  - hostname: demo-admin.inhalab.cloud
+    path: ^/(admin|css|js|webjars)(/.*)?$
+    service: http://host.docker.internal:8090
+  - hostname: demo-admin.inhalab.cloud
+    service: http_status:404
+
+  # cloudflared 가 요구하는 마지막 catch-all.
+  - service: http_status:404
