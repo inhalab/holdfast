@@ -8,7 +8,7 @@ AWS를 쓸지, 쓴다면 어떤 형태로 할지를 여기서 고정한다.
 | 항목 | 결정 |
 |---|---|
 | 측정 주력 | **로컬 Docker Compose** (통제된 환경, 재현성 우선) |
-| **라이브 시연** | **집 PC의 Docker Compose → Cloudflare Tunnel → `demo.inhalab.cloud`** (2.1). 발표장에서 브라우저로 붙는다 |
+| **라이브 시연** | **집 PC의 Docker Compose → Cloudflare Tunnel → `demo-*.inhalab.cloud`** 셋 (2.1). 발표장에서 브라우저로 붙는다 |
 | AWS 사용 | **목표로 둔다. 단 측정·로컬 완료 이후 착수** |
 | AWS 형태 | **ECS Fargate** (앱 2대 + ALB + RDS + ElastiCache) |
 | **배포에서 여는 것** | `app.inhalab.cloud` **공개** · `admin.inhalab.cloud` **Cloudflare Access**(3.1). `/demo/**`는 **끈다** |
@@ -49,13 +49,13 @@ k6를 돌리더라도 스모크이고, 정본을 갱신하지 않는다. `concur
 | **화면을 어떻게 보나** | 발표장 브라우저 → **Cloudflare Tunnel** → 집 PC |
 
 **결론: 라이브 시연(`demo-script.md` 1절)은 집 PC의 Docker Compose에서 돌고,
-발표장에서 `demo.inhalab.cloud`로 붙는다. AWS는 `app.inhalab.cloud`에 실제 서비스로
+발표장에서 `demo-*.inhalab.cloud` 셋으로 붙는다. AWS는 `app.inhalab.cloud`에 실제 서비스로
 띄워 "클라우드에 배포했다"를 보인다.** 이슈 #172의 판정이며 **두 번 뒤집혔다** —
 아래에 회수를 적는다.
 
 | | 어디서 도나 | 무엇을 위해 |
 |---|---|---|
-| **시연** (대본 1절 라이브) | **집 PC의 Docker Compose** → Cloudflare Tunnel → **`demo.inhalab.cloud`** | 발표자가 발표장에서 화면을 띄운다 |
+| **시연** (대본 1절 라이브) | **집 PC의 Docker Compose** → Cloudflare Tunnel → **`demo-*.inhalab.cloud`** 셋(#179) | 발표자가 발표장에서 화면을 띄운다 |
 | **배포** | AWS Fargate → ALB → Cloudflare → **`app.inhalab.cloud`** | **배포 증거이자 실제 서비스.** 없으면 슬라이드로 대체 가능 |
 
 **환경이 셋이다** — 로컬 측정 · 집 PC 시연 · AWS 배포. **앞의 둘은 같은 기계이고
@@ -165,18 +165,22 @@ k6를 돌리더라도 스모크이고, 정본을 갱신하지 않는다. `concur
 **그래서 프로퍼티는 켜 두고 터널 ingress가 경로를 가른다.**
 
 ```
-청중·외부  demo.inhalab.cloud  → 아래 허용 목록만
-발표자     터널 주소 그대로     → 대본이 쓰는 경로 전부
+밖에서   demo-none · demo-pess  → 아래 허용 목록만 (`/admin`은 안 열린다)
+         demo-admin             → `/admin/**` 만
+어느 쪽이든  Cloudflare Access 를 먼저 지난다
 ```
 
 > **발표자도 터널을 지난다는 것이 #172 때와 다르다.** 그때는 발표자가 개발 PC
 > 앞에 있어 `localhost`로 전부 열렸다. 지금은 발표장에 있으므로 **`/admin`도 터널을
-> 지나야 한다.** 그러면 ingress가 `/admin/**`을 실어야 하고, **청중과 발표자를
-> 경로로 가를 수 없다** — 둘이 같은 호스트명으로 들어온다.
+> 지나야 하고**, 그러면 **청중과 발표자를 경로만으로는 가를 수 없다.**
 >
-> **이 갈래는 여기서 닫지 않는다.** 수단이 셋 보인다 — 호스트명을 둘로 나누거나
-> (`admin.` 서브도메인), Cloudflare Access를 `/admin/**`에 걸거나, **3절 동안만
-> ingress를 바꾸거나**다. **`infra/`를 건드리는 판단이라 #174가 진다.**
+> **이 갈래는 #174에서 닫혔다**(#182가 구현). 열거했던 셋 중 **둘을 함께 쓴다** —
+> **호스트명을 나누고**(`demo-admin`) **Access를 건다.** 셋째(3절 동안만 ingress를
+> 바꾸는 것)는 **발표 중에 설정을 만지는 것이라 기각**했다.
+>
+> **호스트명 분리만으로는 안 된다는 것이 그때 판정이다** — 추측되고 인증서 투명성
+> 로그에 실린다. **그래서 분리는 라우팅이고 자물쇠는 Access다.** 아래 절이 그것을
+> 세 호스트명 모두에 거는 근거를 적는다.
 
 #### 밖에 여는 경로 — 이 목록이 정본이다
 
@@ -254,6 +258,10 @@ k6를 돌리더라도 스모크이고, 정본을 갱신하지 않는다. `concur
 | 발표자 | 발표 전에 **발표장에서 쓸 브라우저로** 한 번 인증. 수명 1주 |
 | 그 외 | 앱에 닿지 않는다 |
 
+> **셋을 `demo-*.inhalab.cloud` 와일드카드 하나로 묶어도 된다.** 다만 **그것이
+> `admin.inhalab.cloud`(AWS)를 덮지 않는다** — 접두사가 달라 **별도 Application이
+> 하나 더 필요하다.** 3.1의 「와일드카드가 이것을 안 덮는다」를 함께 본다.
+
 #### 이 안의 대가 — ingress 설정이 곧 보안 경계다
 
 > **위의 Access가 이 대가를 줄인다.** 아래는 Access를 걸기 전의 서술이고,
@@ -320,17 +328,24 @@ PC에서도 볼 수 있으므로 정상으로 보인다.** 프로퍼티와 달�
   인증을 배제한 결과이며 **여기서 바꾸지 않는다.** 감수하는 대신 **발표 직후
   `terraform destroy`**로 창을 닫는다(5절)
 
-#### 도메인 — `inhalab.cloud`. 서브도메인 둘로 나눈다
+#### 도메인 — `inhalab.cloud`. 시연 셋과 배포 하나로 나눈다
 
 **확보했다.** Cloudflare 네임서버 이전도 끝나 **Active**다. 이 문서가 한때
 `<도메인>`으로 두었던 자리가 이것이다.
 
 | 이름 | 어디로 | 무엇 |
 |---|---|---|
-| **`demo.inhalab.cloud`** | Cloudflare Tunnel → **집 PC** | 라이브 시연 |
+| **`demo-none.inhalab.cloud`** | Cloudflare Tunnel → **집 PC** (`holdfast-none`) | 라이브 시연 — 1절 전반 |
+| **`demo-pess.inhalab.cloud`** | Cloudflare Tunnel → **집 PC** (`holdfast-pess`) | 1절 후반 · 2절 |
+| **`demo-admin.inhalab.cloud`** | Cloudflare Tunnel → **집 PC** (`holdfast-pess`의 `/admin`) | 3절 |
 | **`app.inhalab.cloud`** | Cloudflare → ALB → **AWS Fargate** | 배포 증거 |
 
-**하나로 돌려 쓰지 않는다.** 근거가 셋이다.
+**시연 쪽이 셋인 이유는 #179다** — 전략 전환을 탭 전환으로 만들려고 스택을 둘
+띄우고, 관리자는 경로가 아니라 호스트명으로 갈랐다. **3단계 서브도메인
+(`demo.none.…`)은 쓰지 않는다** — 무료 플랜 Universal SSL이 1단계까지만 커버해
+인증서 오류가 난다.
+
+**시연 쪽과 배포 쪽을 하나로 돌려 쓰지 않는다.** 근거가 셋이다.
 
 - **수명이 다르다.** AWS는 `terraform destroy`로 발표 직후 내리고(5절) 터널은 그
   전에 닫는다. **하나에 물려 두면 내리는 순서가 곧 DNS 변경**이 되고, 전파를
