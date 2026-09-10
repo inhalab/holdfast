@@ -15,6 +15,16 @@
 `cloudflared`는 컨테이너로 도므로 **설치할 것은 없다.** 다만 아래는 Cloudflare
 계정에서 사람이 해야 한다.
 
+> **Git Bash라면 `MSYS_NO_PATHCONV=1` 을 앞에 붙인다** — 아래 명령에 이미 붙여
+> 두었다. 없으면 Git Bash가 `-v` 인자의 컨테이너 쪽 경로
+> (`:/home/nonroot/.cloudflared`)를 Windows 경로로 바꿔 **마운트가 엉뚱한 데
+> 걸린다.** 그러면 `cloudflared` 는 `cert.pem` 을 만들었다고 찍는데 **컨테이너
+> 안에만 있고 `--rm` 이 지운다** — 에러가 안 나서 성공한 것처럼 보인다.
+> **실제로 한 번 당했다.** #147이 `//c` 로 겪은 것과 같은 자리다.
+>
+> **확인은 출력이 아니라 `ls infra/tunnel/` 로 한다.** `cloudflared` 가 찍는
+> 경로는 언제나 컨테이너 안 것이다.
+
 ### 1. 도메인을 Cloudflare에 올린다
 
 `inhalab.cloud`의 네임서버를 Cloudflare로 바꾼다. 무료 플랜이면 된다.
@@ -22,9 +32,9 @@
 ### 2. 터널을 만들고 자격증명을 받는다
 
 ```bash
-docker run --rm -it -v "$PWD/infra/tunnel:/home/nonroot/.cloudflared" \
+MSYS_NO_PATHCONV=1 docker run --rm -it -v "$PWD/infra/tunnel:/home/nonroot/.cloudflared" \
   cloudflare/cloudflared:2025.8.1 tunnel login
-docker run --rm -it -v "$PWD/infra/tunnel:/home/nonroot/.cloudflared" \
+MSYS_NO_PATHCONV=1 docker run --rm -it -v "$PWD/infra/tunnel:/home/nonroot/.cloudflared" \
   cloudflare/cloudflared:2025.8.1 tunnel create holdfast-demo
 ```
 
@@ -51,7 +61,7 @@ TUNNEL_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 
 ```bash
 for h in demo-none demo-pess demo-admin; do
-  docker run --rm -v "$PWD/infra/tunnel:/home/nonroot/.cloudflared" \
+  MSYS_NO_PATHCONV=1 docker run --rm -v "$PWD/infra/tunnel:/home/nonroot/.cloudflared" \
     cloudflare/cloudflared:2025.8.1 tunnel route dns holdfast-demo "$h.inhalab.cloud"
 done
 ```
