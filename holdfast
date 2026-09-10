@@ -22,6 +22,19 @@ export MSYS_NO_PATHCONV=1
 # (load-test/README의 Windows 주의). env는 셸 별칭을 지나지 않는다.
 node_run() { env -u MSYS_NO_PATHCONV node "$@"; }
 
+# **curl도 env를 거친다 — 다만 이유가 다르다.** 위에서 켠 MSYS_NO_PATHCONV가
+# `-o /dev/null` 을 그대로 넘겨, 네이티브 curl이 그런 이름의 파일을 만들려다
+# **exit 23(쓰기 실패)** 로 죽는다. 상태 코드는 이미 stdout에 찍힌 뒤라
+# `|| echo 000` 이 덧붙어 **`302000` 같은 값**이 된다.
+#
+# **그 값은 case의 어느 가지에도 안 걸린다.** `200`(앱이 그대로 노출)도
+# `000`(응답 없음)도 `*)` 로 떨어져 **전부 "정상"이 된다** — 검사가 무력해진다.
+# 실측: 200을 내는 주소에 대고 부르면 스크립트가 받는 값이 `200000` 이다.
+#
+# **CI(리눅스)에서는 이 변수가 없어 멀쩡히 돈다.** 그래서 CI만 초록이고 사람이
+# 쓰는 경로에서만 죽어 있었다 — #144·#184가 만든 잡이 지목한 그 형태다.
+curl_run() { env -u MSYS_NO_PATHCONV curl "$@"; }
+
 # **전략 다섯.** 정본은 각 구현의 `@ConditionalOnProperty(havingValue = ...)`이고
 # 이 목록은 그것을 옮긴 것이다. 둘이 어긋나면
 # `api/.../reservation/StrategyArgumentTest`가 깨진다 — 유효 값을 두 곳에서
@@ -256,6 +269,11 @@ use_stack() {
 # ── 터널 검증 (#174) ─────────────────────────────────────────────────────
 TUNNEL_HOSTS="${TUNNEL_HOSTS:-demo-none.inhalab.cloud demo-pess.inhalab.cloud demo-admin.inhalab.cloud}"
 
+# **호스트마다 칠 경로가 다르다.** `demo-admin` 은 ingress가 `/admin/**` 만
+# 실으므로 `/` 가 **Access와 무관하게 404**다 — 거기를 쳐서는 Access가 벗겨진
+# 것을 못 본다. 각 호스트에서 **실제로 여는 경로**를 친다.
+TUNNEL_PROBES="${TUNNEL_PROBES:-demo-none.inhalab.cloud/ demo-pess.inhalab.cloud/ demo-admin.inhalab.cloud/admin/programs}"
+
 # **밖에서 익명으로 쳐 본다.** 안에서 보는 것은 의미가 없다 — 2.1이 적은 대로
 # **발표자는 자기 화면으로 보므로 정상으로 보이고**, 틀린 것은 밖에서만 드러난다.
 #
@@ -267,25 +285,42 @@ TUNNEL_HOSTS="${TUNNEL_HOSTS:-demo-none.inhalab.cloud demo-pess.inhalab.cloud de
 # 세션이 없다. 그쪽은 리허설에서 브라우저로 확인한다 — 이 함수가 지키는 것은
 # **"밖에서 아무나 들어오느냐"** 한 겹이다.
 tunnel_verify() {
-  local host code body failed=0
+  local probe host path code redirect body failed=0
   echo "[holdfast] 밖에서 확인한다 — 인증 없이 앱이 나오면 실패다."
-  for host in $TUNNEL_HOSTS; do
-    code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "https://$host/" 2>/dev/null || echo 000)"
+  for probe in $TUNNEL_PROBES; do
+    host="${probe%%/*}"; path="/${probe#*/}"; [ "$host" = "$probe" ] && path=/
+    # **`|| echo 000` 을 쓰지 않는다.** curl은 실패해도 `%{http_code}` 로 `000` 을
+    # 이미 찍으므로, 거기에 또 붙이면 `000000` 이 되어 분기를 빠져나간다.
+    set -- $(curl_run -s -o /dev/null -w '%{http_code} %{redirect_url}'                --max-time 15 "https://$host$path" 2>/dev/null || true)
+    code="${1:-000}"; redirect="${2:-}"
     case "$code" in
       000)
-        echo "[holdfast]   $host  응답 없음 ($code) — 전파 중이거나 터널이 안 붙었다" >&2
+        echo "[holdfast]   $host$path  응답 없음 — 전파 중이거나 터널이 안 붙었다" >&2
         failed=1 ;;
-      200)
-        # 200이어도 Access 로그인 화면일 수 있다. 앱인지 본문으로 가른다.
-        body="$(curl -s --max-time 15 "https://$host/" 2>/dev/null | head -c 4000)"
-        if printf '%s' "$body" | grep -qi 'holdfast'; then
-          echo "[holdfast]   $host  **앱이 그대로 나온다 (200)** — Access가 안 걸렸다" >&2
-          failed=1
+      3*)
+        # **Access 로그인으로 보내는 리다이렉트만 정상이다.** 다른 곳으로 보내면
+        # 무엇인지 모르므로 통과시키지 않는다.
+        case "$redirect" in
+          *cloudflareaccess.com*)
+            echo "[holdfast]   $host$path  $code → Access 로그인 — 정상" ;;
+          *)
+            echo "[holdfast]   $host$path  $code → $redirect — **Access가 아니다**" >&2
+            failed=1 ;;
+        esac ;;
+      2*)
+        # **2xx는 기본이 실패다.** 인증 없이 200이 왔다는 것은 무언가가 그대로
+        # 나왔다는 뜻이고, 그것이 Access 화면임을 확인해야만 정상이다.
+        # 앱 본문으로 가르지 않는다 — `/admin/programs` 에는 `holdfast` 문자열이
+        # 아예 없어서, 그 방식이면 **가장 중요한 화면이 벗겨진 것을 못 본다.**
+        body="$( { curl_run -s --max-time 15 "https://$host$path" 2>/dev/null || true; } | head -c 4000)"
+        if printf '%s' "$body" | grep -qiE 'cloudflareaccess|cf-access'; then
+          echo "[holdfast]   $host$path  200 (Access 화면) — 정상"
         else
-          echo "[holdfast]   $host  200 (Access 화면) — 정상"
+          echo "[holdfast]   $host$path  **200인데 Access 화면이 아니다** — 그대로 나온다" >&2
+          failed=1
         fi ;;
       *)
-        echo "[holdfast]   $host  $code — 정상 (앱에 못 닿는다)" ;;
+        echo "[holdfast]   $host$path  $code — 정상 (앱에 못 닿는다)" ;;
     esac
   done
   [ "$failed" = "0" ] && { echo "[holdfast] 확인 통과."; return 0; }
@@ -553,8 +588,16 @@ EOF
           echo "[holdfast] !! infra/tunnel/credentials.json 이 없다." >&2
           echo "[holdfast]    infra/tunnel/README.md 의 준비 절차를 먼저 한다." >&2
           exit 1; }
+        # **README가 `.env`에 넣으라고 한다.** `docker compose` 는 그 파일을 스스로
+        # 읽지만 이 가드는 셸 환경만 봐서, **시킨 대로 한 사람이 거부당했다.**
+        # 여기서 한 번 읽어 둘을 맞춘다.
+        if [ -z "${TUNNEL_ID:-}" ] && [ -f .env ]; then
+          TUNNEL_ID="$(sed -n 's/^TUNNEL_ID=//p' .env | tail -1)"
+          export TUNNEL_ID
+        fi
         [ -n "${TUNNEL_ID:-}" ] || {
           echo "[holdfast] !! TUNNEL_ID 가 없다. .env 에 넣거나 앞에 붙여 부른다." >&2
+          echo "[holdfast]    infra/tunnel/README.md 2단계를 먼저 한다." >&2
           exit 1; }
 
         # **오리진이 먼저 서 있어야 한다.** 터널만 뜨면 밖에서 502가 보이고,
