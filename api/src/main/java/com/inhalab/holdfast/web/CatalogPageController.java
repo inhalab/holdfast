@@ -2,6 +2,7 @@ package com.inhalab.holdfast.web;
 
 import com.inhalab.holdfast.catalog.CatalogProgramRepository;
 import com.inhalab.holdfast.catalog.CatalogSessionRepository;
+import com.inhalab.holdfast.catalog.ProgramCard;
 import com.inhalab.holdfast.catalog.SaleState;
 import com.inhalab.holdfast.catalog.SessionAvailabilityRow;
 import com.inhalab.holdfast.catalog.SessionCard;
@@ -20,6 +21,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 예약 카탈로그 — <b>시스템의 진입점</b>.
@@ -59,8 +61,46 @@ public class CatalogPageController {
      */
     @GetMapping({"/", "/programs"})
     public String programs(Model model) {
-        model.addAttribute("programs", programRepository.findAllByOrderByIdAsc());
+        model.addAttribute("programs", programCards(Instant.now()));
         return "catalog/programs";
+    }
+
+    /**
+     * 프로그램 카드들. <b>쿼리는 프로그램 수와 무관하게 셋이다</b>(#192).
+     *
+     * <p>프로그램 전체 → 그 프로그램들의 회차 전체 → 회차들의 좌석 집계. 여기서
+     * 프로그램마다 회차를 묻기 시작하면 #140이 관리자 화면에서 지적한 N+1을
+     * 사용자 진입 화면에 새로 만드는 셈이 된다.
+     *
+     * <p>회차 카드를 만드는 규칙은 회차 목록 화면과 <b>같은 코드를 쓴다</b>
+     * ({@link #toCard}). 규칙이 갈리면 목록에서는 "판매중"인데 들어가 보니
+     * 닫혀 있는 어긋남이 생긴다 — 이슈 #108이 {@link SaleState}를 한 벌로
+     * 묶은 것과 같은 이유다.
+     */
+    private List<ProgramCard> programCards(Instant now) {
+        List<Program> programs = programRepository.findAllByOrderByIdAsc();
+        if (programs.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> programIds = programs.stream().map(Program::getId).toList();
+        List<EventSession> sessions = sessionRepository.findByProgramIdInOrderByStartsAtAsc(programIds);
+        Map<Long, long[]> counts = countsBySession(sessions);
+        Map<Long, List<EventSession>> byProgram = sessions.stream()
+                .collect(Collectors.groupingBy(EventSession::getProgramId));
+
+        return programs.stream()
+                .map(p -> ProgramCard.of(p.getId(), p.getName(), p.getDescription(),
+                        cardsOf(byProgram.get(p.getId()), counts, now), now))
+                .toList();
+    }
+
+    /** 회차가 없는 프로그램도 카드가 되어야 하므로 {@code null}을 빈 목록으로 받는다. */
+    private List<SessionCard> cardsOf(List<EventSession> sessions, Map<Long, long[]> counts, Instant now) {
+        if (sessions == null) {
+            return List.of();
+        }
+        return sessions.stream().map(s -> toCard(s, counts, now)).toList();
     }
 
     /** 한 프로그램의 회차 목록. 회차마다 잔여 좌석을 함께 보여준다. */
@@ -96,14 +136,7 @@ public class CatalogPageController {
 
         Map<Long, long[]> counts = countsBySession(sessions);
         Instant now = Instant.now();
-        List<SessionCard> cards = sessions.stream()
-                .map(s -> {
-                    long[] c = counts.getOrDefault(s.getId(), new long[]{0, 0});
-                    return new SessionCard(
-                            s.getId(), s.getStartsAt(), s.getEndsAt(), s.getReserveOpensAt(),
-                            s.getStatus(), c[0], c[1], saleStateOf(s, c[0], now));
-                })
-                .toList();
+        List<SessionCard> cards = cardsOf(sessions, counts, now);
 
         model.addAttribute("program", program);
         model.addAttribute("sessions", cards);
@@ -126,6 +159,15 @@ public class CatalogPageController {
             c[1] += row.count();
         }
         return counts;
+    }
+
+    /** 회차 하나를 카드로. 두 화면이 이 한 곳을 쓴다. */
+    private SessionCard toCard(EventSession session, Map<Long, long[]> counts, Instant now) {
+        long[] c = counts.getOrDefault(session.getId(), new long[]{0, 0});
+        return new SessionCard(
+                session.getId(), session.getStartsAt(), session.getEndsAt(),
+                session.getReserveOpensAt(), session.getStatus(), c[0], c[1],
+                saleStateOf(session, c[0], now));
     }
 
     /**

@@ -7,25 +7,64 @@
     <link rel="stylesheet" th:href="@{/css/reservation.css}">
 </head>
 <body>
+<!--
+  시스템의 진입점(#192로 개편). 예전에는 카드에 이름과 설명뿐이라 **매진인지
+  오픈 전인지 알려면 눌러 봐야 했다.** 카드가 스스로 답하도록 상태 배지와 요약
+  줄을 넣는다 — 값은 전부 catalog/가 이미 갖고 있던 것이다(SaleState,
+  availabilityOf).
+-->
 <main class="page">
     <h1>예약하기</h1>
     <p class="meta">예약할 프로그램을 고르세요.</p>
 
-    <section class="card" th:each="program : ${programs}">
-        <h2 th:text="${program.name}">데모 공연</h2>
-        <p th:text="${program.description}" th:if="${program.description != null}">설명</p>
-        <a class="link-back" th:href="@{/programs/{id}(id=${program.id})}">회차 보기 →</a>
-    </section>
+    <!--
+      **카드 전체가 링크다.** 예전에는 "회차 보기 →"에 .link-back을 재사용했는데
+      그것은 뒤로 나가는 링크용 클래스였다. 누를 수 있는 면적도 글자 몇 개였다.
+    -->
+    <a class="program-card" th:each="program : ${programs}"
+       th:href="@{/programs/{id}(id=${program.programId})}">
+        <div class="program-head">
+            <div class="program-title">
+                <h2 th:text="${program.name}">데모 공연</h2>
+                <p class="meta" th:if="${program.description != null}" th:text="${program.description}">설명</p>
+            </div>
+            <!--
+              배지 색은 .sale-badge가 상태별로 정한다. 회차 목록 화면과 같은
+              SaleState를 쓰므로 목록과 상세가 어긋나지 않는다(이슈 #108).
+            -->
+            <span class="sale-badge" th:classappend="${program.saleState.name()}"
+                  th:switch="${program.saleState.name()}">
+                <span th:case="'ON_SALE'">판매중</span>
+                <span th:case="'NOT_YET_OPEN'">오픈 전</span>
+                <span th:case="'SOLD_OUT'">매진</span>
+                <span th:case="*">종료</span>
+            </span>
+        </div>
+
+        <div class="program-foot" th:if="${program.hasSessions()}">
+            <span th:if="${!#strings.isEmpty(program.nextStartsAtText())}">
+                다음 회차 <span th:text="${program.nextStartsAtText()}">12/01 19:00</span>
+            </span>
+            <span th:text="'회차 ' + ${program.sessionCount} + '개'">회차 3개</span>
+            <!-- 잔여는 파는 회차가 있을 때만 뜻이 있다. 닫힌 회차의 빈자리는 빈자리가 아니다. -->
+            <span th:if="${program.saleState.name() == 'ON_SALE'}"
+                  th:text="'잔여 ' + ${program.available} + '석'">잔여 18석</span>
+            <span class="program-go">회차 보기 →</span>
+        </div>
+
+        <div class="program-foot" th:unless="${program.hasSessions()}">
+            <span>등록된 회차가 없습니다.</span>
+        </div>
+    </a>
 
     <p th:if="${#lists.isEmpty(programs)}">
         예약 가능한 프로그램이 없습니다. 시드 스크립트를 먼저 실행하세요
         (<code>infra/demo-seed.sql</code>).
     </p>
-
-    <p class="meta">
-        <a class="link-back" th:href="@{/scan}">검표 화면</a> ·
-        <a class="link-back" th:href="@{/admin/reservations}">관리자 예약 현황</a>
-    </p>
+    <!--
+      예전에 여기 있던 "검표 화면 · 관리자 예약 현황" 줄은 뺐다 —
+      page-foot에 같은 링크가 이미 있고, 그쪽은 모든 화면에 있다.
+    -->
 </main>
 <footer th:replace="~{fragments/page-foot :: foot}"></footer>
 </body>

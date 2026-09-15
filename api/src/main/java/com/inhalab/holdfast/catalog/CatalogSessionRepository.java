@@ -19,6 +19,16 @@ public interface CatalogSessionRepository extends JpaRepository<EventSession, Lo
     List<EventSession> findByProgramIdOrderByStartsAtAsc(Long programId);
 
     /**
+     * 여러 프로그램의 회차를 한 번에 읽는다(#192).
+     *
+     * <p>프로그램 목록이 카드마다 "다음 회차·회차 수·잔여"를 보여 주려면 각
+     * 프로그램의 회차가 필요한데, <b>프로그램마다 위 메서드를 부르면 그것이
+     * 곧 N+1이다</b> — #140이 관리자 화면에서 지적한 것과 같은 모양이다.
+     * 목록 전체를 한 번에 받아 호출자가 프로그램별로 가른다.
+     */
+    List<EventSession> findByProgramIdInOrderByStartsAtAsc(Collection<Long> programIds);
+
+    /**
      * 화면에 뿌릴 회차들의 좌석 상태 집계.
      *
      * <p>{@code admin/}의 전체 집계와 쿼리 모양이 닮았지만 <b>범위가 다르다</b> —
