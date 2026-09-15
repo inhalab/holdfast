@@ -391,4 +391,46 @@ class AdminSeatLayoutFlowTest {
                         java.time.ZoneId.of("Asia/Seoul"))
                 .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm"));
     }
+
+    // ── 목록 화면 (이슈 #192) ───────────────────────────────────────────
+
+    /**
+     * <b>목록이 구역 구성을 보여 준다.</b> 배치도를 고르는 판단에 필요한 것은
+     * "10석"이라는 총합이 아니라 "A 10석"이라는 구성이다 — 총합만 보고 고르면
+     * 구역이 하나인 배치도와 열인 배치도가 같아 보인다.
+     *
+     * <p><b>배치도마다 묻지 않는다.</b> 구역 요약은 {@code IN} 한 번으로 받는다
+     * ({@code zoneSummariesOf}) — #140이 옆 화면에서 겪은 N+1을 여기 만들지 않는다.
+     */
+    @Test
+    @DisplayName("목록이 구역 구성과 상태를 보여준다")
+    void 목록이_구역_구성과_상태를_보여준다() throws Exception {
+        String html = mvc.perform(get("/admin/layouts"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // 배치도 1: A구역 10석, 회차 1이 쓰고 있어 고정됨.
+        assertThat(html).contains("A 10");
+        assertThat(html).contains("회차 1개가 사용중");
+
+        // 배치도 9: 아무도 안 쓰므로 고칠 수 있고, 아직 구역이 없다.
+        assertThat(html).contains("수정 가능");
+        assertThat(html).contains("구역 없음");
+    }
+
+    /**
+     * 구역만 만들고 좌석을 안 넣은 상태가 실제로 있다 — 구역 등록과 행 추가가
+     * 다른 단계이기 때문이다. 그 구역이 목록에서 사라지면 관리자는 이 배치도로
+     * 회차를 왜 못 만드는지 알 수 없다.
+     */
+    @Test
+    @DisplayName("좌석이 0인 구역도 목록에 나온다")
+    void 좌석이_없는_구역도_보인다() throws Exception {
+        jdbc.update("INSERT INTO zone (id, seat_layout_id, name, sort_order) VALUES (99, 9, '빈구역', 1)");
+
+        assertThat(mvc.perform(get("/admin/layouts"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString())
+                .contains("빈구역 0");
+    }
 }

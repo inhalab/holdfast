@@ -7,6 +7,16 @@
     <link rel="stylesheet" th:href="@{/css/reservation.css}">
 </head>
 <body>
+<!--
+  좌석배치도 관리(#192로 개편). 세 가지를 고쳤다.
+
+  1) **상태를 배지로.** "없음 (수정 가능)" / "3개 (고정됨)"이 맨 텍스트였는데,
+     같은 화면에 이미 .status-badge 토큰이 있었다.
+  2) **등록 폼을 목록 머리줄로.** 카드 하나를 통째로 쓰고 있었지만 이 화면에서
+     주인공은 목록이다.
+  3) **좌석 수를 구역별로.** 배치도를 고르는 판단에 필요한 것은 "24석"이라는
+     총합이 아니라 "A구역 12 · B구역 12"라는 구성이다.
+-->
 <main class="page admin-page">
     <h1>좌석배치도 관리</h1>
     <p class="meta">배치도에 구역과 좌석을 만들어 두면 회차 등록에서 고를 수 있습니다.</p>
@@ -15,41 +25,48 @@
     <div class="flash flash-error" th:if="${error}" role="alert" th:text="${error}"></div>
 
     <section class="card">
-        <h2>배치도 등록</h2>
-        <form method="post" th:action="@{/admin/layouts}" class="admin-form">
-            <label>이름 <input type="text" name="name" required placeholder="대강당 1층"></label>
-            <button type="submit">등록</button>
-        </form>
-        <p class="meta">등록하면 바로 구역·좌석을 넣는 화면으로 넘어갑니다.</p>
-    </section>
+        <div class="list-head">
+            <h2>배치도 목록 <span class="meta" th:text="${#lists.size(layouts)} + '개'">3개</span></h2>
+            <form method="post" th:action="@{/admin/layouts}" class="inline-form">
+                <input type="text" name="name" required placeholder="새 배치도 이름" aria-label="새 배치도 이름">
+                <button type="submit">등록</button>
+            </form>
+        </div>
+        <!-- 등록하면 바로 구역·좌석 화면으로 넘어간다(컨트롤러의 redirect). -->
 
-    <section class="card">
-        <h2>배치도 목록</h2>
         <div class="table-scroll" th:if="${not #lists.isEmpty(layouts)}">
         <table class="admin-table">
             <thead>
-                <tr><th>ID</th><th>이름</th><th>구역</th><th>좌석</th><th>쓰는 회차</th><th></th></tr>
+                <tr><th>이름</th><th>구성</th><th>상태</th><th class="num">ID</th><th></th></tr>
             </thead>
             <tbody>
-                <tr th:each="l : ${layouts}">
-                    <td th:text="${l.id}">1</td>
-                    <td th:text="${l.name}">데모 배치도</td>
-                    <td th:text="${l.zoneCount} + '개'">2개</td>
-                    <td th:text="${l.seatCount} + '석'">24석</td>
+                <tr th:each="c : ${layouts}">
+                    <td class="layout-name" th:text="${c.layout.name}">데모 배치도</td>
+                    <td>
+                        <!-- 구역이 없는 배치도는 방금 만든 것이다. 다음에 할 일을 적어 준다. -->
+                        <ul class="seat-chip-list" th:if="${not #lists.isEmpty(c.zones)}">
+                            <li th:each="z : ${c.zones}"
+                                th:text="${z.name} + ' ' + ${z.seatCount}">A구역 12</li>
+                        </ul>
+                        <span class="meta" th:if="${#lists.isEmpty(c.zones)}">구역 없음 — 먼저 만드세요</span>
+                    </td>
                     <!--
                       쓰는 회차가 0인지가 삭제·수정 가능 여부다.
                       정책과 근거는 AdminSeatLayoutService 클래스 주석에 있다.
                     -->
                     <td>
-                        <span th:if="${l.deletable}" class="meta">없음 (수정 가능)</span>
-                        <span th:unless="${l.deletable}" th:text="${l.sessionCount} + '개 (고정됨)'">1개</span>
+                        <span th:if="${c.layout.deletable}" class="status-badge editable">수정 가능</span>
+                        <span th:unless="${c.layout.deletable}" class="status-badge locked"
+                              th:text="'회차 ' + ${c.layout.sessionCount} + '개가 사용중'">회차 3개가 사용중</span>
                     </td>
-                    <td><a th:href="@{/admin/layouts/{id}(id=${l.id})}">구역·좌석 →</a></td>
+                    <td class="num id-cell" th:text="${c.layout.id}">1</td>
+                    <td><a th:href="@{/admin/layouts/{id}(id=${c.layout.id})}">구역·좌석 →</a></td>
                 </tr>
             </tbody>
         </table>
         </div>
         <p th:if="${#lists.isEmpty(layouts)}">등록된 배치도가 없습니다.</p>
+        <p class="meta" th:if="${not #lists.isEmpty(layouts)}">회차가 쓰고 있는 배치도는 구역·좌석을 고칠 수 없습니다.</p>
     </section>
 
     <p class="meta">

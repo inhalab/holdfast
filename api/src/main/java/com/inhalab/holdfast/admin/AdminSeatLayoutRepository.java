@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -45,6 +46,29 @@ public interface AdminSeatLayoutRepository extends JpaRepository<SeatLayout, Lon
             ORDER BY l.id
             """)
     List<LayoutRow> rows();
+
+    /**
+     * 목록에 뿌릴 배치도들의 <b>구역 구성</b>(#192). 배치도를 고르는 판단에 필요한
+     * 것은 "24석"이라는 총합이 아니라 "A구역 12 · B구역 12"라는 구성이다.
+     *
+     * <p><b>배치도마다 묻지 않는다.</b> {@code IN}으로 한 번에 받아 호출자가
+     * 배치도별로 가른다 — #140이 관리자 예약 현황에서 지적한 N+1을 옆 화면에
+     * 새로 만들 이유가 없다. 목록 쿼리가 하나 늘 뿐이고 배치도 수에 비례하지 않는다.
+     *
+     * <p>좌석이 0인 구역도 나와야 한다. 구역만 만들고 좌석을 안 넣은 상태가
+     * 실제로 있고, 그것이 보이지 않으면 관리자는 구역을 왜 못 쓰는지 모른다 —
+     * 그래서 {@code LEFT JOIN}이다.
+     */
+    @Query("""
+            SELECT new com.inhalab.holdfast.admin.ZoneSummary(
+                z.seatLayoutId, z.name, COUNT(s.id))
+            FROM Zone z
+            LEFT JOIN Seat s ON s.zoneId = z.id
+            WHERE z.seatLayoutId IN :layoutIds
+            GROUP BY z.seatLayoutId, z.id, z.name, z.sortOrder
+            ORDER BY z.seatLayoutId, z.sortOrder, z.id
+            """)
+    List<ZoneSummary> zoneSummariesOf(@Param("layoutIds") Collection<Long> layoutIds);
 
     /** 한 배치도의 구역과 각 구역의 격자 크기. 정렬 순서는 좌석맵이 그리는 순서다. */
     @Query("""
