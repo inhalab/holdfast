@@ -7,16 +7,35 @@
     <link rel="stylesheet" th:href="@{/css/reservation.css}">
 </head>
 <body>
+<!--
+  검표 화면(#192). 게이트에서 서서 쓰는 화면이라 세 가지를 지킨다.
+
+  1) **누를 수 있어야 한다** — 입력과 버튼이 44px 이상이다(.scan-form).
+  2) **흘끗 보고 갈려야 한다** — 판정은 카드 안 한 줄이 아니라 색면이다.
+  3) **누구를 붙잡을지 알아야 한다** — 판정에 구역·좌석번호를 함께 싣는다.
+     서버가 거절일 때도 좌석을 보내 준다(TicketScanResponse).
+-->
 <main class="page">
     <h1>검표</h1>
-    <p class="meta">QR 토큰을 입력하고 스캔하세요. 실제 카메라 스캔 대신 값을 직접 입력합니다.</p>
+    <p class="meta">QR 토큰을 붙여 넣고 스캔하세요. 실제 카메라 스캔 대신 값을 직접 입력합니다.</p>
 
-    <section class="card">
-        <div class="scan-form">
-            <input type="text" id="token-input" placeholder="QR 토큰 (예: 3f2504e0-...)" autofocus>
-            <button type="button" id="scan-btn">스캔</button>
-        </div>
-        <div id="result"></div>
+    <div class="scan-form">
+        <input type="text" id="token-input" placeholder="QR 토큰 (예: 3f2504e0-...)" autofocus>
+        <button type="button" id="scan-btn">스캔</button>
+    </div>
+
+    <!-- 판정이 들어오는 자리. 첫 스캔 전까지는 비어 있다. -->
+    <div id="result"></div>
+
+    <!--
+      직전 판정. **브라우저 안에서만 쌓는다** — 새로고침하면 사라지고 서버에는
+      묻지 않는다. 검표는 몇 초에 한 명씩 지나가는 일이라 "방금 그게 통과였나"를
+      되묻게 되는데, 그 확인에 왕복을 더할 이유가 없다. 이력의 원본은
+      ticket_scan 테이블이고 이 목록은 그것의 사본이 아니다.
+    -->
+    <section class="card" id="history-card" hidden>
+        <h2>직전 스캔</h2>
+        <ul class="history-list" id="history-list"></ul>
     </section>
 </main>
 <footer th:replace="~{fragments/page-foot :: foot}"></footer>

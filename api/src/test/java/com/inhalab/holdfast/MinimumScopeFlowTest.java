@@ -248,6 +248,11 @@ class MinimumScopeFlowTest {
         JsonNode scan = scan(qrToken);
         assertThat(scan.get("result").asText()).isEqualTo("ADMITTED");
 
+        // **어느 좌석인지가 함께 온다**(#192). 게이트에서 티켓 ID 하나로는 손에 든
+        // 표와 맞춰 볼 수 없다. 시드의 좌석은 A구역의 A-1이다.
+        assertThat(scan.get("zoneName").asText()).isEqualTo("A");
+        assertThat(scan.get("seatNo").asText()).isEqualTo("A-1");
+
         // state-transitions 4절: ISSUED → USED, 그리고 입장 이력이 남는다.
         assertThat(one("SELECT status FROM ticket WHERE qr_token = ?", qrToken)).isEqualTo("USED");
         assertThat(one("SELECT result FROM ticket_scan WHERE ticket_id = ?",
@@ -299,7 +304,12 @@ class MinimumScopeFlowTest {
         String qrToken = issueTicket();
 
         assertThat(scan(qrToken).get("result").asText()).isEqualTo("ADMITTED");
-        assertThat(scan(qrToken).get("result").asText()).isEqualTo("REJECTED_DUPLICATE");
+
+        // **거절에도 좌석이 실린다**(#192). "이미 사용된 티켓"만 뜨면 검표원은
+        // 줄에 선 사람 중 누구를 붙잡아야 할지 모른다.
+        JsonNode second = scan(qrToken);
+        assertThat(second.get("result").asText()).isEqualTo("REJECTED_DUPLICATE");
+        assertThat(second.get("seatNo").asText()).isEqualTo("A-1");
 
         // **U-11은 성공 입장만 티켓당 1건으로 제한한다**(erd 3절). 거절은 몇 번이든
         // 이력으로 남으므로 스캔 2회에 행 2건, 그중 ADMITTED는 1건이다.
@@ -503,6 +513,8 @@ class MinimumScopeFlowTest {
     void unknownTokenIsRejectedAsInvalid() throws Exception {
         JsonNode scan = scan("존재하지-않는-토큰");
         assertThat(scan.get("result").asText()).isEqualTo("REJECTED_INVALID");
+        // 티켓을 특정 못 했으므로 보여 줄 좌석도 없다 — 유일하게 비는 경우다(#192).
+        assertThat(scan.get("seatNo").isNull()).isTrue();
         // 티켓을 특정할 수 없으므로 ticket_scan에 남길 수 없다(FK가 ticket_id다).
         assertThat(count("SELECT count(*) FROM ticket_scan")).isZero();
     }

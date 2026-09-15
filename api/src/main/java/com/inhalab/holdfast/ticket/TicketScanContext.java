@@ -16,6 +16,8 @@ public record TicketScanContext(
         Long reservationId,
         String reservationStatus,
         Instant entryOpensAt,
-        Instant entryClosesAt
+        Instant entryClosesAt,
+        String seatNo,
+        String zoneName
 ) {
 }
