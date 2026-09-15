@@ -22,16 +22,35 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
     /**
      * 검표 판정에 필요한 값을 한 번에 읽는다 — 티켓 상태·예약 상태·회차 입장
-     * 가능 시간. QR 토큰 하나로 네 테이블(ticket → reservation_seat → reservation
-     * → event_session)을 탄다.
+     * 가능 시간, 그리고 <b>어느 좌석인가</b>.
+     *
+     * <p><b>좌석은 판정에 쓰지 않는다. 사람에게 보여주려고 읽는다</b>(#192).
+     * 검표원이 티켓 ID 1042를 받아 할 수 있는 일이 없다 — 손에 든 표와 맞춰 볼
+     * 수 있는 값은 구역과 좌석번호다.
+     *
+     * <p><b>조인이 늘지만 왕복은 늘지 않는다.</b> 아래
+     * {@link #findRowsByReservationId}가 이미 같은 경로로 {@code s.seatNo}·
+     * {@code z.name}을 읽고 있다 — 같은 조인을 여기에도 붙여 한 번에 가져온다.
+     * 두 번째 쿼리를 더하면 판정마다 왕복이 둘이 된다.
+     *
+     * <p><b>내부 조인이어도 안전하다.</b> 네 단계 모두 FK로 묶여 있어 티켓이
+     * 있으면 좌석도 있다 — 위 메서드가 같은 전제로 이미 돌고 있다.
+     *
+     * <p>이 경로는 부하 측정에 들어가지 않는다. k6 시나리오
+     * ({@code load-test/scenarios/reservation.js})는 {@code /api/holds}와
+     * {@code /api/reservations}만 부르고 검표는 지나지 않는다.
      */
     @Query("""
             SELECT new com.inhalab.holdfast.ticket.TicketScanContext(
-                t.id, t.status, r.id, r.status, es.entryOpensAt, es.entryClosesAt)
+                t.id, t.status, r.id, r.status, es.entryOpensAt, es.entryClosesAt,
+                s.seatNo, z.name)
             FROM Ticket t
             JOIN ReservationSeat rs ON rs.id = t.reservationSeatId
             JOIN Reservation r ON r.id = rs.reservationId
             JOIN EventSession es ON es.id = r.sessionId
+            JOIN SeatInventory si ON si.id = rs.seatInventoryId
+            JOIN Seat s ON s.id = si.seatId
+            JOIN Zone z ON z.id = s.zoneId
             WHERE t.qrToken = :qrToken
             """)
     Optional<TicketScanContext> findScanContextByQrToken(@Param("qrToken") String qrToken);

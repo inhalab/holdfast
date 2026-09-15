@@ -2,8 +2,10 @@ package com.inhalab.holdfast.web;
 
 import com.inhalab.holdfast.admin.AdminSeatLayoutRepository;
 import com.inhalab.holdfast.admin.AdminSeatLayoutService;
+import com.inhalab.holdfast.admin.LayoutCard;
 import com.inhalab.holdfast.admin.LayoutRow;
 import com.inhalab.holdfast.admin.SeatRow;
+import com.inhalab.holdfast.admin.ZoneSummary;
 import com.inhalab.holdfast.seat.SeatLayout;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -56,9 +58,17 @@ public class AdminSeatLayoutPageController {
 
     // ── 배치도 목록 ─────────────────────────────────────────────────────
 
+    /**
+     * 배치도 목록. <b>쿼리 둘로 고정된다</b>(#192) — 배치도 줄 전체, 그리고 그
+     * 배치도들의 구역 구성. 배치도마다 구역을 묻지 않는다(#140).
+     */
     @GetMapping("/admin/layouts")
     public String layouts(Model model) {
-        model.addAttribute("layouts", layoutRepository.rows());
+        List<LayoutRow> rows = layoutRepository.rows();
+        List<ZoneSummary> zones = rows.isEmpty()
+                ? List.of()
+                : layoutRepository.zoneSummariesOf(rows.stream().map(LayoutRow::id).toList());
+        model.addAttribute("layouts", LayoutCard.of(rows, zones));
         return "admin/layouts";
     }
 

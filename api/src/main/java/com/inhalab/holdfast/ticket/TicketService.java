@@ -91,32 +91,44 @@ public class TicketService {
         TicketScanContext ctx = context.get();
 
         if (!"CONFIRMED".equals(ctx.reservationStatus())) {
-            return reject(ctx.ticketId(), ScanResult.REJECTED_INVALID, "취소된 예약의 티켓입니다.", now);
+            return reject(ctx, ScanResult.REJECTED_INVALID, "취소된 예약의 티켓입니다.", now);
         }
         if (!TicketStatus.ISSUED.name().equals(ctx.ticketStatus())) {
             // 이미 USED다. U-11까지 갈 것 없이 여기서 걸러진다 — 재고 상태
             // 확인이 제약을 대신하지 않는다는 것과 같은 이유로, 이 확인은
             // "동시에 노린 경합"이 아니라 "늦게 온 재사용 시도"를 거른다
             // (reservation/UniqueSeatHoldStrategy 참고).
-            return reject(ctx.ticketId(), ScanResult.REJECTED_DUPLICATE, "이미 사용된 티켓입니다.", now);
+            return reject(ctx, ScanResult.REJECTED_DUPLICATE, "이미 사용된 티켓입니다.", now);
         }
         if (now.isBefore(ctx.entryOpensAt()) || now.isAfter(ctx.entryClosesAt())) {
-            return reject(ctx.ticketId(), ScanResult.REJECTED_TIME, "입장 가능 시간이 아닙니다.", now);
+            return reject(ctx, ScanResult.REJECTED_TIME, "입장 가능 시간이 아닙니다.", now);
         }
 
         try {
             scanRecorder.admit(ctx.ticketId());
-            return new TicketScanResponse(ScanResult.ADMITTED, ctx.ticketId(), null, now, Instant.now());
+            return new TicketScanResponse(ScanResult.ADMITTED, ctx.ticketId(), null, now, Instant.now(),
+                    ctx.seatNo(), ctx.zoneName());
         } catch (DataIntegrityViolationException e) {
             // 동시에 두 게이트에서 스캔된 진짜 경합. U-11이 하나만 통과시켰다.
-            return reject(ctx.ticketId(), ScanResult.REJECTED_DUPLICATE, "이미 사용된 티켓입니다.", now);
+            return reject(ctx, ScanResult.REJECTED_DUPLICATE, "이미 사용된 티켓입니다.", now);
         }
     }
 
-    private TicketScanResponse reject(Long ticketId, ScanResult result, String reason, Instant scannedAt) {
-        if (ticketId != null) {
-            scanRecorder.reject(ticketId, result, reason);
+    /**
+     * 거절을 남기고 응답한다. {@code ctx}가 {@code null}인 경우는 하나뿐이다 —
+     * 토큰으로 티켓을 못 찾았을 때. 그때는 남길 {@code ticket_scan} 행도
+     * 없고(FK가 {@code ticket_id}다) 보여줄 좌석도 없다.
+     *
+     * <p><b>찾은 경우에는 거절이어도 좌석을 실어 보낸다</b>(#192). 검표원이
+     * 게이트에서 해야 하는 일은 거절 사유를 아는 것만이 아니라 <b>누구를
+     * 붙잡을지 아는 것</b>이다.
+     */
+    private TicketScanResponse reject(TicketScanContext ctx, ScanResult result, String reason, Instant scannedAt) {
+        if (ctx == null) {
+            return new TicketScanResponse(result, null, reason, scannedAt, Instant.now(), null, null);
         }
-        return new TicketScanResponse(result, ticketId, reason, scannedAt, Instant.now());
+        scanRecorder.reject(ctx.ticketId(), result, reason);
+        return new TicketScanResponse(result, ctx.ticketId(), reason, scannedAt, Instant.now(),
+                ctx.seatNo(), ctx.zoneName());
     }
 }
