@@ -114,14 +114,10 @@ open_script() {
   fi
 }
 
-# **여는 탭은 대본이 정한 셋이다.** demo-script.md 0절의 탭 표가 정본이고
-# 1·2·3절이 그 번호로 화면을 부른다("탭 2 — /demo/race"). 다섯을 열지 않는다 —
-# 아래 "시연 주소"에 출력하는 다섯은 참조 목록이지 탭 배치가 아니고, 좌석맵은
-# 탭 1에서 프로그램 목록을 타고 들어간다.
-#
-# **여는 순서가 곧 탭 번호다.** 대본이 번호로 부르므로 왼쪽부터 1·2·3이 되게 한다.
-DEMO_TABS="http://localhost:8080/ http://localhost:8080/demo/race http://localhost:8080/admin/programs"
-
+# **여는 순서가 곧 탭 번호다.** demo-script.md 0절의 탭 표가 정본이고 1~3절이
+# 그 번호로 화면을 부르므로, 왼쪽부터 1·2·3·4가 되게 한다. 값은 `demo` 분기가
+# 정한다 — 포트가 스택마다 다르고(use_stack), 여기서 기본값을 들고 있어 봐야
+# 그쪽이 덮으므로 **두 벌이 생기고 한 벌만 낡는다**(#196).
 open_demo_tabs() {
   local n=0 failed=0
   for url in $DEMO_TABS; do
@@ -192,9 +188,8 @@ holdfast — 실행 진입점
   rebuild [전략]       up --build 와 같다. **코드를 고쳤으면 이쪽이다**
                        전략은 하나만 받는다 — none|pessimistic|optimistic|unique|redis
                        시나리오(low·high·extreme)를 여기 주면 거부한다(#143)
-  demo [전략] [--build] [--no-open]
-                       시연 준비 — 기동 + 시드 + **대본 탭 셋과 대본을 연다**
-                       --no-open 이면 주소만 출력한다
+  strategy <이름>      전략을 바꿔 앱만 다시 띄운다 (약 13초)
+                       **시연에서는 안 쓴다** — 전환이 탭 전환이 됐다(#180)
   down                 전부 내린다
   ps                   컨테이너 상태
   logs [서비스]        로그 (기본 app1)
@@ -204,6 +199,8 @@ holdfast — 실행 진입점
   measure [...]            측정 실행기. 인자 없이 대화형, --preset 지원
   deadlock <전략> [시나리오]  데드락 회피 검증 (7.2.1)
   sustained <전략>         지속 경합 시나리오 (7.2.2)
+  quota [전략]             할당량 경합 시나리오 (CS-6, 7.2.3)
+                           **정합성 축 전용이다** — p95·TPS를 읽지 않는다
   verify                   DB 검증 쿼리 V-1~V-5
   summary [...]            결과 요약 표 (기본: 최신 세션)
 
@@ -215,8 +212,13 @@ holdfast — 실행 진입점
   bundle [출력파일]    판단에 필요한 문서만 zip으로 묶는다 (다른 세션에 넘길 용도)
 
 시연
-  demo [전략] [--build]  기동 + 시드 + 화면 주소 안내
-  strategy <이름>      전략을 바꿔 앱만 다시 띄운다 (약 13초)
+  demo [--build] [--no-open]
+                       시연 준비 — 두 스택(none·pessimistic)을 띄우고 시드 +
+                       **대본 탭 넷과 대본을 연다**. --no-open 이면 주소만 출력한다
+                       **전략 인자를 받지 않는다** — 둘 다 띄우고 탭으로 가른다(#179)
+  demo-down            시연 스택 둘을 내린다. down 은 이쪽을 안 건드린다(#180)
+  tunnel up|down|verify  Cloudflare 터널. up 은 밖에서 열리는지 확인까지 하고
+                       실패하면 닫고 멈춘다(#182·#186)
   race                 동시 요청 데모 주소를 알려준다
 
   각 커맨드에 -h 를 주면 위임 대상의 도움말이 나온다(measure·deadlock 등).
@@ -469,6 +471,9 @@ case "$cmd" in
   measure)   refuse_if_demo_up; "$S/measure.sh" "$@" ;;
   deadlock)  refuse_if_demo_up; "$S/run-deadlock.sh" "$@" ;;
   sustained) refuse_if_demo_up; "$S/run-sustained.sh" "$@" ;;
+  # **측정 보호를 같이 건다**(#179 (c)). 정합성 축이라 p95를 읽지 않지만, 시연
+  # 스택이 떠 있으면 포트와 DB가 겹쳐 무엇을 잰 것인지 알 수 없게 된다.
+  quota)     refuse_if_demo_up; "$S/run-quota.sh" "$@" ;;
   verify)   "$S/verify.sh" "$@" ;;
   summary)  node_run "$S/summarize.mjs" "$@" ;;
 
@@ -526,8 +531,11 @@ case "$cmd" in
 
     none_port="$(stack_port none)"
     pess_port="$(stack_port pessimistic)"
-    # **탭이 넷이 됐다.** 1절이 none 탭에서 시작해 pess 탭으로 넘어간다 —
-    # 그 전환이 이 이슈가 터미널을 대신하는 방식이다.
+    # **탭 넷의 정본이 여기다.** 1절이 none 탭(탭 1)에서 시작해 pess 탭(탭 2)으로
+    # 넘어간다 — 그 전환이 이 이슈가 터미널을 대신하는 방식이다(#179·#180).
+    #
+    # **다섯을 열지 않는다.** 아래 "시연 주소"에 출력하는 다섯은 참조 목록이지 탭
+    # 배치가 아니고, 좌석맵은 탭 3에서 프로그램 목록을 타고 들어간다.
     DEMO_TABS="http://localhost:${none_port}/demo/race http://localhost:${pess_port}/demo/race http://localhost:${pess_port}/ http://localhost:${pess_port}/admin/programs"
     cat <<EOF
 
@@ -680,7 +688,9 @@ EOF
   좌석 하나에 N개 요청을 동시에 보내 전략별 차이를 화면으로 본다.
   none 이면 홀드가 여러 건, 전략을 걸면 1건이다.
 
-  준비:  ./holdfast demo none        (또는 pessimistic 등)
+  준비(개발):  ./holdfast up none      (또는 pessimistic 등) — 8080 한 곳이다
+  준비(시연):  ./holdfast demo          두 스택이 뜬다. 8080=none, 8090=pessimistic
+               전략 전환이 탭 전환이라 두 쪽을 나란히 놓고 비교한다(#179)
 EOF
     ;;
 

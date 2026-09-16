@@ -281,8 +281,10 @@ lazy 검증)와 구현이 갈린 것이다. **#157은 #104의 잔여석 정의�
 ```bash
 ./holdfast              # 서브커맨드 목록
 ./holdfast up           # 앱 2대 + DB + Redis + nginx 기동 (nginx 설정 reload 포함)
-./holdfast demo none    # 시연 준비 — 기동 + 시드 + 화면 주소 안내
+./holdfast demo         # 시연 준비 — 두 스택 + 시드 + 대본 탭 넷과 대본을 연다
+./holdfast demo-down    # 시연 스택 둘만 내린다 (down 은 이쪽을 안 건드린다)
 ./holdfast strategy redis   # 전략을 바꿔 앱만 다시 띄운다 (약 13초, 시드도 함께)
+                            # 시연에서는 안 쓴다 — 전환이 탭 전환이 됐다
 ./holdfast down
 ```
 

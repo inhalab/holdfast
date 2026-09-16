@@ -139,8 +139,8 @@ nginx 설정을 reload한다. 생짜 `docker compose up -d --build`에는 그 �
 ```bash
 ./holdfast                       # 서브커맨드 목록
 ./holdfast up                    # 스택 기동 (앱이 응답할 때까지 기다린다)
-./holdfast demo none             # 시연 준비 — 기동 + 시드 + **대본 탭 셋과 대본을 연다**
-./holdfast demo none --no-open   # 열지 않고 주소만 출력한다
+./holdfast demo                  # 시연 준비 — 두 스택 + 시드 + **대본 탭 넷과 대본을 연다**
+./holdfast demo --no-open        # 열지 않고 주소만 출력한다
 ./holdfast measure               # 측정 실행기 (대화형)
 ./holdfast test                  # cd api && ./gradlew test
 ./holdfast summary               # 결과 요약 표
@@ -184,8 +184,10 @@ docker run --rm -v "$PWD:/repo" -w /repo/api <이미지> ./gradlew test
 않는다.
 
 ```bash
-./holdfast demo none
-# http://localhost:8080/demo/race 에서 "동시에 홀드 요청"
+./holdfast demo
+# http://localhost:8080/demo/race  (none — 막지 않는 쪽)
+# http://localhost:8090/demo/race  (pessimistic — 막는 쪽)
+# 두 탭에서 "동시에 홀드 요청"을 눌러 비교한다
 ```
 
 브라우저가 `Promise.all`로 한 번에 발사하고, 결과와 **DB 상태**를 함께 보여준다.
