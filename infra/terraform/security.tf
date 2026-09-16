@@ -7,13 +7,21 @@
  * **태스크가 퍼블릭 서브넷에 있고 퍼블릭 IP 를 받는다**(network.tf — NAT 를 안 만든
  * 대가). 그래서 «앱은 ALB 뒤에 있다»가 라우팅으로 보장되지 않고 **이 보안그룹이
  * 유일한 방어**다. 8080 을 ALB 에서만 받는 규칙이 그 자리다.
+ *
+ * <h2>description 은 ASCII 만 받는다</h2>
+ *
+ * EC2 API 가 보안그룹 description 에 ASCII 밖의 문자를 거부한다
+ * (`InvalidParameterValue ... Character sets beyond ASCII are not supported`).
+ * **태그는 UTF-8 이 되는데 description 만 안 된다** — 한글로 적었다가 apply 에서
+ * 걸렸다. 설명은 여기 주석에 두고 description 은 영문 한 줄로 둔다.
  */
 
 # ── ALB ────────────────────────────────────────────────────────────────
 
 resource "aws_security_group" "alb" {
-  name        = "${local.name}-alb"
-  description = "ALB. Cloudflare 대역에서만 받는다."
+  name = "${local.name}-alb"
+  # 인터넷에서 들어오는 유일한 문. Cloudflare 대역에서만 받는다.
+  description = "ALB - accepts Cloudflare ranges only"
   vpc_id      = aws_vpc.main.id
 
   tags = { Name = "${local.name}-alb" }
@@ -49,8 +57,9 @@ resource "aws_vpc_security_group_egress_rule" "alb_all" {
 # ── 앱 ─────────────────────────────────────────────────────────────────
 
 resource "aws_security_group" "app" {
-  name        = "${local.name}-app"
-  description = "Fargate 태스크. ALB 에서만 받는다."
+  name = "${local.name}-app"
+  # 퍼블릭 서브넷에 있고 퍼블릭 IP 를 받는다. 8080 직행을 막는 것이 이 그룹이다.
+  description = "Fargate tasks - accepts ALB only"
   vpc_id      = aws_vpc.main.id
 
   tags = { Name = "${local.name}-app" }
@@ -79,8 +88,9 @@ resource "aws_vpc_security_group_egress_rule" "app_all" {
 # ── 데이터 계층 ────────────────────────────────────────────────────────
 
 resource "aws_security_group" "data" {
-  name        = "${local.name}-data"
-  description = "RDS·ElastiCache. 앱에서만 받는다."
+  name = "${local.name}-data"
+  # RDS 와 ElastiCache 가 함께 쓴다. 앱 보안그룹에서만 받는다.
+  description = "RDS and ElastiCache - accepts app only"
   vpc_id      = aws_vpc.main.id
 
   tags = { Name = "${local.name}-data" }
