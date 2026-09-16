@@ -207,27 +207,67 @@ CloudWatch 로그. 합쳐서 월 $0.1 수준이다.
 
 **루트 계정 키를 쓰지 않는다.** 루트 키는 회수도 범위 제한도 어렵다.
 
-**IAM → Users → Create user**
+### 쓰던 사용자가 이미 있다면 — 그래도 하나 더 만든다
 
-- 콘솔 접근은 필요 없다. **액세스 키만 만든다**(Security credentials → Create
-  access key → *Command Line Interface*)
-- 권한은 #42에서 만들 리소스에 맞춘다 — VPC·ECS·ECR·RDS·ElastiCache·ELB·IAM·
-  CloudWatch Logs. **처음에는 `AdministratorAccess`로 두고, `destroy`까지 한 번
-  돌려 본 뒤 좁히는 편이 현실적이다**(권한 부족은 `apply` 중간에 터지고, 그때
-  절반만 만들어진 상태가 가장 치우기 어렵다)
+**우리 계정에는 이미 IAM 사용자가 있었다**(`admin` 그룹, `AdministratorAccess` +
+`Billing`, 키는 2026-03 생성). **루트가 아니므로 이슈가 요구한 최소선은 이미
+만족한다.** 그대로 써도 Terraform은 돈다.
 
-키는 `~/.aws/credentials`에 둔다. **저장소에 넣지 않는다:**
+**그런데 따로 만든다. 이유가 둘이다.**
+
+- **회수 단위가 갈린다.** 이 키는 Terraform이 쓰고, 언젠가 CI에도 들어간다
+  (5절: *"CI는 `plan`까지만"*). 그 키가 새면 **그것만 지워야 한다** — 쓰던
+  사용자를 지우면 다른 프로젝트와 콘솔 작업까지 같이 끊긴다
+- **`Billing`이 붙어 있다.** Terraform은 청구서를 읽지 않는다. 새어도 인보이스와
+  결제 설정에 닿지 못하는 편이 낫다
+
+> **그룹에 넣지 않는다.** 기존 `admin` 그룹에 넣으면 `Billing`이 따라온다.
+> **정책을 직접 연결한다.**
+
+### 만들기
+
+**IAM → 사용자 → 사용자 생성**
+
+1. 이름 `holdfast-terraform`
+2. **콘솔 접근은 체크하지 않는다.** 사람이 로그인할 사용자가 아니다
+3. 권한 → **직접 정책 연결** → `AdministratorAccess`
+4. 만든 뒤 → **보안 자격 증명 → 액세스 키 만들기** → *명령줄 인터페이스(CLI)*
+   - AWS가 **"대안을 고려하라"**고 경고한다. 장기 키 대신 IAM Identity Center를
+     권하는 것인데, **한 사람이 몇 달 쓰는 프로젝트에서는 키가 맞다.** 확인에
+     체크하고 넘어간다
+   - **비밀 키는 이 화면에서 한 번만 보인다.** 놓치면 지우고 다시 만든다
+
+> **권한을 처음부터 좁히지 않는다.** #42에서 만들 것이 VPC·ECS·ECR·RDS·
+> ElastiCache·ELB·IAM·CloudWatch Logs로 넓고, **권한 부족은 `apply` 중간에
+> 터진다** — 그때 절반만 만들어진 상태가 가장 치우기 어렵다. `destroy`까지 한 번
+> 돌려 본 뒤 좁히는 편이 현실적이다.
+
+### 저장
+
+**`aws configure --profile holdfast` 로 넣는다.** 파일을 직접 열어 붙여 넣는 것보다
+안전하다 — 키가 셸 기록이나 편집기 임시 파일에 남지 않는다.
 
 ```
-[holdfast]
-aws_access_key_id = AKIA...
-aws_secret_access_key = ...
-region = ap-northeast-2
+$ aws configure --profile holdfast
+AWS Access Key ID [None]: (붙여넣기)
+AWS Secret Access Key [None]: (붙여넣기)
+Default region name [None]: ap-northeast-2
+Default output format [None]: json
 ```
+
+확인은 신원만 본다:
+
+```bash
+aws sts get-caller-identity --profile holdfast
+```
+
+**Terraform이 이 프로필을 쓰게 한다** — `AWS_PROFILE=holdfast`를 주거나 provider에
+`profile = "holdfast"`를 적는다. **기본 프로필에 기대지 않는다**: 기본이 다른
+프로젝트를 가리키는 상태에서 `apply`를 돌리면 **엉뚱한 계정에 리소스가 선다.**
 
 > `.gitignore`가 `.terraform/`·`*.tfstate`·`*.tfvars`를 이미 막고 있고, 그 줄에
 > **"이거 빠지면 AWS 리소스 정보가 통째로 공개됩니다"**라고 적혀 있다.
-> **키를 이슈나 PR, 채팅에 붙이지 않는다.**
+> **키를 이슈·PR·채팅에 붙이지 않는다.**
 
 ## 6. 도메인
 
@@ -251,9 +291,10 @@ Access로 가린다. 실제 레코드를 붙이는 것은 ALB 주소가 생긴 �
 | **기존 사용액** | **$0.00** — 8월·9월 모두 0. **경보 임계값의 바닥이 0이다** | 2026-09-17 |
 | 크레딧 잔량 | **없음 — 받을 경로가 없다**(4절) | 2026-09-17 |
 | 12개월 프리티어 | **기대하지 않는다** — 날짜가 닫는다(4절) | 2026-09-17 |
-| Budgets 임계값 | $5 · $10 | _(미설정)_ |
-| 경보 수신 이메일 | _(미확인)_ | — |
-| IAM 사용자 | _(미생성)_ | — |
+| **Budgets 임계값** | **$5 · $10** (월 $10 예산의 50%·100%) | 2026-09-17 |
+| 알림 기본 설정 | 프리티어 알림 켜짐(루트 이메일) | 2026-09-17 |
+| 예상 총비용 | **약 $1.5~2** (테스트 3회 + 시연 1회) | 2026-09-17 |
+| IAM 사용자 | `holdfast-terraform` / 프로필 `holdfast` | _(진행 중)_ |
 
 > **계정 ID를 여기 적지 않는다.** 저장소는 공개이고, 계정 ID는 그 자체로 비밀은
 > 아니지만 다른 정보와 합쳐지면 표적이 된다. 필요하면 콘솔에서 본다.
