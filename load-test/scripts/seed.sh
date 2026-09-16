@@ -41,7 +41,11 @@ case "$SCENARIO" in
   # 시드가 만든 좌석보다 큰 번호를 k6가 고르면 SEAT_NOT_IN_SESSION이 섞인다.
   # 보정은 pessimistic 한 전략에서만 하고 그 값을 고정한다(7.2.2).
   sustained) SEATS="${SUSTAINED_SEATS:-3}"; VUS=500; USERS=500 ;;
-  *) echo "SCENARIO는 low|high|extreme|sustained 중 하나여야 한다: $SCENARIO" >&2; exit 2 ;;
+  # 7.2.3 할당량 경합(CS-6). **사용자가 VU보다 훨씬 적은 유일한 시나리오다** —
+  # VU 25개가 한 할당량 행을 다투게 하려는 것이고, 좌석을 넉넉히 두어 좌석
+  # 경합이 그것을 가리지 않게 한다. scenarios/lib/config.js의 quota와 같은 값이다.
+  quota)     SEATS=1000; VUS=500; USERS=20 ;;
+  *) echo "SCENARIO는 low|high|extreme|sustained|quota 중 하나여야 한다: $SCENARIO" >&2; exit 2 ;;
 esac
 
 DB_SERVICE="${DB_SERVICE:-db}"
