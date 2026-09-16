@@ -346,7 +346,8 @@ cd api && ./gradlew test                 # 174건 — 저장소 전체가 보이
 | [`openapi.yaml`](openapi.yaml) | API 계약의 기계 판독본. `api-spec.md`와 짝이다 |
 | [`workflow.md`](workflow.md) | 협업 규칙. 문서 갱신 8개 규칙 |
 | [`infra-decision.md`](infra-decision.md) | AWS 판단. 4절이 "잘라도 되는 것", **2.1이 시연 환경**(집 PC + 터널 + 도메인), **3.1이 배포에서 무엇을 여는가** |
-| [`setup.md`](setup.md) · [`roles.md`](roles.md) · [`demo-script.md`](demo-script.md) | 환경 구축 · 역할 · 시연 대본 |
+| [`setup.md`](setup.md) · [`roles.md`](roles.md) | 환경 구축 · 역할 |
+| [`demo-script.md`](demo-script.md) | **시연 대본.** 0절이 준비 순서와 탭 넷, 0.1이 어디서 도는가(집 PC + 터널)와 **말하지 않을 것** |
 | [`submissions/README.md`](submissions/README.md) | 수업 제출물 기록 — **파일은 저장소 밖**이고, 제출물이 담은 판단이 어느 문서에 대응하는지만 적는다 |
 
 **`results/` 아래의 나머지 다섯**은 결론이 아니라 **결론에 이르는 과정**이다.
