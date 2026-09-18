@@ -84,3 +84,26 @@ variable "log_retention_days" {
   type        = number
   default     = 1
 }
+
+variable "test_cidr" {
+  description = <<-EOT
+    **첫 배포를 스스로 확인하기 위한 탈출구다.** 비워 두면 아무 일도 안 한다.
+
+    ALB 보안그룹이 Cloudflare 대역만 받으므로(security.tf), **DNS 가 붙기 전에는
+    우리가 배포를 확인할 길이 없다** — Cloudflare 계정은 다른 사람 것이고(#204)
+    그쪽이 준비되기를 기다리는 동안 «떴는지조차 모르는» 상태가 된다.
+
+    여기에 내 공인 IP(`x.x.x.x/32`)를 주면 그 주소에서만 ALB 가 열린다.
+    **확인이 끝나면 비우고 apply 한다** — 남겨 두면 Cloudflare 를 거치지 않는
+    옆문이 되고, admin 에 Access 를 건 것이 무의미해진다(3.1).
+
+    내 IP: `curl ifconfig.me`
+  EOT
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.test_cidr == "" || can(cidrnetmask(var.test_cidr))
+    error_message = "빈 문자열이거나 CIDR 표기여야 한다 (예: 1.2.3.4/32)."
+  }
+}

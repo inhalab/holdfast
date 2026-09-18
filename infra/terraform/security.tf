@@ -48,6 +48,26 @@ resource "aws_vpc_security_group_ingress_rule" "alb_from_cloudflare" {
   description       = "Cloudflare edge"
 }
 
+/*
+ * **임시 확인용 구멍.** `test_cidr` 이 비어 있으면 만들어지지 않는다.
+ *
+ * 첫 배포를 스스로 확인하려면 이것이 필요하다 — Cloudflare 계정이 다른 사람
+ * 것이라(#204) DNS 가 붙기 전에는 ALB 에 닿을 길이 아예 없다.
+ *
+ * **확인이 끝나면 비우고 apply 한다.** 남겨 두면 Cloudflare 를 거치지 않는 옆문이
+ * 되고, `admin` 에 Access 를 건 것이 무의미해진다(3.1).
+ */
+resource "aws_vpc_security_group_ingress_rule" "alb_from_test" {
+  count = var.test_cidr == "" ? 0 : 1
+
+  security_group_id = aws_security_group.alb.id
+  cidr_ipv4         = var.test_cidr
+  from_port         = 80
+  to_port           = 80
+  ip_protocol       = "tcp"
+  description       = "temporary test access - remove before demo"
+}
+
 resource "aws_vpc_security_group_egress_rule" "alb_all" {
   security_group_id = aws_security_group.alb.id
   cidr_ipv4         = "0.0.0.0/0"
