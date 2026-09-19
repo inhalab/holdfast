@@ -45,7 +45,12 @@ case "$SCENARIO" in
   # VU 25개가 한 할당량 행을 다투게 하려는 것이고, 좌석을 넉넉히 두어 좌석
   # 경합이 그것을 가리지 않게 한다. scenarios/lib/config.js의 quota와 같은 값이다.
   quota)     SEATS=1000; VUS=500; USERS=20 ;;
-  *) echo "SCENARIO는 low|high|extreme|sustained|quota 중 하나여야 한다: $SCENARIO" >&2; exit 2 ;;
+  # 7.2.4 취소·재선점(CS-4). **확정까지 가는 유일한 시나리오다.** 좌석 수가
+  # 손잡이다 — 많으면 돌아온 좌석을 아무도 안 기다려 재선점 경합이 없고, 적으면
+  # 확정까지 가는 반복이 드물어 취소가 안 돈다. scenarios/lib/config.js의 cancel과
+  # 같은 값이다.
+  cancel)    SEATS=200;  VUS=500; USERS=500 ;;
+  *) echo "SCENARIO는 low|high|extreme|sustained|quota|cancel 중 하나여야 한다: $SCENARIO" >&2; exit 2 ;;
 esac
 
 DB_SERVICE="${DB_SERVICE:-db}"
