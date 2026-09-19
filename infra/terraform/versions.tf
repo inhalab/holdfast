@@ -25,5 +25,14 @@ terraform {
       source  = "hashicorp/http"
       version = "~> 3.4"
     }
+    /*
+     * **DNS 를 사람이 옮기지 않게 한다**(#204). ALB 주소는 destroy·apply 마다
+     * 바뀌는데, Cloudflare 계정이 다른 사람 것이라 매번 그 사람을 기다려야 했다 —
+     * 테스트 세 번에 실행 한 번이면 네 번이고 그중 한 번이 가장 나쁜 때다.
+     */
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 5.0"
+    }
   }
 }

@@ -1,8 +1,7 @@
 /*
  * 보안그룹 — 층마다 앞 층만 받는다. 이슈 #42.
  *
- *   인터넷 ──(Cloudflare 대역만)──▶ ALB ──▶ 앱(8080) ──▶ RDS(5432)
- *                                                    └─▶ Redis(6379)
+ *   인터넷 ──(Cloudflare 대역만, :443/:80)──▶ ALB ──▶ 앱(8080) ──▶ RDS(5432)
  *
  * **태스크가 퍼블릭 서브넷에 있고 퍼블릭 IP 를 받는다**(network.tf — NAT 를 안 만든
  * 대가). 그래서 «앱은 ALB 뒤에 있다»가 라우팅으로 보장되지 않고 **이 보안그룹이
@@ -28,8 +27,12 @@ resource "aws_security_group" "alb" {
 }
 
 /*
- * **오리진을 평문으로 두지 않는다**(infra-decision 2.1). 인증서를 하나 더 관리하는
- * 대신 **Cloudflare 를 거치지 않은 요청을 아예 받지 않는다.**
+ * **Cloudflare 를 거치지 않은 요청을 아예 받지 않는다**(infra-decision 2.1).
+ *
+ * **한때 이 자리에 «오리진을 평문으로 두지 않는다 — 인증서를 하나 더 관리하는
+ * 대신»이라고 적혀 있었다.** 축을 헷갈린 것이다. 보안그룹은 «누가 들어오는가»를
+ * 막지 «무엇이 지나가는가»를 가리지 않는다. 평문 구간은 ACM 과 `Full (strict)`
+ * 가 따로 푼다(cert.tf · #204). 둘은 겹치지 않으므로 이 규칙은 그대로 남는다.
  *
  * `admin.inhalab.cloud` 를 Cloudflare Access 로 가리는 것(3.1)이 의미를 가지려면
  * **ALB 주소로 직행하는 길이 막혀 있어야 한다.** 그러지 않으면 Access 를 걸어 두고
@@ -38,12 +41,16 @@ resource "aws_security_group" "alb" {
  * 대역은 main.tf 가 cloudflare.com/ips-v4 에서 받아 온다.
  */
 resource "aws_vpc_security_group_ingress_rule" "alb_from_cloudflare" {
-  for_each = toset(local.cloudflare_ipv4)
+  # 포트 둘 × 대역 15개. 443 이 실제 경로이고 80 은 리다이렉트만 한다(app.tf).
+  for_each = {
+    for pair in setproduct(local.cloudflare_ipv4, [80, 443]) :
+    "${pair[0]}-${pair[1]}" => { cidr = pair[0], port = pair[1] }
+  }
 
   security_group_id = aws_security_group.alb.id
-  cidr_ipv4         = each.value
-  from_port         = 80
-  to_port           = 80
+  cidr_ipv4         = each.value.cidr
+  from_port         = each.value.port
+  to_port           = each.value.port
   ip_protocol       = "tcp"
   description       = "Cloudflare edge"
 }
@@ -58,14 +65,14 @@ resource "aws_vpc_security_group_ingress_rule" "alb_from_cloudflare" {
  * 되고, `admin` 에 Access 를 건 것이 무의미해진다(3.1).
  */
 resource "aws_vpc_security_group_ingress_rule" "alb_from_test" {
-  count = var.test_cidr == "" ? 0 : 1
+  for_each = var.test_cidr == "" ? toset([]) : toset(["80", "443"])
 
   security_group_id = aws_security_group.alb.id
   cidr_ipv4         = var.test_cidr
-  from_port         = 80
-  to_port           = 80
+  from_port         = tonumber(each.value)
+  to_port           = tonumber(each.value)
   ip_protocol       = "tcp"
-  description       = "temporary test access - remove before demo"
+  description       = "temporary test access - remove when done"
 }
 
 resource "aws_vpc_security_group_egress_rule" "alb_all" {

@@ -86,6 +86,15 @@ resource "aws_lb" "main" {
   # 데모 스택이다. 실수로 지워지는 것보다 지워지지 않는 것이 비싸다.
   enable_deletion_protection = false
 
+  /*
+   * **인터넷 게이트웨이가 붙은 뒤에 세운다.** 인터넷용 ALB 는 IGW 없는 VPC 에서
+   * `InvalidSubnet: VPC ... has no internet gateway` 로 거절당한다. 그런데 이
+   * 리소스가 참조하는 것은 서브넷과 보안그룹뿐이라 IGW 와 의존 관계가 없었다 —
+   * 전체 apply 는 IGW 가 먼저 끝나서 통과했을 뿐이고, 순서를 보장한 적이 없다.
+   * `-target` 으로 부분만 세웠을 때 실제로 이 오류로 죽었다.
+   */
+  depends_on = [aws_internet_gateway.main]
+
   tags = { Name = "${local.name}-alb" }
 }
 
@@ -93,9 +102,10 @@ resource "aws_lb" "main" {
  * <h2>헬스체크는 `/api/health` 다 — `/actuator/health` 가 아니다</h2>
  *
  * **`/actuator/health` 는 Redis 가 없으면 503 을 낸다**(#42 댓글, #155 머지 후 실측).
- * 지금 배포는 `redis` 전략이라 ElastiCache 가 있지만, **전략을 바꿔 띄우는 순간
- * 타겟 둘이 전부 unhealthy 가 되고 ALB 가 503 을 낸다** — 그때 증상은 «앱은 떴는데
- * 주소가 안 열린다»라 원인을 찾기 어렵다.
+ * **이 배포에는 ElastiCache 가 없다**(전략을 pessimistic 으로 되돌리며 함께 뺐다 —
+ * data.tf 의 회수 기록). 그러므로 actuator 를 헬스체크로 쓰면 **지금 당장 타겟
+ * 둘이 전부 unhealthy 가 되고 ALB 가 503 을 낸다** — 그때 증상은 «앱은 떴는데
+ * 주소가 안 열린다»라 원인을 찾기 어렵다. 가정이 아니라 현재 구성의 이야기다.
  *
  * `/api/health` 는 200 을 내고 `db`·`redis` 상태를 본문에 싣는다. **#156 이
  * actuator 를 노출에서 거부하는 방향과도 맞는다** — 헬스체크가 actuator 안에
@@ -125,21 +135,55 @@ resource "aws_lb_target_group" "app" {
 }
 
 /*
- * `:80` HTTP/1.1 하나다. **CloudFront 를 세우지 않기로 했고**(#42 갱신 — 시연이
- * 이 이슈 밖으로 나가면서 브라우저 6커넥션 제약이 애초에 안 걸린다),
- * **TLS 는 Cloudflare 가 끝낸다**(2.1 — 인증서를 하나 더 관리하지 않는다).
+ * <h2>오리진 구간도 TLS 다 — `:443` 이 실제 경로다</h2>
  *
- * 그래서 Cloudflare 의 SSL/TLS 모드가 `Flexible` 이어야 한다(#204). `Full` 이면
- * 오리진 `:443` 으로 붙으려다 502 가 난다.
+ * **한때 `:80` 하나였다.** Cloudflare 무료 플랜이 엣지에서 TLS 를 주므로 인증서를
+ * 안 붙이고 보안그룹으로만 오리진을 가렸다(2.1).
+ *
+ * **그 판단은 구간을 하나로 봤다.** Cloudflare 의 `Flexible` 은 브라우저↔엣지만
+ * 암호화하고 **엣지↔ALB 는 평문**이다. 보안그룹은 «누가 들어오는가»를 막지
+ * **«무엇이 지나가는가»를 가리지 않는다.** ACM 공인 인증서가 무료이므로 붙이지
+ * 않을 이유가 없다(cert.tf).
+ *
+ * **Cloudflare 의 SSL/TLS 모드는 `Full (strict)` 여야 한다**(#204). ACM 인증서는
+ * 공인이라 `strict` 가 통과한다 — 자체 서명이었다면 `Full` 까지만 됐다.
  */
-resource "aws_lb_listener" "http" {
+resource "aws_lb_listener" "https" {
+  load_balancer_arn = aws_lb.main.arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+
+  # **검증이 끝난 뒤의 ARN 을 쓴다.** 인증서 리소스를 직접 참조하면 검증 전에
+  # 리스너가 서고, 그러면 TLS 를 못 주는 채로 떠 있게 된다(cert.tf).
+  certificate_arn = aws_acm_certificate_validation.main.certificate_arn
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app.arn
+  }
+}
+
+/*
+ * **`:80` 은 리다이렉트만 한다.** Cloudflare 가 `Full (strict)` 에서 오리진에
+ * `:443` 으로만 붙으므로 이 리스너를 지나는 정상 트래픽은 없다.
+ *
+ * **그래도 둔다** — 없으면 `:80` 이 연결 거부를 내고, 설정을 잘못 잡았을 때
+ * 증상이 «거부»로 나와 원인을 찾기 어렵다. 301 이면 «여기는 HTTPS 다»가 바로
+ * 읽힌다.
+ */
+resource "aws_lb_listener" "http_redirect" {
   load_balancer_arn = aws_lb.main.arn
   port              = 80
   protocol          = "HTTP"
 
   default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.app.arn
+    type = "redirect"
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
   }
 }
 
@@ -241,7 +285,7 @@ resource "aws_ecs_service" "app" {
   health_check_grace_period_seconds = 120
 
   # 리스너가 있어야 타겟 등록이 된다. 없으면 "target group not associated" 로 실패한다.
-  depends_on = [aws_lb_listener.http]
+  depends_on = [aws_lb_listener.https]
 
   tags = { Name = local.name }
 }

@@ -193,7 +193,23 @@ AWS_HOURLY="${AWS_HOURLY:-0.18}"
 AWS_WARN_HOURS="${AWS_WARN_HOURS:-2}"
 
 # terraform 은 항상 이 디렉터리에서, 프로필을 고정해 부른다.
-tf() { (cd "$AWS_TF" && terraform "$@"); }
+# **Cloudflare 토큰을 .env 에서 꺼내 프로바이더가 읽는 이름으로 넘긴다.**
+#
+# 저장소에는 토큰이 없다(#204). Terraform 변수로 받지 않는 이유는 변수로 두면
+# tfvars 나 명령줄에 값이 남고 **그것이 셸 기록·상태 파일로 새는 경로**이기
+# 때문이다 — 프로바이더가 환경변수를 스스로 읽으므로 그대로 둔다.
+#
+# **없으면 조용히 넘어간다.** DNS 를 안 건드리는 작업(net·data 단계, status)은
+# 토큰 없이도 돌아야 한다. 정말 필요한 자리에서 terraform 이 알려 준다.
+cf_token_env() {
+  [ -f "$ROOT/.env" ] || return 0
+  local t
+  t="$(sed -n 's/^CF_API_TOKEN=//p' "$ROOT/.env" | tail -1 | tr -d '\r"'"'"' ')"
+  [ -n "$t" ] || return 0
+  export CLOUDFLARE_API_TOKEN="$t"
+}
+
+tf() { (cf_token_env; cd "$AWS_TF" && terraform "$@"); }
 
 # **프로필을 확인하고 아니면 거부한다.**
 #
@@ -268,21 +284,50 @@ warn_if_aws_up() {
 # 주지 않아 전체를 맞춘다.
 aws_stage_targets() {
   case "$1" in
+    # **인증서를 여기 넣는다.** 만드는 것은 공짜이고 즉시 끝나며, 검증 CNAME 을
+    # 뽑아야 최건이 Cloudflare 에 넣을 수 있다(#204). 기다리는 쪽
+    # (aws_acm_certificate_validation)은 app 단계다 — cert.tf 참조.
     net)
       echo "-target=aws_route_table_association.public"
       echo "-target=aws_ecr_lifecycle_policy.app"
+      echo "-target=aws_acm_certificate.main"
       echo "-target=aws_vpc_security_group_ingress_rule.alb_from_cloudflare"
       echo "-target=aws_vpc_security_group_ingress_rule.app_from_alb"
       echo "-target=aws_vpc_security_group_ingress_rule.db_from_app"
-      echo "-target=aws_vpc_security_group_ingress_rule.redis_from_app"
       echo "-target=aws_vpc_security_group_egress_rule.alb_all"
       echo "-target=aws_vpc_security_group_egress_rule.app_all"
       ;;
     # **ElastiCache 는 여기 없다.** 세우지 않기로 했다 — 근거는
     # infra/terraform/data.tf 의 회수 기록(#42 댓글 ②).
     data) echo "-target=aws_db_instance.main" ;;
+    # **엣지만 세운다 — 앱도 DB도 없이.** `Full (strict)` 는 Cloudflare 가 오리진
+    # 인증서를 «검증»하는 모드라, 설정값이 맞다는 것과 핸드셰이크가 통한다는 것이
+    # 다르다. 통하는지 보려면 오리진이 서 있어야 하는데, 그 오리진은 ALB 뿐이고
+    # ALB 는 RDS 도 ECS 도 필요로 하지 않는다.
+    #
+    # **판정은 응답 코드로 한다.** 503 이면 통과다 — TLS 는 통했고 뒤에 태스크가
+    # 없을 뿐이다. 526 이면 오리진 인증서를 거부한 것이고, 무응답이면 보안그룹이
+    # Cloudflare 대역을 안 받고 있는 것이다.
+    #
+    # 리스너와 서비스 레코드를 주면 ALB · 타겟그룹 · 인증서 검증 · 검증용 CNAME 이
+    # 의존성으로 딸려 온다. ALB 하나라 시간당 $0.03 안팎이다.
+    #
+    # **net 을 통째로 포함한다.** `-target` 은 «지정한 것 + 그것이 의존하는 것»만
+    # 남기는데, 보안그룹 «규칙»과 라우트 테이블 «연결»은 아무도 참조하지 않는
+    # 고아 노드라 ALB 를 지정해도 그래프에 안 들어온다. 그러면 ALB 는 서는데
+    # 구멍도 경로도 없어 **Cloudflare 가 오리진에 닿지 못하고 요청이 멈춘다.**
+    #
+    # 처음에는 리스너와 레코드만 지정했다가 그 둘을 차례로 밟았다. 하나씩
+    # 찾아 더하는 대신 net 을 앞에 붙인다 — net 은 전부 무료라 더해도 손해가 없고,
+    # 「edge 는 net 위에 ALB 만 얹은 것」이라는 관계가 코드에 드러난다.
+    edge)
+      aws_stage_targets net
+      echo "-target=aws_lb_listener.https"
+      echo "-target=aws_lb_listener.http_redirect"
+      echo "-target=cloudflare_dns_record.service"
+      ;;
     app)  ;;  # 전체
-    *) echo "[holdfast] 알 수 없는 단계: $1 (net|data|app)" >&2; exit 2 ;;
+    *) echo "[holdfast] 알 수 없는 단계: $1 (net|data|edge|app)" >&2; exit 2 ;;
   esac
 }
 
@@ -382,7 +427,8 @@ holdfast — 실행 진입점
 
 AWS 배포 (#42)
   aws push             이미지를 빌드해 ECR 에 민다
-  aws up [단계]        apply. 단계는 net|data|app 이고 기본은 app(전체)
+  aws up [단계]        apply. 단계는 net|data|edge|app 이고 기본은 app(전체)
+                       edge 는 ALB · 인증서 · DNS 만 — TLS 확인용, 앱도 DB도 안 선다
                        **비싼 것이 뒤다** — net 은 과금이 없고 data 부터 돈이 든다
   aws status           떠 있나 · 몇 시간째 · 지금까지 얼마
   aws down             destroy 하고 **태그로** 남은 것을 확인한다
@@ -888,13 +934,22 @@ EOF
         tf plan -no-color -out=".tfplan" "${targets[@]}"
         aws_nat_guard ".tfplan"
 
-        tf apply -no-color ".tfplan"
-        rm -f "$planfile"
-
-        # 과금이 시작되는 단계부터 시계를 켠다. net 은 전부 무료라 세지 않는다.
+        # **시계를 apply 앞에서 켠다.** 한때 뒤에서 켰는데, apply 가 중간에 죽으면
+        # **과금되는 리소스는 서 있고 시계는 안 켜진 상태**가 된다 — 실제로 한 번
+        # 그랬고, ALB 가 떠 있는데 `status` 가 «뜬 기록이 없다»고 답했다. 확인이
+        # 괜찮다고 거짓말하는 구조라 #184 · #186 과 같은 종류다.
+        #
+        # 앞에서 켜면 반대 방향으로 틀릴 수 있다 — 아무것도 안 섰는데 시계가 돈다.
+        # 그쪽은 손해가 없다. `down` 이 지울 게 없을 뿐이고 시계도 거기서 지운다.
+        # **틀릴 거면 «떠 있다»는 쪽으로 틀리는 게 맞다.**
+        #
+        # net 은 전부 무료라 세지 않는다.
         if [ "$stage" != "net" ] && [ ! -f "$AWS_STAMP" ]; then
           date +%s > "$AWS_STAMP"
         fi
+
+        tf apply -no-color ".tfplan"
+        rm -f "$planfile"
 
         echo
         echo "[holdfast] $stage 단계 완료."
@@ -963,7 +1018,30 @@ EOF
         [ -n "$url" ] && echo "$url" || echo "[holdfast] 아직 ALB 가 없다 — ./holdfast aws up" >&2
         ;;
 
-      *) echo "알 수 없는 aws 커맨드: $sub (push|up|status|down|url)" >&2; exit 2 ;;
+      # **Cloudflare 계정이 갈려 있어 사람이 넘겨야 한다**(#204). 콘솔에서 찾아
+      # 적는 대신 여기서 찍는다 — 주소를 손으로 옮기다 틀리는 일이 가장 비싸다.
+      cert)
+        recs="$(tf output -json acm_validation_records 2>/dev/null)" || recs=""
+        if [ -z "$recs" ] || [ "$recs" = "{}" ]; then
+          echo "[holdfast] 아직 인증서가 없다 — ./holdfast aws up net 먼저." >&2
+          exit 1
+        fi
+        echo "[holdfast] Cloudflare 에 넣을 검증 CNAME (한 번만 넣으면 된다):"
+        echo
+        node_run -e '
+          const r = JSON.parse(process.argv[1]);
+          for (const [name, value] of Object.entries(r)) {
+            console.log("  타입   CNAME");
+            console.log("  이름   " + name.replace(/\.$/, ""));
+            console.log("  값     " + value.replace(/\.$/, ""));
+            console.log("  프록시 끔 (회색 구름)");
+            console.log();
+          }
+        ' "$recs"
+        echo "[holdfast] 넣은 뒤: ./holdfast aws up app  (검증을 기다렸다가 :443 리스너를 세운다)"
+        ;;
+
+      *) echo "알 수 없는 aws 커맨드: $sub (push|up|cert|status|down|url)" >&2; exit 2 ;;
     esac
     ;;
 
