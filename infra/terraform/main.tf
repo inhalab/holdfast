@@ -16,6 +16,14 @@ provider "aws" {
   }
 }
 
+/*
+ * **토큰을 변수로 받지 않는다.** 변수로 두면 `terraform.tfvars` 나 명령줄에 값이
+ * 남고, 그것이 셸 기록·상태 파일로 새는 경로다. 프로바이더가 환경변수
+ * `CLOUDFLARE_API_TOKEN` 을 스스로 읽으므로 그대로 둔다 — `./holdfast aws` 가
+ * 루트 `.env` 의 `CF_API_TOKEN` 을 그 이름으로 넘긴다.
+ */
+provider "cloudflare" {}
+
 locals {
   name = var.project
 

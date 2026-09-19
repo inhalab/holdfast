@@ -193,7 +193,23 @@ AWS_HOURLY="${AWS_HOURLY:-0.18}"
 AWS_WARN_HOURS="${AWS_WARN_HOURS:-2}"
 
 # terraform 은 항상 이 디렉터리에서, 프로필을 고정해 부른다.
-tf() { (cd "$AWS_TF" && terraform "$@"); }
+# **Cloudflare 토큰을 .env 에서 꺼내 프로바이더가 읽는 이름으로 넘긴다.**
+#
+# 저장소에는 토큰이 없다(#204). Terraform 변수로 받지 않는 이유는 변수로 두면
+# tfvars 나 명령줄에 값이 남고 **그것이 셸 기록·상태 파일로 새는 경로**이기
+# 때문이다 — 프로바이더가 환경변수를 스스로 읽으므로 그대로 둔다.
+#
+# **없으면 조용히 넘어간다.** DNS 를 안 건드리는 작업(net·data 단계, status)은
+# 토큰 없이도 돌아야 한다. 정말 필요한 자리에서 terraform 이 알려 준다.
+cf_token_env() {
+  [ -f "$ROOT/.env" ] || return 0
+  local t
+  t="$(sed -n 's/^CF_API_TOKEN=//p' "$ROOT/.env" | tail -1 | tr -d '\r"'"'"' ')"
+  [ -n "$t" ] || return 0
+  export CLOUDFLARE_API_TOKEN="$t"
+}
+
+tf() { (cf_token_env; cd "$AWS_TF" && terraform "$@"); }
 
 # **프로필을 확인하고 아니면 거부한다.**
 #
@@ -268,13 +284,16 @@ warn_if_aws_up() {
 # 주지 않아 전체를 맞춘다.
 aws_stage_targets() {
   case "$1" in
+    # **인증서를 여기 넣는다.** 만드는 것은 공짜이고 즉시 끝나며, 검증 CNAME 을
+    # 뽑아야 최건이 Cloudflare 에 넣을 수 있다(#204). 기다리는 쪽
+    # (aws_acm_certificate_validation)은 app 단계다 — cert.tf 참조.
     net)
       echo "-target=aws_route_table_association.public"
       echo "-target=aws_ecr_lifecycle_policy.app"
+      echo "-target=aws_acm_certificate.main"
       echo "-target=aws_vpc_security_group_ingress_rule.alb_from_cloudflare"
       echo "-target=aws_vpc_security_group_ingress_rule.app_from_alb"
       echo "-target=aws_vpc_security_group_ingress_rule.db_from_app"
-      echo "-target=aws_vpc_security_group_ingress_rule.redis_from_app"
       echo "-target=aws_vpc_security_group_egress_rule.alb_all"
       echo "-target=aws_vpc_security_group_egress_rule.app_all"
       ;;
@@ -963,7 +982,30 @@ EOF
         [ -n "$url" ] && echo "$url" || echo "[holdfast] 아직 ALB 가 없다 — ./holdfast aws up" >&2
         ;;
 
-      *) echo "알 수 없는 aws 커맨드: $sub (push|up|status|down|url)" >&2; exit 2 ;;
+      # **Cloudflare 계정이 갈려 있어 사람이 넘겨야 한다**(#204). 콘솔에서 찾아
+      # 적는 대신 여기서 찍는다 — 주소를 손으로 옮기다 틀리는 일이 가장 비싸다.
+      cert)
+        recs="$(tf output -json acm_validation_records 2>/dev/null)" || recs=""
+        if [ -z "$recs" ] || [ "$recs" = "{}" ]; then
+          echo "[holdfast] 아직 인증서가 없다 — ./holdfast aws up net 먼저." >&2
+          exit 1
+        fi
+        echo "[holdfast] Cloudflare 에 넣을 검증 CNAME (한 번만 넣으면 된다):"
+        echo
+        node_run -e '
+          const r = JSON.parse(process.argv[1]);
+          for (const [name, value] of Object.entries(r)) {
+            console.log("  타입   CNAME");
+            console.log("  이름   " + name.replace(/\.$/, ""));
+            console.log("  값     " + value.replace(/\.$/, ""));
+            console.log("  프록시 끔 (회색 구름)");
+            console.log();
+          }
+        ' "$recs"
+        echo "[holdfast] 넣은 뒤: ./holdfast aws up app  (검증을 기다렸다가 :443 리스너를 세운다)"
+        ;;
+
+      *) echo "알 수 없는 aws 커맨드: $sub (push|up|cert|status|down|url)" >&2; exit 2 ;;
     esac
     ;;
 

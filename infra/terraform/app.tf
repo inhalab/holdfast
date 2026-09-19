@@ -125,21 +125,55 @@ resource "aws_lb_target_group" "app" {
 }
 
 /*
- * `:80` HTTP/1.1 하나다. **CloudFront 를 세우지 않기로 했고**(#42 갱신 — 시연이
- * 이 이슈 밖으로 나가면서 브라우저 6커넥션 제약이 애초에 안 걸린다),
- * **TLS 는 Cloudflare 가 끝낸다**(2.1 — 인증서를 하나 더 관리하지 않는다).
+ * <h2>오리진 구간도 TLS 다 — `:443` 이 실제 경로다</h2>
  *
- * 그래서 Cloudflare 의 SSL/TLS 모드가 `Flexible` 이어야 한다(#204). `Full` 이면
- * 오리진 `:443` 으로 붙으려다 502 가 난다.
+ * **한때 `:80` 하나였다.** Cloudflare 무료 플랜이 엣지에서 TLS 를 주므로 인증서를
+ * 안 붙이고 보안그룹으로만 오리진을 가렸다(2.1).
+ *
+ * **그 판단은 구간을 하나로 봤다.** Cloudflare 의 `Flexible` 은 브라우저↔엣지만
+ * 암호화하고 **엣지↔ALB 는 평문**이다. 보안그룹은 «누가 들어오는가»를 막지
+ * **«무엇이 지나가는가»를 가리지 않는다.** ACM 공인 인증서가 무료이므로 붙이지
+ * 않을 이유가 없다(cert.tf).
+ *
+ * **Cloudflare 의 SSL/TLS 모드는 `Full (strict)` 여야 한다**(#204). ACM 인증서는
+ * 공인이라 `strict` 가 통과한다 — 자체 서명이었다면 `Full` 까지만 됐다.
  */
-resource "aws_lb_listener" "http" {
+resource "aws_lb_listener" "https" {
+  load_balancer_arn = aws_lb.main.arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+
+  # **검증이 끝난 뒤의 ARN 을 쓴다.** 인증서 리소스를 직접 참조하면 검증 전에
+  # 리스너가 서고, 그러면 TLS 를 못 주는 채로 떠 있게 된다(cert.tf).
+  certificate_arn = aws_acm_certificate_validation.main.certificate_arn
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app.arn
+  }
+}
+
+/*
+ * **`:80` 은 리다이렉트만 한다.** Cloudflare 가 `Full (strict)` 에서 오리진에
+ * `:443` 으로만 붙으므로 이 리스너를 지나는 정상 트래픽은 없다.
+ *
+ * **그래도 둔다** — 없으면 `:80` 이 연결 거부를 내고, 설정을 잘못 잡았을 때
+ * 증상이 «거부»로 나와 원인을 찾기 어렵다. 301 이면 «여기는 HTTPS 다»가 바로
+ * 읽힌다.
+ */
+resource "aws_lb_listener" "http_redirect" {
   load_balancer_arn = aws_lb.main.arn
   port              = 80
   protocol          = "HTTP"
 
   default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.app.arn
+    type = "redirect"
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
   }
 }
 
@@ -241,7 +275,7 @@ resource "aws_ecs_service" "app" {
   health_check_grace_period_seconds = 120
 
   # 리스너가 있어야 타겟 등록이 된다. 없으면 "target group not associated" 로 실패한다.
-  depends_on = [aws_lb_listener.http]
+  depends_on = [aws_lb_listener.https]
 
   tags = { Name = local.name }
 }

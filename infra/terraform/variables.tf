@@ -113,3 +113,46 @@ variable "test_cidr" {
     error_message = "빈 문자열이거나 CIDR 표기여야 한다 (예: 1.2.3.4/32)."
   }
 }
+
+variable "domain_app" {
+  description = <<-EOT
+    사용자 화면 주소. **공개**다. ACM 인증서의 주 도메인이고 Cloudflare 가 이
+    이름으로 오리진에 붙는다.
+  EOT
+  type        = string
+  default     = "app.inhalab.cloud"
+}
+
+variable "domain_admin" {
+  description = <<-EOT
+    관리자 주소. **Cloudflare Access 가 가린다**(infra-decision 3.1) — 앱은 그
+    자물쇠를 모른다. 같은 ALB 를 가리키고 가르는 것은 Cloudflare 다.
+
+    ACM 인증서에 SAN 으로 함께 넣는다. 인증서가 둘이면 리스너도 둘이거나
+    SNI 설정이 늘어서, 하나에 담는 편이 단순하다.
+  EOT
+  type        = string
+  default     = "admin.inhalab.cloud"
+}
+
+variable "domain_wildcard" {
+  description = <<-EOT
+    ACM 인증서가 덮는 범위. **와일드카드 하나로 받는다** — 이름을 따로 넣으면
+    검증 CNAME 이 이름 수만큼 생기고, 그것을 다른 사람이 손으로 넣어야 한다(#204).
+
+    1단계까지만 덮는다. 3단계 서브도메인은 이미 안 쓰기로 했다(2.1).
+  EOT
+  type        = string
+  default     = "*.inhalab.cloud"
+}
+
+variable "zone_name" {
+  description = <<-EOT
+    Cloudflare 존 이름. **ID 가 아니라 이름으로 받는다** — 관리할 값이 하나 줄고,
+    ID 가 틀렸을 때 증상이 «레코드가 엉뚱한 존에 생긴다»로 조용하다.
+
+    토큰(`CF_API_TOKEN`)은 저장소에 없다. 루트 `.env` 에 두고 .gitignore 가 막는다.
+  EOT
+  type        = string
+  default     = "inhalab.cloud"
+}

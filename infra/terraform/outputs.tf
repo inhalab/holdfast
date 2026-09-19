@@ -35,8 +35,32 @@ output "alb_dns_name" {
 }
 
 output "app_url" {
-  description = "ALB 직행 주소. 브라우저로는 안 열린다 — 보안그룹이 Cloudflare 대역만 받는다."
-  value       = try("http://${aws_lb.main.dns_name}", "")
+  description = <<-EOT
+    ALB 직행 주소. **브라우저로는 안 열린다** — 보안그룹이 Cloudflare 대역만 받는다.
+    게다가 인증서가 `app.inhalab.cloud` 용이라 이 이름으로 붙으면 TLS 경고가 난다.
+  EOT
+  value       = try("https://${aws_lb.main.dns_name}", "")
+}
+
+/*
+ * **최건에게 넘길 값이다**(#204 — Cloudflare 계정이 갈려 있다).
+ *
+ * ACM 이 도메인 소유를 확인하는 CNAME 이고, **한 번만 넣으면 된다** — 계정 +
+ * 도메인 단위로 안정적이라 destroy·apply 를 반복해도 재검증이 없다(cert.tf).
+ *
+ * `./holdfast aws cert` 가 이 값을 사람이 읽기 좋게 찍는다.
+ */
+output "acm_validation_records" {
+  description = "Cloudflare 에 넣을 검증 CNAME. 이름 → 값. 프록시는 끈다(회색 구름)."
+  value = try({
+    for o in aws_acm_certificate.main.domain_validation_options :
+    o.resource_record_name => o.resource_record_value
+  }, {})
+}
+
+output "domains" {
+  description = "Cloudflare CNAME 이 가리킬 이름 둘. 둘 다 같은 ALB 다."
+  value       = [var.domain_app, var.domain_admin]
 }
 
 output "db_endpoint" {
