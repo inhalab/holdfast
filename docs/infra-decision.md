@@ -322,13 +322,17 @@ PC에서도 볼 수 있으므로 정상으로 보인다.** 프로퍼티와 달�
   **ACM 인증서도 CloudFront도 필요 없다**(3.2 회수)
 - **오리진 구간을 평문으로 두지 않는다.** ALB 보안그룹을 **Cloudflare IP 대역으로
   좁힌다** — 인증서를 하나 더 관리하지 않고 오리진을 가리는 실용적인 답이다
-- **노출 스위치 셋은 이미 있다** — `admin` 끔·`demo` 끔(위 표), ALB에서
-  `/actuator/*` 거부(3.1)
+- **노출 스위치는 둘이다** — `demo` 끔(위 표), ALB에서 `/actuator/*` 거부(3.1).
+  **`admin`은 켠다** — 자물쇠를 앱이 아니라 Cloudflare Access에 건다(3.1)
+
+  > **이 줄은 한때 *"노출 스위치 **셋**은 이미 있다 — `admin` 끔·`demo` 끔"*이었다**(#185).
+  > 3.1이 *"배포하면 끈다"*를 뒤집으면서 `admin`이 스위치가 아니게 됐는데 이 줄이
+  > 따라오지 않았다. 아래 표도 같은 이유로 낡아 있었다.
 - **`/api/**`는 인증이 없어 누구나 홀드를 잡을 수 있다.** `rfp-scope.md` 4.3이
   인증을 배제한 결과이며 **여기서 바꾸지 않는다.** 감수하는 대신 **발표 직후
   `terraform destroy`**로 창을 닫는다(5절)
 
-#### 도메인 — `inhalab.cloud`. 시연 셋과 배포 하나로 나눈다
+#### 도메인 — `inhalab.cloud`. 시연 셋과 배포 둘로 나눈다
 
 **확보했다.** Cloudflare 네임서버 이전도 끝나 **Active**다. 이 문서가 한때
 `<도메인>`으로 두었던 자리가 이것이다.
@@ -338,12 +342,18 @@ PC에서도 볼 수 있으므로 정상으로 보인다.** 프로퍼티와 달�
 | **`demo-none.inhalab.cloud`** | Cloudflare Tunnel → **집 PC** (`holdfast-none`) | 라이브 시연 — 1절 전반 |
 | **`demo-pess.inhalab.cloud`** | Cloudflare Tunnel → **집 PC** (`holdfast-pess`) | 1절 후반 · 2절 |
 | **`demo-admin.inhalab.cloud`** | Cloudflare Tunnel → **집 PC** (`holdfast-pess`의 `/admin`) | 3절 |
-| **`app.inhalab.cloud`** | Cloudflare → ALB → **AWS Fargate** | 배포 증거 |
+| **`app.inhalab.cloud`** | Cloudflare → ALB → **AWS Fargate** | 배포 증거 — **공개** |
+| **`admin.inhalab.cloud`** | Cloudflare → ALB → **AWS Fargate** | 관리자 — **Cloudflare Access**(3.1) |
 
 **시연 쪽이 셋인 이유는 #179다** — 전략 전환을 탭 전환으로 만들려고 스택을 둘
 띄우고, 관리자는 경로가 아니라 호스트명으로 갈랐다. **3단계 서브도메인
 (`demo.none.…`)은 쓰지 않는다** — 무료 플랜 Universal SSL이 1단계까지만 커버해
 인증서 오류가 난다.
+
+**배포 쪽이 둘인 것은 3.1이 «배포하면 admin을 끈다»를 뒤집었기 때문이다**(#185).
+**두 이름이 같은 ALB를 가리키고 가르는 것은 Cloudflare다** — `admin` 쪽에만
+Access를 건다. 이 표가 한때 `app` 하나만 적고 있었는데, 같은 문서 2절 전제표와
+3.1은 이미 둘이라 적고 있어 **문서 안에서 서로 다른 말을 했다.**
 
 **시연 쪽과 배포 쪽을 하나로 돌려 쓰지 않는다.** 근거가 셋이다.
 
