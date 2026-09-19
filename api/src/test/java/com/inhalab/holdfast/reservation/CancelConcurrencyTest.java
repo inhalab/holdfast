@@ -259,6 +259,19 @@ class CancelConcurrencyTest {
                  WHERE r.session_id = ? AND r.status = 'CONFIRMED' AND si.status <> 'SOLD'
                 """, Integer.class, SESSION_ID);
 
+        // **취소가 실제로 됐는지를 먼저 본다.** 아래 stranded 만 보면 «아무 일도
+        // 안 일어난» 회귀에도 0이 나와 초록이 된다 — 취소가 전부 실패하면
+        // cancelled 는 CONFIRMED 로 남고 좌석도 SOLD 라 어긋남이 없다. 같은
+        // 파일의 위 테스트가 @Disabled 인 동안에는 이 테스트가 혼자 서야
+        // 한다(#210 리뷰).
+        assertThat(jdbc.queryForObject(
+                "SELECT status FROM reservation WHERE id = ?", String.class, cancelled))
+                .as("취소가 실제로 됐어야 한다 — 아니면 아래 단언이 헛통과한다")
+                .isEqualTo("CANCELLED");
+        assertThat(seatStatus(1L))
+                .as("취소했으니 좌석이 돌아왔어야 한다")
+                .isEqualTo("AVAILABLE");
+
         assertThat(stranded)
                 .as("""
                         확정된 예약의 좌석이 재고에서 비면 안 된다. 0이 아니면 겹친 취소가 \
