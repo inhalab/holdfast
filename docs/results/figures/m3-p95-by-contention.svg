@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="601" viewBox="0 0 900 601" font-family="'Malgun Gothic','Apple SD Gothic Neo',system-ui,-apple-system,'Segoe UI',sans-serif">
+<rect width="900" height="601" fill="#fcfcfb"/>
+<text x="26" y="38" font-size="19" font-weight="700" fill="#0b0b0b">p95 로는 전략을 가를 수 없다 — 같은 것을 다시 재면 그만큼 흔들린다</text>
+<text x="26" y="62" font-size="13" fill="#52514e">3회 중앙값. 맨 아랫줄은 전략을 바꾼 것이 아니라 같은 조건을 다섯 세션에서 잰 것이다</text>
+<rect x="26" y="104.0" width="828" height="62" fill="#fbf1f1"/>
+<rect x="448.4" y="96" width="345.5" height="380" fill="#ecebe6" fill-opacity="0.75"/>
+<text x="621.2" y="88" font-size="12.5" font-weight="700" fill="#52514e" text-anchor="middle">맨 아랫줄이 만든 폭 18~41ms</text>
+<line x1="178.0" y1="96" x2="178.0" y2="476" stroke="#e8e7e3" stroke-width="1"/>
+<text x="178.0" y="497" font-size="12" fill="#8a8a84" text-anchor="middle">0</text>
+<line x1="328.2" y1="96" x2="328.2" y2="476" stroke="#e8e7e3" stroke-width="1"/>
+<text x="328.2" y="497" font-size="12" fill="#8a8a84" text-anchor="middle">10</text>
+<line x1="478.4" y1="96" x2="478.4" y2="476" stroke="#e8e7e3" stroke-width="1"/>
+<text x="478.4" y="497" font-size="12" fill="#8a8a84" text-anchor="middle">20</text>
+<line x1="628.7" y1="96" x2="628.7" y2="476" stroke="#e8e7e3" stroke-width="1"/>
+<text x="628.7" y="497" font-size="12" fill="#8a8a84" text-anchor="middle">30</text>
+<line x1="778.9" y1="96" x2="778.9" y2="476" stroke="#e8e7e3" stroke-width="1"/>
+<text x="778.9" y="497" font-size="12" fill="#8a8a84" text-anchor="middle">40</text>
+<text x="854" y="518" font-size="12" fill="#8a8a84" text-anchor="end">p95 응답시간 (ms)</text>
+<text x="160" y="136.0" font-size="14" font-weight="700" fill="#b3282a" text-anchor="end">none</text>
+<text x="160" y="152.0" font-size="10.5" fill="#8a8a84" text-anchor="end">락 없음 — 대조군</text>
+<line x1="178" y1="135.0" x2="854" y2="135.0" stroke="#e8e7e3" stroke-width="1"/>
+<circle cx="538.5" cy="135.0" r="7" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="538.5" y="119.0" font-size="12.5" font-weight="700" fill="#52514e" text-anchor="middle">24</text>
+<circle cx="643.7" cy="135.0" r="7" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<text x="643.7" y="119.0" font-size="12.5" font-weight="700" fill="#52514e" text-anchor="middle">31</text>
+<circle cx="778.9" cy="135.0" r="7" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<text x="778.9" y="119.0" font-size="12.5" font-weight="700" fill="#52514e" text-anchor="middle">40</text>
+<line x1="26" y1="166.0" x2="854" y2="166.0" stroke="#cfcec9" stroke-width="1" stroke-dasharray="5 5"/>
+<text x="160" y="198.0" font-size="14" font-weight="700" fill="#0b0b0b" text-anchor="end">pessimistic</text>
+<line x1="178" y1="197.0" x2="854" y2="197.0" stroke="#e8e7e3" stroke-width="1"/>
+<circle cx="463.4" cy="197.0" r="7" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="463.4" y="181.0" font-size="12.5" font-weight="700" fill="#52514e" text-anchor="middle">19</text>
+<circle cx="658.7" cy="197.0" r="7" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<text x="658.7" y="181.0" font-size="12.5" font-weight="700" fill="#52514e" text-anchor="middle">32</text>
+<circle cx="688.8" cy="197.0" r="7" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<text x="688.8" y="181.0" font-size="12.5" font-weight="700" fill="#52514e" text-anchor="middle">34</text>
+<text x="160" y="260.0" font-size="14" font-weight="700" fill="#0b0b0b" text-anchor="end">optimistic</text>
+<line x1="178" y1="259.0" x2="854" y2="259.0" stroke="#e8e7e3" stroke-width="1"/>
+<circle cx="613.6" cy="259.0" r="7" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="613.6" y="243.0" font-size="12.5" font-weight="700" fill="#52514e" text-anchor="middle">29</text>
+<circle cx="658.7" cy="259.0" r="7" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<text x="658.7" y="243.0" font-size="12.5" font-weight="700" fill="#52514e" text-anchor="middle">32</text>
+<circle cx="793.9" cy="259.0" r="7" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<text x="793.9" y="243.0" font-size="12.5" font-weight="700" fill="#52514e" text-anchor="middle">41</text>
+<text x="160" y="322.0" font-size="14" font-weight="700" fill="#0b0b0b" text-anchor="end">unique</text>
+<line x1="178" y1="321.0" x2="854" y2="321.0" stroke="#e8e7e3" stroke-width="1"/>
+<circle cx="463.4" cy="321.0" r="7" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="463.4" y="305.0" font-size="12.5" font-weight="700" fill="#52514e" text-anchor="middle">19</text>
+<circle cx="643.7" cy="321.0" r="7" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<text x="643.7" y="305.0" font-size="12.5" font-weight="700" fill="#52514e" text-anchor="middle">31</text>
+<circle cx="703.8" cy="321.0" r="7" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<text x="703.8" y="305.0" font-size="12.5" font-weight="700" fill="#52514e" text-anchor="middle">35</text>
+<text x="160" y="384.0" font-size="14" font-weight="700" fill="#0b0b0b" text-anchor="end">redis</text>
+<line x1="178" y1="383.0" x2="854" y2="383.0" stroke="#e8e7e3" stroke-width="1"/>
+<circle cx="433.4" cy="383.0" r="7" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<text x="433.4" y="367.0" font-size="12.5" font-weight="700" fill="#52514e" text-anchor="middle">17</text>
+<circle cx="448.4" cy="383.0" r="7" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<text x="448.4" y="408.0" font-size="12.5" font-weight="700" fill="#52514e" text-anchor="middle">18</text>
+<circle cx="493.5" cy="383.0" r="7" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="493.5" y="367.0" font-size="12.5" font-weight="700" fill="#52514e" text-anchor="middle">21</text>
+<line x1="26" y1="414.0" x2="854" y2="414.0" stroke="#cfcec9" stroke-width="1" stroke-dasharray="5 5"/>
+<text x="160" y="446.0" font-size="14" font-weight="700" fill="#0b0b0b" text-anchor="end">같은 것을 5번</text>
+<text x="160" y="462.0" font-size="10.5" fill="#8a8a84" text-anchor="end">none 고경합만 다섯 세션에서</text>
+<line x1="178" y1="445.0" x2="854" y2="445.0" stroke="#e8e7e3" stroke-width="1"/>
+<circle cx="448.4" cy="445.0" r="7" fill="#7a7973" stroke="#fcfcfb" stroke-width="2"/>
+<text x="448.4" y="429.0" font-size="12.5" font-weight="700" fill="#52514e" text-anchor="middle">18</text>
+<circle cx="478.4" cy="445.0" r="7" fill="#7a7973" stroke="#fcfcfb" stroke-width="2"/>
+<text x="478.4" y="429.0" font-size="12.5" font-weight="700" fill="#52514e" text-anchor="middle">20</text>
+<circle cx="673.7" cy="445.0" r="7" fill="#7a7973" stroke="#fcfcfb" stroke-width="2"/>
+<text x="673.7" y="429.0" font-size="12.5" font-weight="700" fill="#52514e" text-anchor="middle">33</text>
+<circle cx="748.8" cy="445.0" r="7" fill="#7a7973" stroke="#fcfcfb" stroke-width="2"/>
+<text x="748.8" y="429.0" font-size="12.5" font-weight="700" fill="#52514e" text-anchor="middle">38</text>
+<circle cx="793.9" cy="445.0" r="7" fill="#7a7973" stroke="#fcfcfb" stroke-width="2"/>
+<text x="793.9" y="429.0" font-size="12.5" font-weight="700" fill="#52514e" text-anchor="middle">41</text>
+<circle cx="32.0" cy="540.0" r="6" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="46.0" y="544.0" font-size="12.5" fill="#52514e">저경합 1000석 / 100 VU</text>
+<circle cx="229.6" cy="540.0" r="6" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<text x="243.6" y="544.0" font-size="12.5" fill="#52514e">고경합 10석 / 500 VU</text>
+<circle cx="408.8" cy="540.0" r="6" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<text x="422.8" y="544.0" font-size="12.5" fill="#52514e">극단 1석 / 200 VU</text>
+<circle cx="569.6" cy="540.0" r="6" fill="#7a7973" stroke="#fcfcfb" stroke-width="2"/>
+<text x="583.6" y="544.0" font-size="12.5" fill="#52514e">같은 조건 재측정</text>
+<text x="26" y="570" font-size="12.5" fill="#0b0b0b">위 다섯 줄의 15개 값이 전부 이 폭 안에 들어간다 — redis 극단 17ms 하나만 1ms 밖이다.</text>
+<text x="26" y="589" font-size="12.5" fill="#0b0b0b">순위를 읽는 그림이 아니다. 전략을 바꾼 것과 아무것도 안 바꾼 것이 같은 크기로 흔들린다는 그림이다.</text>
+</svg>
