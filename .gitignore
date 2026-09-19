@@ -15,6 +15,9 @@ dist/
 *.tfstate
 *.tfstate.*
 *.tfvars
+# apply 시각 스탬프. holdfast 가 경과 시간을 재는 데 쓴다(#42).
+infra/terraform/.aws-up-at
+infra/terraform/.tfplan
 !example.tfvars
 crash.log
 
