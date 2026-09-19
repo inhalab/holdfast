@@ -74,8 +74,25 @@ resource "aws_acm_certificate" "main" {
  * `:443` 리스너가 만들어지지 않는다 — 인증서 없이 뜬 리스너가 TLS 를 못 주는 상태를
  * 막는다.
  *
- * **레코드는 사람이 넣는다**(#204). Cloudflare 계정이 다른 사람 것이라 Terraform 이
- * 직접 못 만든다 — 토큰을 받으면 그때 자동화한다.
+ * **레코드는 이제 Terraform 이 넣는다**(#204) — dns.tf 의 `acm_validation` 이다.
+ * 한때 «사람이 넣는다»였고, 좁게 받은 토큰 하나로 그 자리가 사라졌다.
+ *
+ * **그런데 그 사실이 코드에 안 적혀 있었다.** `validation_record_fqdns` 를 인증서
+ * 쪽에서 읽으므로 Cloudflare 레코드와 의존 관계가 생기지 않는다.
+ *
+ * **전체 apply 는 이것 없이도 잘 돈다** — 레코드 만들기가 1초고 이 리소스는 10분을
+ * 폴링하니, 순서가 보장돼 있지 않아도 시간 차가 커서 사실상 늘 통과한다. 1차
+ * 테스트가 30초 만에 발급된 것이 그 증거다. 그러므로 이 `depends_on` 은 순서를
+ * 고치려는 것이 아니다. 실익은 둘이다.
+ *
+ * - **`-target` 에서는 확정적으로 깨진다.** 의존이 없으면 레코드가 그래프에서
+ *   잘려 아예 만들어지지 않는다. edge 단계에서 실제로 그렇게 죽었다
+ * - **레코드 생성이 실패했을 때 진짜 원인으로 즉시 죽는다.** 토큰이 틀렸다면
+ *   지금까지는 10분을 헛기다린 뒤 «인증서가 PENDING 이다»라는 엉뚱한 오류가
+ *   났다 — 원인에서 가장 먼 자리에서 나는 오류다
+ *
+ * **값은 ACM 에서 읽고 순서만 못 박는다.** Cloudflare 쪽에서 값을 읽어도 되지만,
+ * 그러면 «ACM 이 요구한 것»과 «우리가 넣은 것»이 같은지 보는 검사가 사라진다.
  */
 resource "aws_acm_certificate_validation" "main" {
   certificate_arn = aws_acm_certificate.main.arn
@@ -84,9 +101,10 @@ resource "aws_acm_certificate_validation" "main" {
     for o in aws_acm_certificate.main.domain_validation_options : o.resource_record_name
   ]
 
+  depends_on = [cloudflare_dns_record.acm_validation]
+
   timeouts {
-    # 기본 45분은 «사람이 레코드를 넣기를 기다리는» 시간으로는 너무 길다.
-    # 10분 안에 안 되면 레코드가 아직 없는 것이고, 그때는 멈추는 편이 낫다.
+    # 10분 안에 안 되면 레코드가 잘못 들어간 것이다. 그때는 멈추는 편이 낫다.
     create = "10m"
   }
 }

@@ -86,6 +86,15 @@ resource "aws_lb" "main" {
   # 데모 스택이다. 실수로 지워지는 것보다 지워지지 않는 것이 비싸다.
   enable_deletion_protection = false
 
+  /*
+   * **인터넷 게이트웨이가 붙은 뒤에 세운다.** 인터넷용 ALB 는 IGW 없는 VPC 에서
+   * `InvalidSubnet: VPC ... has no internet gateway` 로 거절당한다. 그런데 이
+   * 리소스가 참조하는 것은 서브넷과 보안그룹뿐이라 IGW 와 의존 관계가 없었다 —
+   * 전체 apply 는 IGW 가 먼저 끝나서 통과했을 뿐이고, 순서를 보장한 적이 없다.
+   * `-target` 으로 부분만 세웠을 때 실제로 이 오류로 죽었다.
+   */
+  depends_on = [aws_internet_gateway.main]
+
   tags = { Name = "${local.name}-alb" }
 }
 

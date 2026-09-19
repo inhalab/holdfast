@@ -300,8 +300,34 @@ aws_stage_targets() {
     # **ElastiCache 는 여기 없다.** 세우지 않기로 했다 — 근거는
     # infra/terraform/data.tf 의 회수 기록(#42 댓글 ②).
     data) echo "-target=aws_db_instance.main" ;;
+    # **엣지만 세운다 — 앱도 DB도 없이.** `Full (strict)` 는 Cloudflare 가 오리진
+    # 인증서를 «검증»하는 모드라, 설정값이 맞다는 것과 핸드셰이크가 통한다는 것이
+    # 다르다. 통하는지 보려면 오리진이 서 있어야 하는데, 그 오리진은 ALB 뿐이고
+    # ALB 는 RDS 도 ECS 도 필요로 하지 않는다.
+    #
+    # **판정은 응답 코드로 한다.** 503 이면 통과다 — TLS 는 통했고 뒤에 태스크가
+    # 없을 뿐이다. 526 이면 오리진 인증서를 거부한 것이고, 무응답이면 보안그룹이
+    # Cloudflare 대역을 안 받고 있는 것이다.
+    #
+    # 리스너와 서비스 레코드를 주면 ALB · 타겟그룹 · 인증서 검증 · 검증용 CNAME 이
+    # 의존성으로 딸려 온다. ALB 하나라 시간당 $0.03 안팎이다.
+    #
+    # **net 을 통째로 포함한다.** `-target` 은 «지정한 것 + 그것이 의존하는 것»만
+    # 남기는데, 보안그룹 «규칙»과 라우트 테이블 «연결»은 아무도 참조하지 않는
+    # 고아 노드라 ALB 를 지정해도 그래프에 안 들어온다. 그러면 ALB 는 서는데
+    # 구멍도 경로도 없어 **Cloudflare 가 오리진에 닿지 못하고 요청이 멈춘다.**
+    #
+    # 처음에는 리스너와 레코드만 지정했다가 그 둘을 차례로 밟았다. 하나씩
+    # 찾아 더하는 대신 net 을 앞에 붙인다 — net 은 전부 무료라 더해도 손해가 없고,
+    # 「edge 는 net 위에 ALB 만 얹은 것」이라는 관계가 코드에 드러난다.
+    edge)
+      aws_stage_targets net
+      echo "-target=aws_lb_listener.https"
+      echo "-target=aws_lb_listener.http_redirect"
+      echo "-target=cloudflare_dns_record.service"
+      ;;
     app)  ;;  # 전체
-    *) echo "[holdfast] 알 수 없는 단계: $1 (net|data|app)" >&2; exit 2 ;;
+    *) echo "[holdfast] 알 수 없는 단계: $1 (net|data|edge|app)" >&2; exit 2 ;;
   esac
 }
 
@@ -401,7 +427,8 @@ holdfast — 실행 진입점
 
 AWS 배포 (#42)
   aws push             이미지를 빌드해 ECR 에 민다
-  aws up [단계]        apply. 단계는 net|data|app 이고 기본은 app(전체)
+  aws up [단계]        apply. 단계는 net|data|edge|app 이고 기본은 app(전체)
+                       edge 는 ALB · 인증서 · DNS 만 — TLS 확인용, 앱도 DB도 안 선다
                        **비싼 것이 뒤다** — net 은 과금이 없고 data 부터 돈이 든다
   aws status           떠 있나 · 몇 시간째 · 지금까지 얼마
   aws down             destroy 하고 **태그로** 남은 것을 확인한다
