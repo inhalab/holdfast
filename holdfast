@@ -934,13 +934,22 @@ EOF
         tf plan -no-color -out=".tfplan" "${targets[@]}"
         aws_nat_guard ".tfplan"
 
-        tf apply -no-color ".tfplan"
-        rm -f "$planfile"
-
-        # 과금이 시작되는 단계부터 시계를 켠다. net 은 전부 무료라 세지 않는다.
+        # **시계를 apply 앞에서 켠다.** 한때 뒤에서 켰는데, apply 가 중간에 죽으면
+        # **과금되는 리소스는 서 있고 시계는 안 켜진 상태**가 된다 — 실제로 한 번
+        # 그랬고, ALB 가 떠 있는데 `status` 가 «뜬 기록이 없다»고 답했다. 확인이
+        # 괜찮다고 거짓말하는 구조라 #184 · #186 과 같은 종류다.
+        #
+        # 앞에서 켜면 반대 방향으로 틀릴 수 있다 — 아무것도 안 섰는데 시계가 돈다.
+        # 그쪽은 손해가 없다. `down` 이 지울 게 없을 뿐이고 시계도 거기서 지운다.
+        # **틀릴 거면 «떠 있다»는 쪽으로 틀리는 게 맞다.**
+        #
+        # net 은 전부 무료라 세지 않는다.
         if [ "$stage" != "net" ] && [ ! -f "$AWS_STAMP" ]; then
           date +%s > "$AWS_STAMP"
         fi
+
+        tf apply -no-color ".tfplan"
+        rm -f "$planfile"
 
         echo
         echo "[holdfast] $stage 단계 완료."

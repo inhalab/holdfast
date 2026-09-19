@@ -102,9 +102,10 @@ resource "aws_lb" "main" {
  * <h2>헬스체크는 `/api/health` 다 — `/actuator/health` 가 아니다</h2>
  *
  * **`/actuator/health` 는 Redis 가 없으면 503 을 낸다**(#42 댓글, #155 머지 후 실측).
- * 지금 배포는 `redis` 전략이라 ElastiCache 가 있지만, **전략을 바꿔 띄우는 순간
- * 타겟 둘이 전부 unhealthy 가 되고 ALB 가 503 을 낸다** — 그때 증상은 «앱은 떴는데
- * 주소가 안 열린다»라 원인을 찾기 어렵다.
+ * **이 배포에는 ElastiCache 가 없다**(전략을 pessimistic 으로 되돌리며 함께 뺐다 —
+ * data.tf 의 회수 기록). 그러므로 actuator 를 헬스체크로 쓰면 **지금 당장 타겟
+ * 둘이 전부 unhealthy 가 되고 ALB 가 503 을 낸다** — 그때 증상은 «앱은 떴는데
+ * 주소가 안 열린다»라 원인을 찾기 어렵다. 가정이 아니라 현재 구성의 이야기다.
  *
  * `/api/health` 는 200 을 내고 `db`·`redis` 상태를 본문에 싣는다. **#156 이
  * actuator 를 노출에서 거부하는 방향과도 맞는다** — 헬스체크가 actuator 안에
