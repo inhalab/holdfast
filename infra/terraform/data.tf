@@ -30,13 +30,6 @@ resource "aws_db_subnet_group" "main" {
   tags = { Name = local.name }
 }
 
-resource "aws_elasticache_subnet_group" "main" {
-  name       = local.name
-  subnet_ids = [for s in aws_subnet.public : s.id]
-
-  tags = { Name = local.name }
-}
-
 # ── DB 비밀번호 ────────────────────────────────────────────────────────
 
 /*
@@ -119,38 +112,40 @@ resource "aws_db_instance" "main" {
   tags = { Name = local.name }
 }
 
-# ── ElastiCache ────────────────────────────────────────────────────────
+# ── ElastiCache — 세우지 않는다 ─────────────────────────────────────────
 
 /*
- * **뺄 수 있었지만 세운다**(#42 댓글 ①). 이슈 본문이 *"배포 전략이 pessimistic
- * 고정이면 아예 만들지 않는다"*고 적었는데, **빼서 아끼는 것이 시간당 $0.026,
- * 데모 한 번에 $0.06 이다.**
+ * **한때 세웠고 회수했다**(#42 댓글 ①·②).
  *
- * 그 값에 사는 것은 **Fargate 태스크 둘이 ElastiCache 로 분산락을 거는 그림**이고,
- * 이 프로젝트가 클라우드에서 보일 수 있는 것 중 가장 강한 구성이다. `pessimistic`
- * 은 한 DB 안에서 끝나 «분산»이 화면에 안 나온다.
+ * 이슈 본문이 *"배포 전략이 pessimistic 고정이면 ElastiCache 를 아예 만들지
+ * 않는다"*를 조건으로 적어 두었고, **그 조건이 성립한다** — 배포 전략이
+ * pessimistic 이다(variables.tf).
  *
- * 그래서 `var.strategy` 기본값이 `redis` 다.
+ * <h2>세우자고 했던 근거와, 그것이 왜 안 섰나</h2>
+ *
+ * 근거는 *"빼서 아끼는 것이 데모 한 번에 $0.06 인데, 그 값에 사는 것은 Fargate
+ * 태스크 둘이 ElastiCache 로 분산락을 거는 그림"*이었다. 비용 계산은 맞다.
+ *
+ * **틀린 것은 «그 그림이 이 배포의 목적인가»였다.** #172 가 이 이슈의 목적을
+ * «온전한 시스템을 클라우드에 배포했다»로 좁혔고 시연은 집 PC 에서 완결된다.
+ * 분산락을 보이는 자리는 **로컬 시연 2절**이지 여기가 아니다. 여기에 redis 를
+ * 세우는 것은 배포 증거가 아니라 **별도 데모를 하나 더 만드는 일**이었다.
+ *
+ * <h2>빼서 얻는 것 — 비용보다 이쪽이 크다</h2>
+ *
+ * - **시연과 구성이 같아진다.** 2절이 pessimistic 이므로 «같은 시스템»이 성립한다
+ * - **기동 실패 지점이 하나 줄어든다.** 발표 당일에 그것이 값을 한다
+ * - **destroy 대상이 하나 줄어든다.** 5절이 남는 과금을 경계한 자리이기도 하다
+ *
+ * <h2>되돌리려면</h2>
+ *
+ * `aws_elasticache_subnet_group` 과 `aws_elasticache_cluster`(engine redis 7.1,
+ * cache.t3.micro, 노드 1, snapshot_retention 0)를 되살리고, app.tf 의 컨테이너에
+ * REDIS_HOST·REDIS_PORT 를 넣고, security.tf 에 6379 규칙을 되살린 뒤
+ * var.strategy 를 redis 로 바꾼다. **#155 덕분에 앱은 Redis 없이도 뜬다** —
+ * 그래서 이 넷이 한 벌로 움직인다.
+ *
+ * > **헬스체크가 /api/health 인 것이 여기서 값을 한다.** /actuator/health 는
+ * > Redis 가 없으면 503 을 낸다(#155 실측). ElastiCache 를 빼는 지금이 정확히
+ * > 그 상황이고, app.tf 가 이미 /api/health 를 쓰고 있어 아무 일도 일어나지 않는다.
  */
-resource "aws_elasticache_cluster" "main" {
-  cluster_id = local.name
-
-  engine         = "redis"
-  engine_version = "7.1"
-  node_type      = "cache.t3.micro"
-
-  # 노드 하나. 복제도 클러스터 모드도 쓰지 않는다 — 로컬 compose 의 redis 한 대와
-  # 같은 모양이고, 분산락이 증명하는 것은 «앱이 여럿»이지 «캐시가 여럿»이 아니다.
-  num_cache_nodes = 1
-
-  parameter_group_name = "default.redis7"
-  port                 = 6379
-
-  subnet_group_name  = aws_elasticache_subnet_group.main.name
-  security_group_ids = [aws_security_group.data.id]
-
-  # 스냅샷을 남기지 않는다. 남으면 destroy 후에도 보관료가 나간다.
-  snapshot_retention_limit = 0
-
-  tags = { Name = local.name }
-}

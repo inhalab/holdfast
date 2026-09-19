@@ -182,8 +182,8 @@ resource "aws_ecs_task_definition" "app" {
       { name = "DB_NAME", value = "holdfast" },
       { name = "DB_USER", value = "holdfast" },
       { name = "JPA_DDL_AUTO", value = "validate" },
-      { name = "REDIS_HOST", value = aws_elasticache_cluster.main.cache_nodes[0].address },
-      { name = "REDIS_PORT", value = "6379" },
+      # **REDIS_HOST·REDIS_PORT 를 주지 않는다.** ElastiCache 를 세우지 않기
+      # 때문이고(data.tf), #155 덕분에 pessimistic 은 Redis 없이 뜬다.
       { name = "HOLDFAST_STRATEGY", value = var.strategy },
       { name = "HOLDFAST_DEMO_ENABLED", value = "false" },
       { name = "HOLDFAST_ADMIN_ENABLED", value = "true" },

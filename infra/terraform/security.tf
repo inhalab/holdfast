@@ -109,8 +109,8 @@ resource "aws_vpc_security_group_egress_rule" "app_all" {
 
 resource "aws_security_group" "data" {
   name = "${local.name}-data"
-  # RDS 와 ElastiCache 가 함께 쓴다. 앱 보안그룹에서만 받는다.
-  description = "RDS and ElastiCache - accepts app only"
+  # RDS 가 쓴다. 앱 보안그룹에서만 받는다.
+  description = "RDS - accepts app only"
   vpc_id      = aws_vpc.main.id
 
   tags = { Name = "${local.name}-data" }
@@ -125,11 +125,7 @@ resource "aws_vpc_security_group_ingress_rule" "db_from_app" {
   description                  = "PostgreSQL from app"
 }
 
-resource "aws_vpc_security_group_ingress_rule" "redis_from_app" {
-  security_group_id            = aws_security_group.data.id
-  referenced_security_group_id = aws_security_group.app.id
-  from_port                    = 6379
-  to_port                      = 6379
-  ip_protocol                  = "tcp"
-  description                  = "Redis from app"
-}
+/*
+ * **6379 규칙을 두지 않는다.** ElastiCache 를 세우지 않기 때문이다 — 근거와
+ * 되돌리는 방법은 `data.tf` 의 회수 기록에 있다(#42 댓글 ②).
+ */

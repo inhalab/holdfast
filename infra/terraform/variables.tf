@@ -38,12 +38,18 @@ variable "vpc_cidr" {
 
 variable "strategy" {
   description = <<-EOT
-    배포할 락 전략. **redis 로 띄운다** — Fargate 태스크 둘이 ElastiCache로 분산락을
-    거는 그림이 이 프로젝트가 클라우드에서 보일 수 있는 가장 강한 구성이다(#42 댓글 ①).
-    pessimistic 은 한 DB 안에서 끝나 «분산»이 화면에 안 나온다.
+    배포할 락 전략. **pessimistic 이다** — 시연(2절)이 그것으로 돌고, 이 배포의
+    목적은 «온전한 시스템을 클라우드에 배포했다»를 보이는 것이므로(#172) **구성이
+    같은 쪽이 그 문장에 맞다.**
+
+    **한때 redis 였고 회수했다**(#42 댓글 ①·②). 그때 근거는 "태스크 둘이
+    ElastiCache로 분산락을 거는 그림이 강하다"였는데, 그것은 배포 증거가 아니라
+    **별도 데모를 하나 더 만드는 쪽**이다. 분산락을 보이는 자리는 로컬 시연이다.
+
+    바꾸려면 ElastiCache 를 함께 세워야 한다 — data.tf 가 그것을 적어 두었다.
   EOT
   type        = string
-  default     = "redis"
+  default     = "pessimistic"
 
   validation {
     # holdfast 스크립트·StrategyArgumentTest 와 같은 다섯이다.
