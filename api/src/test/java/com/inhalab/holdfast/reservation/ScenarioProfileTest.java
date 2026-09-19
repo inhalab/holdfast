@@ -30,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <b>테스트로 묶는 것</b>이다({@code StrategyArgumentTest}가 전략 이름에 한 것).
  *
  * <p>7.2.3의 할당량 경합 시나리오를 더하면서 <b>지켜야 할 자리가 넷에서 다섯으로
- * 늘었다.</b> 그래서 여기서 묶는다.
+ * 늘었다.</b> 그래서 여기서 묶는다. 7.2.4의 취소·재선점이 여섯째다(#200).
  *
  * <h2>{@code sustained}는 좌석 수를 비교하지 않는다</h2>
  *
@@ -79,9 +79,12 @@ class ScenarioProfileTest {
                 .as("사용자 수가 VU 이상이면 같은 사용자의 동시 요청이 안 생겨 CS-6이 안 밟힌다 (1.1)")
                 .isLessThan(p.get("quota").vus());
 
-        for (String name : new String[] {"low", "high", "extreme"}) {
+        // **quota 만 반대다.** 나머지는 사용자 수가 VU 이상이어야 같은 할당량 행을
+        // 두 VU가 동시에 다투지 않는다 — cancel(7.2.4)도 그쪽이다. 거기서 겹치는
+        // 둘은 «같은 예약을 취소하는 둘»이고, 그것은 할당량 경합이 아니다.
+        for (String name : new String[] {"low", "high", "extreme", "cancel"}) {
             assertThat(p.get(name).users())
-                    .as("%s — 경합도 3단계는 반대로 사용자 수가 VU 이상이어야 한다 (7.3)", name)
+                    .as("%s — 사용자 수가 VU 이상이어야 CS-6이 섞이지 않는다 (7.3)", name)
                     .isGreaterThanOrEqualTo(p.get(name).vus());
         }
     }

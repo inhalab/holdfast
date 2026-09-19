@@ -67,7 +67,22 @@ stateDiagram-v2
 | `HELD → CONFIRMED` | API 호출 + lazy 검증 — `POST /api/reservations` | `seat_inventory`(`HELD→SOLD`), `seat_hold`(`HELD→CONFIRMED`) | 단일 조건부 UPDATE, `held_until > now()` 검사 포함(`concurrency-spec.md` 3절 확정 쿼리) |
 | `HELD → EXPIRED` | lazy 검증(홀드 재획득 경로) 또는 스케줄러(보조) | `seat_hold`(`HELD→RELEASED`), `seat_inventory`(`HELD→AVAILABLE`), `user_session_quota`(감소) — 4곳(`erd.md` 4절) | 조건부 UPDATE + `rowsAffected` 판정(`erd.md` 4.1) |
 | `HELD → CANCELLED` | API 호출 — `DELETE /api/holds/{holdId}` | `seat_inventory`(`HELD→AVAILABLE`), `seat_hold`(`HELD→RELEASED`), `user_session_quota`(감소) | 조건부 UPDATE, `reservation.status='HELD'` 확인 후 전이 |
-| `CONFIRMED → CANCELLED` | API 호출 — `POST /api/reservations/{id}/cancel` | `seat_inventory`(`SOLD→AVAILABLE`), `seat_hold`(`CONFIRMED→RELEASED`) | 조건부 UPDATE, `reservation.status='CONFIRMED'` 확인 후 전이. 재호출 시 200과 기존 결과(`api-spec.md` 6.1절 멱등) |
+| `CONFIRMED → CANCELLED` | API 호출 — `POST /api/reservations/{id}/cancel` | `seat_inventory`(`SOLD→AVAILABLE`), `seat_hold`(`CONFIRMED→RELEASED`), **`user_session_quota`(감소)** | 조건부 UPDATE, `reservation.status='CONFIRMED'` 확인 후 전이. 재호출 시 200과 기존 결과(`api-spec.md` 6.1절 멱등). **동시 호출은 `concurrency-spec.md` 7.2.4가 본다** |
+
+> **`user_session_quota`(감소)가 이 줄에 빠져 있었다(#200).** 바로 윗줄
+> (`HELD → CANCELLED`)은 적고 있는데 확정 취소 쪽만 없었다 — 구현은 처음부터
+> 둘 다 깎는다(`ReservationService#cancel`). **CS-4가 건드리는 것이 셋이 아니라
+> 넷이라는 사실이 표에서 빠져 있었던 것이고**, 7.2.4의 C-3이 보는 것이 정확히
+> 그 넷째다.
+>
+> **`erd.md` 4절의 판정은 그대로다.** 쓰기가 늘어난 것이 아니라 원래 있던 쓰기를
+> 이제 적은 것이다 — 취소 트랜잭션에 쓰기를 더하지 않기로 한 #106의 근거가
+> 흔들리지 않는다.
+
+**동시 호출의 멱등은 순차 재호출과 다른 문제다.** 위 "재호출 시 200"은
+`MinimumScopeFlowTest`가 **단일 스레드**로 고정한 성질이고, 취소 둘이 겹쳤을 때도
+서는지는 `CancelConcurrencyTest`와 `concurrency-spec.md` 7.2.4의 부하 시나리오가
+본다(#200).
 
 **`PENDING_PAYMENT`는 이 다이어그램에 없다. (M4 기준 — 조건이 판정돼 결론이
 바뀌었다.)** `erd.md` 스키마의 `reservation.status` 열거형에는 존재한다
