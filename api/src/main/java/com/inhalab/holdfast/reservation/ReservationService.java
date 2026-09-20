@@ -163,10 +163,29 @@ public class ReservationService {
                 .findForUpdate(reservation.getSessionId(), userId)
                 .orElseThrow(() -> new IllegalStateException("할당량 행이 없습니다. reservationId=" + reservationId));
 
+        // **이 한 줄이 판정이다.** 위의 상태 검사는 할당량 행을 잠그기 **전에**
+        // 읽은 스냅샷 위에서 돌아, READ COMMITTED 에서는 앞엣 취소가 커밋한 뒤에도
+        // "아직 CONFIRMED" 로 보인다. 겹친 취소 둘이 그 검사를 **둘 다** 통과한다.
+        //
+        // 조건부 UPDATE 의 rowsAffected 를 게이트로 쓴다(erd.md 4.1, 6.1). 이미
+        // 다른 취소가 RELEASED 로 바꿔 놓았으면 0 이고, 그때는 **아무것도 되돌리지
+        // 않는다.** SeatHoldService#release 가 같은 관용구를 쓴다 — 그쪽은
+        // 처음부터 released 로 깎았고 이쪽만 상수로 깎고 있었다(#209).
+        int released = seatHoldRepository.releaseByHoldId(reservation.getHoldId());
+        if (released == 0) {
+            // 다른 취소가 이미 끝냈다. 재조회해 그쪽 결과를 그대로 돌려준다 —
+            // 재취소는 409 가 아니라 200 이다(api-spec.md 6.1).
+            //
+            // **여기서 반환하는 것이 좌석도 지킨다.** 아래 releaseSold 는
+            // status = 'SOLD' 조건부라 보통은 무해하지만, 그 사이에 좌석이 다시
+            // 팔렸다면 조건이 참이 되어 **남의 좌석을 푼다**(7.2.4 C-2).
+            Reservation current = reservationRepository.findById(reservationId).orElse(reservation);
+            return new CancelOutcome(current, seatIds);
+        }
+
         for (ReservationSeat reservationSeat : reservationSeatRepository.findByReservationId(reservationId)) {
             seatInventoryRepository.releaseSold(reservationSeat.getSeatInventoryId());
         }
-        seatHoldRepository.releaseByHoldId(reservation.getHoldId());
 
         reservation.setStatus("CANCELLED");
         reservation.setCancelledAt(Instant.now());
@@ -174,7 +193,12 @@ public class ReservationService {
 
         // 취소하면 그 좌석은 더 이상 보유분이 아니다. 되돌리지 않으면 사용자의
         // 1인 최대 매수가 영구히 소모된다(REQ-03).
-        quota.setHeldCount(Math.max(0, quota.getHeldCount() - seatIds.size()));
+        //
+        // **released 로 깎는다. seatIds.size() 가 아니다** — 저쪽은 잠그기 전에
+        // 읽은 수라 겹친 취소가 둘 다 그 값으로 깎는다. 그리고 **바닥을 두지
+        // 않는다**: 게이트가 선 뒤에는 음수가 나올 수 없고, 나온다면 게이트가
+        // 샌 것이라 Math.max 로 누르면 그 증거가 지워진다(7.2.4 C-3).
+        quota.setHeldCount(quota.getHeldCount() - released);
         userSessionQuotaRepository.save(quota);
 
         return new CancelOutcome(saved, seatIds);

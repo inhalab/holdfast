@@ -2,7 +2,6 @@ package com.inhalab.holdfast.reservation;
 
 import com.inhalab.holdfast.api.ApiException;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -121,27 +120,24 @@ class CancelConcurrencyTest {
     }
 
     /**
-     * <b>지금 깨진다. 고치는 것은 이 이슈가 아니다</b>(#200 → #209).
+     * <b>#209의 회귀 수단이다.</b> 고치기 전에는 깨졌다 —
+     * <b>스레드 2개에 4 → 2, 12개에 4 → 0</b>이었고 정답은 3이다.
+     * 취소 하나당 한 번만 깎여야 하는데 <b>겹친 수만큼 깎였다.</b>
      *
-     * <p>실측: 보유량 4에서 좌석 하나짜리 예약을 동시에 취소하면
-     * <b>스레드 2개에 4 → 2, 12개에 4 → 0</b>이 나온다. 정답은 3이다.
-     * 취소 하나당 한 번만 깎여야 하는데 <b>겹친 수만큼 깎인다.</b>
+     * <p><b>어긋나면 실패하는 것을 먼저 확인하고 고쳤다</b> — 통과만 보고
+     * 회귀 수단이라 하는 것이 아니다.
      *
-     * <p><b>드리프트가 아래로 난다는 것이 중요하다.</b> {@code held_count}가
+     * <p><b>드리프트가 아래로 나는 것이 위험했다.</b> {@code held_count}가
      * 실제 보유량보다 작아지면 그 사용자는 상한을 넘겨 더 잡을 수 있다 —
      * REQ-11("상한 초과 승인 0건")을 우회하는 경로다.
      *
-     * <p><b>7.2.4의 부하 시나리오는 이것을 못 봤다.</b> 거기서는 한 사용자가
-     * 한 번에 한 좌석만 들고 있어 보유량이 1이고, 두 번 깎여도
-     * {@code Math.max(0, ...)}가 눌러 <b>정답(0)과 구분되지 않는다.</b>
-     * `verify-cancel.sql`의 C-3이 "0에 눌린 것은 안 보인다"라고 적은 한계가
-     * 그대로 나타난 것이고, <b>이 테스트가 보유량을 4로 두는 이유가 그것이다.</b>
-     *
-     * <p>고친 뒤 {@code @Disabled}를 떼면 회귀 수단이 된다. 어긋나면 실패하는
-     * 것을 확인했으므로(위 실측) <b>통과만 보고 회귀 수단이라 하는 것이 아니다.</b>
+     * <p><b>7.2.4의 부하 시나리오는 이것을 못 본다.</b> 거기서는 {@code userPool}이
+     * VU와 같아 가상 사용자 하나가 실사용자 하나를 독점하고, 보유량이 {0, 1}을
+     * 벗어나지 못한다. 두 번 깎여도 바닥에 눌려 <b>정답과 구분되지 않는다</b> —
+     * <b>부하를 올려도 안 열린다</b>(7.3의 ⚠ 각주). <b>이 테스트가 보유량을 4로
+     * 두는 이유가 그것이고, 이것이 유일한 회귀 수단인 이유다.</b>
      */
     @Test
-    @Disabled("#209 — #200이 찾은 결함 — 겹친 취소가 held_count를 여러 번 깎는다. 고치는 PR에서 연다")
     @DisplayName("12스레드가 같은 예약을 동시에 취소해도 할당량은 정확히 1만 줄어든다")
     void concurrentCancelsDecrementQuotaExactlyOnce() throws Exception {
         // 좌석 넷을 각각 따로 잡아 보유량을 4로 만든다. **1에서 재지 않는다** —
@@ -261,9 +257,8 @@ class CancelConcurrencyTest {
 
         // **취소가 실제로 됐는지를 먼저 본다.** 아래 stranded 만 보면 «아무 일도
         // 안 일어난» 회귀에도 0이 나와 초록이 된다 — 취소가 전부 실패하면
-        // cancelled 는 CONFIRMED 로 남고 좌석도 SOLD 라 어긋남이 없다. 같은
-        // 파일의 위 테스트가 @Disabled 인 동안에는 이 테스트가 혼자 서야
-        // 한다(#210 리뷰).
+        // cancelled 는 CONFIRMED 로 남고 좌석도 SOLD 라 어긋남이 없다.
+        // 의도한 범위가 아닌 것은 맞지만 **회귀 수단으로 서려면 필요하다**(#210 리뷰).
         assertThat(jdbc.queryForObject(
                 "SELECT status FROM reservation WHERE id = ?", String.class, cancelled))
                 .as("취소가 실제로 됐어야 한다 — 아니면 아래 단언이 헛통과한다")

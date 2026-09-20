@@ -186,7 +186,10 @@ public class SeatHoldService {
             reservationRepository.save(reservation);
         });
 
-        quota.setHeldCount(Math.max(0, quota.getHeldCount() - released));
+        // **바닥을 두지 않는다.** released 가 조건부 UPDATE 의 rowsAffected 라
+        // 겹쳐 들어와도 한 번만 깎인다 — 음수가 나온다면 그 게이트가 샌 것이고,
+        // Math.max 로 누르면 그 증거가 지워진다(#209).
+        quota.setHeldCount(quota.getHeldCount() - released);
         userSessionQuotaRepository.save(quota);
     }
 }
