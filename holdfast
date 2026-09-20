@@ -245,6 +245,52 @@ aws_nat_guard() {  # $1 = plan 파일
   fi
 }
 
+# **test_cidr 이 들어 있으면 확인을 받는다**(#218).
+#
+# `variables.tf` 가 *"확인이 끝나면 비우고 apply 한다"* 고 적어 두었지만 **그것은
+# 규율이지 보장이 아니다.** plan 에 뜨기는 해도 아무도 안 보면 그대로 선다.
+#
+# **열리는 것이 admin 이라는 것이 이 검사의 이유다.** `admin.inhalab.cloud` 의
+# 자물쇠는 Cloudflare Access 인데, ALB 직행이 열려 있으면 그 자물쇠를 지나지 않는
+# 길이 생긴다 — 그때 남는 방어는 **«그 IP 를 아는 사람이 나뿐»** 뿐이다.
+#
+# **plan 을 본다 — 변수를 안 본다.** 값이 tfvars 로 오든 `TF_VAR_` 로 오든
+# `-var` 로 오든, 규칙이 서면 plan 에 뜬다. 들어오는 길을 세는 대신 결과를 본다.
+aws_test_cidr_guard() {  # $1 = plan 파일
+  tf show -no-color "$1" 2>/dev/null | grep -q 'alb_from_test' || return 0
+
+  echo >&2
+  echo "[holdfast] !! plan 에 test_cidr 구멍이 있다 — ALB 가 Cloudflare 밖으로 열린다." >&2
+  echo "[holdfast]    admin 의 자물쇠는 Cloudflare Access 인데, 그 길은 엣지를" >&2
+  echo "[holdfast]    지나지 않는다. 남는 방어는 «그 IP 를 아는 사람이 나뿐» 이다." >&2
+  echo "[holdfast]    확인이 끝났으면 비우고 다시 apply 한다(#218)." >&2
+  echo >&2
+  if [ ! -t 0 ]; then
+    echo "[holdfast]    대화형이 아니라 여기서 멈춘다. 계속하려면 사람이 직접 친다." >&2
+    exit 1
+  fi
+  printf '[holdfast]    그래도 계속하려면 «open» 을 친다: ' >&2
+  local answer=""
+  read -r answer || answer=""
+  [ "$answer" = "open" ] || { echo "[holdfast]    멈춘다." >&2; exit 1; }
+  echo "[holdfast]    계속한다 — 확인이 끝나면 비우고 다시 apply 한다." >&2
+}
+
+# **destroy 가 tfvars 를 지우지 않는다**(#218 (b)).
+#
+# 리소스를 내려도 값은 남고 **다음 apply 가 그것을 그대로 쓴다.** 내린 뒤에
+# 「닫혔다」고 읽는 것이 가장 위험한 자리라, down 끝에서 한 번 더 본다.
+aws_test_cidr_leftover() {
+  local hits
+  hits="$(grep -ls 'test_cidr' "$AWS_TF"/*.tfvars "$AWS_TF"/*.tfvars.json 2>/dev/null || true)"
+  [ -n "${TF_VAR_test_cidr:-}" ] && hits="$hits (환경변수 TF_VAR_test_cidr)"
+  [ -n "$hits" ] || return 0
+  echo >&2
+  echo "[holdfast] !! 리소스는 내렸지만 test_cidr 값이 남아 있다:" >&2
+  echo "$hits" | sed 's/^/  /' >&2
+  echo "[holdfast]    destroy 는 이 값을 안 지운다 — 다음 apply 가 그대로 쓴다(#218)." >&2
+}
+
 # 떠 있은 시간(시). 스탬프가 없으면 빈 문자열.
 aws_elapsed_hours() {
   [ -f "$AWS_STAMP" ] || return 0
@@ -936,6 +982,7 @@ EOF
         planfile="$AWS_TF/.tfplan"
         tf plan -no-color -out=".tfplan" "${targets[@]}"
         aws_nat_guard ".tfplan"
+        aws_test_cidr_guard ".tfplan"
 
         # **시계를 apply 앞에서 켠다.** 한때 뒤에서 켰는데, apply 가 중간에 죽으면
         # **과금되는 리소스는 서 있고 시계는 안 켜진 상태**가 된다 — 실제로 한 번
@@ -988,6 +1035,7 @@ EOF
         aws_profile_guard
         tf destroy -no-color -auto-approve
         rm -f "$AWS_STAMP"
+        aws_test_cidr_leftover
 
         # **destroy 가 성공했다고 찍는 것과 실제로 빈 것은 다르다**(5절).
         # 다만 판정은 «돈이 나가나»로 한다 — 근거는 aws_billable_left 주석.
