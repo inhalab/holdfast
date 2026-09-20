@@ -42,9 +42,20 @@ load-test/results/*
 # 파일은 저장소 밖에 두고, 무엇을 제출했고 그 판단이 어느 문서에 대응하는지만
 # docs/submissions/README.md에 남긴다.
 #
-# **확장자를 넓게 잡지 않는다.** docs/submissions/* 로 통째로 무시하면 그
-# README까지 걸린다. 새 형식이 오면 한 줄 더한다.
-docs/submissions/*.pptx
+# **README.md 와 .gitkeep 말고는 아무것도 커밋하지 않는다.**
+#
+# 한때 `docs/submissions/*.pptx` 만 무시했고, 그 옆에
+# *"확장자를 넓게 잡지 않는다 — 통째로 무시하면 README까지 걸린다"* 고 적혀
+# 있었다. **넓게 잡되 README 와 .gitkeep 을 되살리면 된다** — 그 걱정은
+# 예외 두 줄로 해소된다.
+#
+# **넓게 잡는 이유는 확장자가 아니라 내용이다.** `*.pptx` 만 막으면 마크다운은
+# 통과하고, 실제로 발표자 노트가 그렇게 들어왔다(#224). **저장소가 공개라
+# 「안 할 말」과 예상 질문까지 함께 공개된다.** 제출물은 저장소 밖이고 노트도
+# 제출물이다.
+docs/submissions/*
+!docs/submissions/README.md
+!docs/submissions/.gitkeep
 
 # --- 시연 대본 렌더링 결과 ---
 # `./holdfast demo`가 docs/demo-script.md를 HTML로 만들어 build/에 둔다(#146).
