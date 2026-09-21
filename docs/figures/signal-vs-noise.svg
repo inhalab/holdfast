@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="560" viewBox="0 0 980 560" font-family="'Malgun Gothic','Apple SD Gothic Neo',system-ui,-apple-system,'Segoe UI',sans-serif">
+<rect width="980" height="560" fill="#fcfcfb"/>
+<text x="26" y="40" font-size="20" font-weight="700" fill="#0b0b0b">왜 성능으로 전략을 가를 수 없나 — 신호가 0.034%다</text>
+<text x="26" y="66" font-size="13" fill="#52514e">고경합 1회는 요청 59,000건인데 그중 전략의 임계 구역을 지나는 것이 20건이다</text>
+<rect x="26.0" y="110.0" width="928.0" height="44.0" rx="6" fill="#f2f2f0" stroke="#7a7973" stroke-width="1.5"/>
+<rect x="26.0" y="110.0" width="2.5" height="44.0" rx="0" fill="#e34948"/>
+<text x="40.0" y="137.0" font-size="12.5" fill="#52514e" font-weight="700">나머지는 전부 정상 거절 — 409</text>
+<text x="940.0" y="137.0" font-size="12.5" fill="#8a8a84" text-anchor="end">409율 99.97%</text>
+<line x1="27.0" y1="110" x2="116.0" y2="84" stroke="#e34948" stroke-width="1.2"/>
+<text x="122.0" y="88.0" font-size="12" fill="#e34948" font-weight="700">여기 20건 — 이 빨간 선 하나보다 얇다</text>
+<text x="26.0" y="208.0" font-size="13" fill="#52514e" font-weight="700">경합도 셋 — 좌석 수가 곧 경합도다</text>
+<rect x="26.0" y="220.0" width="928.0" height="32.0" rx="6" fill="#f4f3f0"/>
+<text x="40.0" y="241.0" font-size="11.5" fill="#52514e" font-weight="700">경합도</text>
+<text x="170.0" y="241.0" font-size="11.5" fill="#52514e" font-weight="700">프로필</text>
+<text x="330.0" y="241.0" font-size="11.5" fill="#52514e" font-weight="700">TPS — 다섯 전략의 폭</text>
+<text x="590.0" y="241.0" font-size="11.5" fill="#52514e" font-weight="700">409율</text>
+<text x="790.0" y="241.0" font-size="11.5" fill="#52514e" font-weight="700">p95</text>
+<rect x="26.0" y="252.0" width="928.0" height="36.0" rx="6" fill="#fcfcfb"/>
+<line x1="26" y1="252" x2="954" y2="252" stroke="#e8e7e3" stroke-width="1"/>
+<text x="40.0" y="275.0" font-size="12.5" fill="#0b0b0b" font-weight="700">저경합</text>
+<text x="170.0" y="275.0" font-size="11.5" fill="#8a8a84">1000석 · 100VU</text>
+<text x="330.0" y="275.0" font-size="12.5" fill="#52514e">106.8 ~ 107.1</text>
+<text x="590.0" y="275.0" font-size="12.5" fill="#52514e">84.21 ~ 84.31%</text>
+<text x="790.0" y="275.0" font-size="12.5" fill="#52514e">19 ~ 29ms</text>
+<rect x="26.0" y="288.0" width="928.0" height="36.0" rx="6" fill="#fcfcfb"/>
+<line x1="26" y1="288" x2="954" y2="288" stroke="#e8e7e3" stroke-width="1"/>
+<text x="40.0" y="311.0" font-size="12.5" fill="#0b0b0b" font-weight="700">고경합</text>
+<text x="170.0" y="311.0" font-size="11.5" fill="#8a8a84">10석 · 500VU</text>
+<text x="330.0" y="311.0" font-size="12.5" fill="#52514e">487.4 ~ 492.8</text>
+<text x="590.0" y="311.0" font-size="12.5" fill="#52514e">99.90 ~ 99.97%</text>
+<text x="790.0" y="311.0" font-size="12.5" fill="#52514e">18 ~ 41ms</text>
+<rect x="26.0" y="324.0" width="928.0" height="36.0" rx="6" fill="#fcfcfb"/>
+<line x1="26" y1="324" x2="954" y2="324" stroke="#e8e7e3" stroke-width="1"/>
+<text x="40.0" y="347.0" font-size="12.5" fill="#0b0b0b" font-weight="700">극단</text>
+<text x="170.0" y="347.0" font-size="11.5" fill="#8a8a84">1석 · 200VU</text>
+<text x="330.0" y="347.0" font-size="12.5" fill="#52514e">195.6 ~ 197.3</text>
+<text x="590.0" y="347.0" font-size="12.5" fill="#52514e">99.98 ~ 100.0%</text>
+<text x="790.0" y="347.0" font-size="12.5" fill="#52514e">17 ~ 34ms</text>
+<line x1="26" y1="360" x2="954" y2="360" stroke="#cfcec9" stroke-width="1"/>
+<text x="26.0" y="386.0" font-size="12.5" fill="#0b0b0b" font-weight="700">경합도가 TPS 를 4.6배 움직이는 동안 다섯 전략은 같은 경합도 안에서 1% 안에 모인다 — 7.6 표의 값 그대로다.</text>
+<text x="26.0" y="406.0" font-size="12" fill="#8a8a84">저장소는 TPS 에 대해 판정을 적은 적이 없다. 이 그림도 세우지 않는다 — 값을 옮길 뿐이다.</text>
+<rect x="26.0" y="422.0" width="928.0" height="80.0" rx="6" fill="#fdf2ec"/>
+<text x="40.0" y="446.0" font-size="13" fill="#eb6834" font-weight="700">표본을 늘려도 해결되지 않는다</text>
+<text x="40.0" y="467.0" font-size="11.5" fill="#52514e">회차를 늘리면 잡음은 줄지만 신호는 여전히 0.03% 에 갇혀 있다. 성공 요청만 따로 뽑아도 같다 —</text>
+<text x="40.0" y="485.0" font-size="11.5" fill="#52514e">none 을 여섯 번 재자 성공 요청 중앙값이 2.05배 흔들렸고, 회차당 표본이 40건이라 어떤 통계량도 안 선다.</text>
+<text x="26.0" y="528.0" font-size="12.5" fill="#0b0b0b">그리고 성공 표본을 늘리려면 좌석을 늘려야 하는데, 그러면 경합이 사라진다 — 시나리오 설계에 내장된 상충이다.</text>
+<text x="26.0" y="556.0" font-size="11.5" fill="#8a8a84">정본: m3-conclusion.md 3.5 「이 프로젝트가 답하지 못한 질문」 · concurrency-spec.md 7.6 경합도별 표</text>
+</svg>

@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1042" height="660" viewBox="0 0 1042 660" font-family="'Malgun Gothic','Apple SD Gothic Neo',system-ui,-apple-system,'Segoe UI',sans-serif">
+<rect width="1042" height="660" fill="#fcfcfb"/>
+<text x="26" y="40" font-size="20" font-weight="700" fill="#0b0b0b">ERD — 테이블 15개와 그 관계</text>
+<text x="26" y="66" font-size="13" fill="#52514e">컬럼은 erd.md 1절에 있다. 이 그림은 관계만 보인다 — 컬럼을 두 곳에 두지 않는다</text>
+<defs><marker id="e" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 z" fill="#b9b8b3"/></marker></defs>
+<path d="M186 129 L222 190" fill="none" stroke="#b9b8b3" stroke-width="1.6" marker-end="url(#e)"/>
+<path d="M186 199 L222 203" fill="none" stroke="#b9b8b3" stroke-width="1.6" marker-end="url(#e)"/>
+<path d="M106 218 L106 246" fill="none" stroke="#b9b8b3" stroke-width="1.6" marker-end="url(#e)"/>
+<path d="M106 288 L106 316" fill="none" stroke="#b9b8b3" stroke-width="1.6" marker-end="url(#e)"/>
+<path d="M396 188 L432 262" fill="none" stroke="#b9b8b3" stroke-width="1.6" marker-end="url(#e)"/>
+<path d="M396 199 L432 332" fill="none" stroke="#b9b8b3" stroke-width="1.6" marker-end="url(#e)"/>
+<path d="M396 210 L432 402" fill="none" stroke="#b9b8b3" stroke-width="1.6" marker-end="url(#e)"/>
+<path d="M186 339 L432 339" fill="none" stroke="#b9b8b3" stroke-width="1.6" marker-end="url(#e)"/>
+<path d="M186 335 L521 254" fill="none" stroke="#b9b8b3" stroke-width="1.6" marker-end="url(#e)"/>
+<path d="M606 269 L642 269" fill="none" stroke="#b9b8b3" stroke-width="1.6" marker-end="url(#e)"/>
+<path d="M311 218 L311 470 L700 470 L700 372" fill="none" stroke="#b9b8b3" stroke-width="1.6" marker-end="url(#e)"/>
+<path d="M731 330 L731 292" fill="none" stroke="#b9b8b3" stroke-width="1.6" marker-end="url(#e)"/>
+<path d="M816 269 L848 222" fill="none" stroke="#b9b8b3" stroke-width="1.6" marker-end="url(#e)"/>
+<path d="M934 238 L934 264" fill="none" stroke="#b9b8b3" stroke-width="1.6" marker-end="url(#e)"/>
+<path d="M816 349 L848 362" fill="none" stroke="#b9b8b3" stroke-width="1.6" marker-end="url(#e)"/>
+<path d="M816 353 L848 430" fill="none" stroke="#b9b8b3" stroke-width="1.6" marker-end="url(#e)"/>
+<path d="M760 368 L760 501 L848 501" fill="none" stroke="#b9b8b3" stroke-width="1.6" marker-end="url(#e)"/>
+<rect x="26.0" y="110.0" width="160.0" height="38.0" rx="6" fill="#f2f2f0" stroke="#7a7973" stroke-width="1.5"/>
+<text x="36.0" y="127.0" font-size="11.5" fill="#0b0b0b" font-weight="700">program</text>
+<text x="36.0" y="141.0" font-size="9.5" fill="#8a8a84">프로그램</text>
+<rect x="26.0" y="180.0" width="160.0" height="38.0" rx="6" fill="#f2f2f0" stroke="#7a7973" stroke-width="1.5"/>
+<text x="36.0" y="197.0" font-size="11.5" fill="#0b0b0b" font-weight="700">seat_layout</text>
+<text x="36.0" y="211.0" font-size="9.5" fill="#8a8a84">좌석 배치도</text>
+<rect x="26.0" y="250.0" width="160.0" height="38.0" rx="6" fill="#f2f2f0" stroke="#7a7973" stroke-width="1.5"/>
+<text x="36.0" y="267.0" font-size="11.5" fill="#0b0b0b" font-weight="700">zone</text>
+<text x="36.0" y="281.0" font-size="9.5" fill="#8a8a84">구역</text>
+<rect x="26.0" y="320.0" width="160.0" height="38.0" rx="6" fill="#f2f2f0" stroke="#7a7973" stroke-width="1.5"/>
+<text x="36.0" y="337.0" font-size="11.5" fill="#0b0b0b" font-weight="700">seat</text>
+<text x="36.0" y="351.0" font-size="9.5" fill="#8a8a84">좌석</text>
+<rect x="226.0" y="180.0" width="170.0" height="38.0" rx="6" fill="#eef4fc" stroke="#2a78d6" stroke-width="1.5"/>
+<text x="236.0" y="197.0" font-size="11.5" fill="#0b0b0b" font-weight="700">event_session</text>
+<text x="236.0" y="211.0" font-size="9.5" fill="#8a8a84">회차 — 예약의 단위</text>
+<rect x="436.0" y="250.0" width="170.0" height="38.0" rx="6" fill="#fbf1f1" stroke="#e34948" stroke-width="1.5"/>
+<text x="446.0" y="267.0" font-size="11.5" fill="#0b0b0b" font-weight="700">seat_inventory</text>
+<text x="446.0" y="281.0" font-size="9.5" fill="#8a8a84">재고 — 전략이 만진다</text>
+<rect x="436.0" y="320.0" width="170.0" height="38.0" rx="6" fill="#fbf1f1" stroke="#e34948" stroke-width="1.5"/>
+<text x="446.0" y="337.0" font-size="11.5" fill="#0b0b0b" font-weight="700">seat_hold</text>
+<text x="446.0" y="351.0" font-size="9.5" fill="#8a8a84">홀드 — U-2</text>
+<rect x="436.0" y="390.0" width="170.0" height="38.0" rx="6" fill="#fbf1f1" stroke="#e34948" stroke-width="1.5"/>
+<text x="446.0" y="407.0" font-size="11.5" fill="#0b0b0b" font-weight="700">user_session_quota</text>
+<text x="446.0" y="421.0" font-size="9.5" fill="#8a8a84">1인 매수 집계</text>
+<rect x="646.0" y="250.0" width="170.0" height="38.0" rx="6" fill="#eef8f4" stroke="#1baf7a" stroke-width="1.5"/>
+<text x="656.0" y="267.0" font-size="11.5" fill="#0b0b0b" font-weight="700">reservation_seat</text>
+<text x="656.0" y="281.0" font-size="9.5" fill="#8a8a84">예약 ↔ 재고</text>
+<rect x="646.0" y="330.0" width="170.0" height="38.0" rx="6" fill="#eef8f4" stroke="#1baf7a" stroke-width="1.5"/>
+<text x="656.0" y="347.0" font-size="11.5" fill="#0b0b0b" font-weight="700">reservation</text>
+<text x="656.0" y="361.0" font-size="9.5" fill="#8a8a84">확정</text>
+<rect x="852.0" y="200.0" width="164.0" height="38.0" rx="6" fill="#eef8f4" stroke="#1baf7a" stroke-width="1.5"/>
+<text x="862.0" y="217.0" font-size="11.5" fill="#0b0b0b" font-weight="700">ticket</text>
+<text x="862.0" y="231.0" font-size="9.5" fill="#8a8a84">QR 티켓</text>
+<rect x="852.0" y="268.0" width="164.0" height="38.0" rx="6" fill="#eef8f4" stroke="#1baf7a" stroke-width="1.5"/>
+<text x="862.0" y="285.0" font-size="11.5" fill="#0b0b0b" font-weight="700">ticket_scan</text>
+<text x="862.0" y="299.0" font-size="9.5" fill="#8a8a84">검표 이력</text>
+<rect x="852.0" y="346.0" width="164.0" height="38.0" rx="6" fill="#eef8f4" stroke="#1baf7a" stroke-width="1.5"/>
+<text x="862.0" y="363.0" font-size="11.5" fill="#0b0b0b" font-weight="700">payment</text>
+<text x="862.0" y="377.0" font-size="9.5" fill="#8a8a84">결제 시도</text>
+<rect x="852.0" y="414.0" width="164.0" height="38.0" rx="6" fill="#eef8f4" stroke="#1baf7a" stroke-width="1.5"/>
+<text x="862.0" y="431.0" font-size="11.5" fill="#0b0b0b" font-weight="700">outbox</text>
+<text x="862.0" y="445.0" font-size="9.5" fill="#8a8a84">알림 큐</text>
+<rect x="852.0" y="482.0" width="164.0" height="38.0" rx="6" fill="#eef8f4" stroke="#1baf7a" stroke-width="1.5"/>
+<text x="862.0" y="499.0" font-size="11.5" fill="#0b0b0b" font-weight="700">idempotency_record</text>
+<text x="862.0" y="513.0" font-size="9.5" fill="#8a8a84">요청 멱등키</text>
+<text x="748.0" y="318.0" font-size="9.5" fill="#8a8a84">1 : 1..N</text>
+<text x="824.0" y="206.0" font-size="9.5" fill="#8a8a84" text-anchor="end">1 : 0..1</text>
+<text x="766.0" y="492.0" font-size="9.5" fill="#8a8a84">0..1 : 0..1</text>
+<text x="206.0" y="378.0" font-size="9.5" fill="#8a8a84">좌석은 회차를 건너 재고·홀드로 바로 간다</text>
+<text x="26.0" y="100.0" font-size="10.5" fill="#7a7973" font-weight="700">카탈로그 — 정적</text>
+<text x="226.0" y="100.0" font-size="10.5" fill="#2a78d6" font-weight="700">회차</text>
+<text x="436.0" y="100.0" font-size="10.5" fill="#e34948" font-weight="700">전략이 다투는 셋</text>
+<text x="646.0" y="100.0" font-size="10.5" fill="#1baf7a" font-weight="700">예약</text>
+<text x="852.0" y="100.0" font-size="10.5" fill="#1baf7a" font-weight="700">후속</text>
+<rect x="26.0" y="530.0" width="990.0" height="72.0" rx="6" fill="#eef4fc"/>
+<text x="40.0" y="554.0" font-size="12.5" fill="#0b0b0b" font-weight="700">표시 없는 선은 1:N 이다. erd.md 의 mermaid 표기를 그대로 옮겼고 특수한 셋만 따로 적었다.</text>
+<text x="40.0" y="575.0" font-size="11" fill="#52514e">reservation ||--|{ reservation_seat (최소 1)  ·  reservation_seat ||--o| ticket  ·  reservation |o--o| idempotency_record</text>
+<text x="40.0" y="593.0" font-size="11" fill="#52514e">좌석 수를 늘리면 경합이 흩어지고 줄이면 몰린다 — 경합도 3단계가 바로 seat_inventory 행 수다.</text>
+<text x="26.0" y="630.0" font-size="11.5" fill="#8a8a84">정본: erd.md 1절 ERD(컬럼 포함) · 3절 유니크 제약 · V1__init_schema.sql</text>
+</svg>
