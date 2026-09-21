@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="458" viewBox="0 0 980 458" font-family="'Malgun Gothic','Apple SD Gothic Neo',system-ui,-apple-system,'Segoe UI',sans-serif">
+<rect width="980" height="458" fill="#fcfcfb"/>
+<text x="26" y="40" font-size="20" font-weight="700" fill="#0b0b0b">데이터 모델 — 테이블 15개, 유니크 제약 13개</text>
+<text x="26" y="66" font-size="13" fill="#52514e">다섯 전략이 다투는 것은 이 중 셋뿐이다. 나머지는 참조·이력이다</text>
+<rect x="26.0" y="92.0" width="298.7" height="212.0" rx="6" fill="#fbf1f1"/>
+<text x="40.0" y="118.0" font-size="13" fill="#e34948" font-weight="700">전략이 다투는 테이블</text>
+<text x="40.0" y="146.0" font-size="11.5" fill="#0b0b0b" font-weight="700">seat_inventory</text>
+<text x="40.0" y="164.0" font-size="10.5" fill="#8a8a84">좌석 재고 — 전략이 직접 만진다</text>
+<text x="40.0" y="181.0" font-size="10.5" fill="#e34948">U-1</text>
+<text x="40.0" y="198.0" font-size="11.5" fill="#0b0b0b" font-weight="700">seat_hold</text>
+<text x="40.0" y="216.0" font-size="10.5" fill="#8a8a84">홀드 — 최후 방어선이 여기 있다</text>
+<text x="40.0" y="233.0" font-size="10.5" fill="#e34948">U-2</text>
+<text x="40.0" y="250.0" font-size="11.5" fill="#0b0b0b" font-weight="700">user_session_quota</text>
+<text x="40.0" y="268.0" font-size="10.5" fill="#8a8a84">1인 매수 집계 — 좌석 락이 못 막는 축</text>
+<text x="40.0" y="285.0" font-size="10.5" fill="#e34948">U-5</text>
+<rect x="340.7" y="92.0" width="298.7" height="212.0" rx="6" fill="#eef4fc"/>
+<text x="354.7" y="118.0" font-size="13" fill="#2a78d6" font-weight="700">예약·결제·발권</text>
+<text x="354.7" y="146.0" font-size="11.5" fill="#0b0b0b" font-weight="700">reservation · reservation_seat</text>
+<text x="354.7" y="164.0" font-size="10.5" fill="#8a8a84">확정 기록</text>
+<text x="354.7" y="181.0" font-size="10.5" fill="#2a78d6">U-6 · U-7</text>
+<text x="354.7" y="198.0" font-size="11.5" fill="#0b0b0b" font-weight="700">payment · outbox</text>
+<text x="354.7" y="216.0" font-size="10.5" fill="#8a8a84">결제 이력 · 알림 큐</text>
+<text x="354.7" y="233.0" font-size="10.5" fill="#2a78d6">U-8 · U-12</text>
+<text x="354.7" y="250.0" font-size="11.5" fill="#0b0b0b" font-weight="700">ticket · ticket_scan</text>
+<text x="354.7" y="268.0" font-size="10.5" fill="#8a8a84">QR 과 입장 이력</text>
+<text x="354.7" y="285.0" font-size="10.5" fill="#2a78d6">U-9 · U-10 · U-11</text>
+<rect x="655.3" y="92.0" width="298.7" height="212.0" rx="6" fill="#f2f2f0"/>
+<text x="669.3" y="118.0" font-size="13" fill="#7a7973" font-weight="700">참조 데이터</text>
+<text x="669.3" y="146.0" font-size="11.5" fill="#0b0b0b" font-weight="700">program · event_session</text>
+<text x="669.3" y="164.0" font-size="10.5" fill="#8a8a84">프로그램과 회차</text>
+<text x="669.3" y="181.0" font-size="10.5" fill="#7a7973">—</text>
+<text x="669.3" y="198.0" font-size="11.5" fill="#0b0b0b" font-weight="700">seat_layout · zone · seat</text>
+<text x="669.3" y="216.0" font-size="10.5" fill="#8a8a84">좌석 배치</text>
+<text x="669.3" y="233.0" font-size="10.5" fill="#7a7973">U-3 · U-4</text>
+<text x="669.3" y="250.0" font-size="11.5" fill="#0b0b0b" font-weight="700">idempotency_record</text>
+<text x="669.3" y="268.0" font-size="10.5" fill="#8a8a84">멱등키 기록</text>
+<text x="669.3" y="285.0" font-size="10.5" fill="#7a7973">U-13</text>
+<rect x="26.0" y="328.0" width="928.0" height="76.0" rx="6" fill="#fbf1f1"/>
+<text x="40.0" y="354.0" font-size="13" fill="#0b0b0b" font-weight="700">핵심은 U-2 하나다 — ux_seat_hold_active, 「같은 좌석에 활성 홀드는 하나」를 부분 유니크 인덱스로 건다.</text>
+<text x="40.0" y="376.0" font-size="12" fill="#52514e">none 에서만 이것을 지운다. 남겨 두면 앱 락이 새도 DB 가 받아내 실패 증거를 얻지 못한다.</text>
+<text x="40.0" y="395.0" font-size="12" fill="#52514e">그래서 M3 의 결론이 「정합성의 최종 책임은 전략이 아니라 DB 제약과 조건부 UPDATE 가 진다」가 된다.</text>
+<text x="26.0" y="434.0" font-size="11.5" fill="#8a8a84">정본: erd.md 3절 유니크 제약 U-1~U-13 · V1__init_schema.sql 의 CREATE TABLE 15개</text>
+</svg>

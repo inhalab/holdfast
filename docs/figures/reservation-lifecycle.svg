@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="470" viewBox="0 0 980 470" font-family="'Malgun Gothic','Apple SD Gothic Neo',system-ui,-apple-system,'Segoe UI',sans-serif">
+<rect width="980" height="470" fill="#fcfcfb"/>
+<text x="26" y="40" font-size="20" font-weight="700" fill="#0b0b0b">예약 하나의 일생 — 경합은 화살표 위에 있다</text>
+<text x="26" y="66" font-size="13" fill="#52514e">상태 넷. 이 프로젝트가 잰 것은 상태가 아니라 그 사이의 전이다</text>
+<rect x="70.0" y="150.0" width="176.0" height="52.0" rx="6" fill="#eef4fc" stroke="#2a78d6" stroke-width="1.5"/>
+<text x="158.0" y="182.0" font-size="14" fill="#0b0b0b" font-weight="700" text-anchor="middle">HELD</text>
+<rect x="400.0" y="150.0" width="176.0" height="52.0" rx="6" fill="#eef8f4" stroke="#1baf7a" stroke-width="1.5"/>
+<text x="488.0" y="182.0" font-size="14" fill="#0b0b0b" font-weight="700" text-anchor="middle">CONFIRMED</text>
+<rect x="720.0" y="100.0" width="176.0" height="52.0" rx="6" fill="#f2f2f0" stroke="#7a7973" stroke-width="1.5"/>
+<text x="808.0" y="132.0" font-size="14" fill="#0b0b0b" font-weight="700" text-anchor="middle">CANCELLED</text>
+<rect x="720.0" y="206.0" width="176.0" height="52.0" rx="6" fill="#f2f2f0" stroke="#7a7973" stroke-width="1.5"/>
+<text x="808.0" y="238.0" font-size="14" fill="#0b0b0b" font-weight="700" text-anchor="middle">EXPIRED</text>
+<defs><marker id="b" markerWidth="9" markerHeight="9" refX="8" refY="3.5" orient="auto"><path d="M0,0 L8,3.5 L0,7 z" fill="#52514e"/></marker></defs>
+<line x1="28" y1="176" x2="62" y2="176" stroke="#52514e" stroke-width="2" marker-end="url(#b)"/>
+<text x="26.0" y="146.0" font-size="11" fill="#e34948" font-weight="700">CS-1</text>
+<text x="26.0" y="162.0" font-size="10.5" fill="#8a8a84">POST /api/holds</text>
+<line x1="248" y1="176" x2="394" y2="176" stroke="#52514e" stroke-width="2" marker-end="url(#b)"/>
+<text x="321.0" y="166.0" font-size="10.5" fill="#8a8a84" text-anchor="middle">POST /api/reservations</text>
+<text x="321.0" y="193.0" font-size="11" fill="#e34948" font-weight="700" text-anchor="middle">CS-2 · 확정</text>
+<line x1="578" y1="164" x2="714" y2="124" stroke="#52514e" stroke-width="2" marker-end="url(#b)"/>
+<text x="646.0" y="128.0" font-size="10.5" fill="#e34948" text-anchor="middle">cancel — CS-4</text>
+<line x1="250" y1="202" x2="714" y2="240" stroke="#52514e" stroke-width="2" marker-end="url(#b)"/>
+<text x="470.0" y="238.0" font-size="10.5" fill="#e34948" text-anchor="middle">lazy 검증 TTL 만료 — CS-3</text>
+<path d="M158 150 C 158 106, 300 98, 712 112" fill="none" stroke="#8a8a84" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#b)"/>
+<text x="350.0" y="88.0" font-size="10.5" fill="#8a8a84" text-anchor="middle">DELETE /api/holds/{holdId} — 확정 전 자진 해제</text>
+<rect x="26.0" y="290.0" width="928.0" height="84.0" rx="6" fill="#fbf1f1"/>
+<text x="40.0" y="315.0" font-size="13" fill="#0b0b0b" font-weight="700">전이마다 임계 구역이 하나씩 붙는다. 이 프로젝트가 잰 것은 상태가 아니라 그 전이들이다.</text>
+<text x="40.0" y="337.0" font-size="11.5" fill="#52514e">CS-1  홀드 획득 — 부하 60회 · 단위 경합 테스트 5종    ·    CS-4  취소 반환 — 취소 쌍 15만 · #209 를 여기서 찾았다</text>
+<text x="40.0" y="357.0" font-size="11.5" fill="#eb6834">CS-2 · CS-3 — 「가장 자주 터진다」고 지목해 놓고 부하로 한 번도 안 밀어봤다 (#199 보류)</text>
+<text x="26.0" y="402.0" font-size="12.5" fill="#0b0b0b">취소는 행을 지우지 않는다 — CANCELLED 로 남기고 예약·좌석·홀드·할당량 넷을 한 트랜잭션에서 되돌린다.</text>
+<text x="26.0" y="422.0" font-size="12.5" fill="#52514e">그 넷째(할당량)가 전이표에서 빠져 있었고, 겹친 취소가 보유량을 두 번 깎는 #209 가 그 아래 살아 있었다.</text>
+<text x="26.0" y="452.0" font-size="11.5" fill="#8a8a84">정본: state-transitions.md 1절 전이표 · concurrency-spec.md 1절 CS-1~CS-6</text>
+</svg>

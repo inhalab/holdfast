@@ -227,6 +227,7 @@ DURATION_SEC=120 load-test/scripts/run.sh high pessimistic   # 본 측정
 - [역할 분담](docs/roles.md)
 - [협업 규칙](docs/workflow.md)
 - [배포 환경 결정](docs/infra-decision.md)
+- [발표용 그림 — 산출물을 그림으로](docs/figures/README.md)
 
 ## 라이선스
 

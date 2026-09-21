@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="792" viewBox="0 0 980 792" font-family="'Malgun Gothic','Apple SD Gothic Neo',system-ui,-apple-system,'Segoe UI',sans-serif">
+<rect width="980" height="792" fill="#fcfcfb"/>
+<text x="26" y="40" font-size="20" font-weight="700" fill="#0b0b0b">요구사항 14개 — 무엇을 요구했고 무엇으로 확인했나</text>
+<text x="26" y="66" font-size="13" fill="#52514e">«충족»은 만들었다는 뜻이 아니라 확인할 수단이 있다는 뜻이다</text>
+<rect x="26.0" y="92.0" width="210.0" height="66.0" rx="6" fill="#eef8f4"/>
+<text x="42.0" y="118.0" font-size="13" fill="#52514e" font-weight="700">충족</text>
+<text x="42.0" y="143.0" font-size="21" fill="#1baf7a" font-weight="700">10개</text>
+<text x="92.0" y="143.0" font-size="11" fill="#8a8a84">검증 수단이 붙어 있다</text>
+<rect x="252.0" y="92.0" width="210.0" height="66.0" rx="6" fill="#fdf2ec"/>
+<text x="268.0" y="118.0" font-size="13" fill="#52514e" font-weight="700">부분</text>
+<text x="268.0" y="143.0" font-size="21" fill="#eb6834" font-weight="700">4개</text>
+<text x="318.0" y="143.0" font-size="11" fill="#8a8a84">수단이나 전제가 모자라다</text>
+<rect x="478.0" y="92.0" width="472.0" height="66.0" rx="6" fill="#eef4fc"/>
+<text x="494.0" y="116.0" font-size="13" fill="#0b0b0b" font-weight="700">출처 — 국립 RFP 9개 · 궁능 RFP 2개 · 자체 확장 3개</text>
+<text x="494.0" y="139.0" font-size="11.5" fill="#52514e">자체 확장 셋이 없으면 이 프로젝트가 성립하지 않는다 (REQ-09·11·12).</text>
+<text x="26.0" y="186.0" font-size="13" fill="#52514e" font-weight="700">요구사항 14개</text>
+<rect x="26.0" y="200.0" width="128.0" height="60.0" rx="6" fill="#eef8f4"/>
+<text x="36.0" y="223.0" font-size="12.5" fill="#1baf7a" font-weight="700">REQ-01</text>
+<text x="144.0" y="223.0" font-size="10.5" fill="#1baf7a" text-anchor="end">충족</text>
+<text x="36.0" y="243.0" font-size="11" fill="#52514e">좌석 초과 확정 방지</text>
+<rect x="162.0" y="200.0" width="128.0" height="60.0" rx="6" fill="#fdf2ec"/>
+<text x="172.0" y="223.0" font-size="12.5" fill="#eb6834" font-weight="700">REQ-02</text>
+<text x="280.0" y="223.0" font-size="10.5" fill="#eb6834" text-anchor="end">부분</text>
+<text x="172.0" y="243.0" font-size="11" fill="#52514e">실시간 좌석 상태</text>
+<rect x="298.0" y="200.0" width="128.0" height="60.0" rx="6" fill="#eef8f4"/>
+<text x="308.0" y="223.0" font-size="12.5" fill="#1baf7a" font-weight="700">REQ-03</text>
+<text x="416.0" y="223.0" font-size="10.5" fill="#1baf7a" text-anchor="end">충족*</text>
+<text x="308.0" y="243.0" font-size="11" fill="#52514e">1인 매수 제한</text>
+<rect x="434.0" y="200.0" width="128.0" height="60.0" rx="6" fill="#eef8f4"/>
+<text x="444.0" y="223.0" font-size="12.5" fill="#1baf7a" font-weight="700">REQ-04</text>
+<text x="552.0" y="223.0" font-size="10.5" fill="#1baf7a" text-anchor="end">충족</text>
+<text x="444.0" y="243.0" font-size="11" fill="#52514e">예약·결제 정합성</text>
+<rect x="570.0" y="200.0" width="128.0" height="60.0" rx="6" fill="#eef8f4"/>
+<text x="580.0" y="223.0" font-size="12.5" fill="#1baf7a" font-weight="700">REQ-05</text>
+<text x="688.0" y="223.0" font-size="10.5" fill="#1baf7a" text-anchor="end">충족</text>
+<text x="580.0" y="243.0" font-size="11" fill="#52514e">알림 중복 방지</text>
+<rect x="706.0" y="200.0" width="128.0" height="60.0" rx="6" fill="#eef8f4"/>
+<text x="716.0" y="223.0" font-size="12.5" fill="#1baf7a" font-weight="700">REQ-06</text>
+<text x="824.0" y="223.0" font-size="10.5" fill="#1baf7a" text-anchor="end">충족</text>
+<text x="716.0" y="243.0" font-size="11" fill="#52514e">입장 검표</text>
+<rect x="842.0" y="200.0" width="128.0" height="60.0" rx="6" fill="#eef8f4"/>
+<text x="852.0" y="223.0" font-size="12.5" fill="#1baf7a" font-weight="700">REQ-07</text>
+<text x="960.0" y="223.0" font-size="10.5" fill="#1baf7a" text-anchor="end">충족</text>
+<text x="852.0" y="243.0" font-size="11" fill="#52514e">QR 티켓 발급</text>
+<rect x="26.0" y="268.0" width="128.0" height="60.0" rx="6" fill="#eef8f4"/>
+<text x="36.0" y="291.0" font-size="12.5" fill="#1baf7a" font-weight="700">REQ-08</text>
+<text x="144.0" y="291.0" font-size="10.5" fill="#1baf7a" text-anchor="end">충족</text>
+<text x="36.0" y="311.0" font-size="11" fill="#52514e">예약 오픈 일시</text>
+<rect x="162.0" y="268.0" width="128.0" height="60.0" rx="6" fill="#eef8f4"/>
+<text x="172.0" y="291.0" font-size="12.5" fill="#1baf7a" font-weight="700">REQ-09</text>
+<text x="280.0" y="291.0" font-size="10.5" fill="#1baf7a" text-anchor="end">충족</text>
+<text x="172.0" y="311.0" font-size="11" fill="#52514e">좌석 단위 점유</text>
+<rect x="298.0" y="268.0" width="128.0" height="60.0" rx="6" fill="#eef8f4"/>
+<text x="308.0" y="291.0" font-size="12.5" fill="#1baf7a" font-weight="700">REQ-10</text>
+<text x="416.0" y="291.0" font-size="10.5" fill="#1baf7a" text-anchor="end">충족</text>
+<text x="308.0" y="311.0" font-size="11" fill="#52514e">응답시간 3초</text>
+<rect x="434.0" y="268.0" width="128.0" height="60.0" rx="6" fill="#eef8f4"/>
+<text x="444.0" y="291.0" font-size="12.5" fill="#1baf7a" font-weight="700">REQ-11</text>
+<text x="552.0" y="291.0" font-size="10.5" fill="#1baf7a" text-anchor="end">충족*</text>
+<text x="444.0" y="311.0" font-size="11" fill="#52514e">매수 상한 직렬화</text>
+<rect x="570.0" y="268.0" width="128.0" height="60.0" rx="6" fill="#fdf2ec"/>
+<text x="580.0" y="291.0" font-size="12.5" fill="#eb6834" font-weight="700">REQ-12</text>
+<text x="688.0" y="291.0" font-size="10.5" fill="#eb6834" text-anchor="end">부분</text>
+<text x="580.0" y="311.0" font-size="11" fill="#52514e">만료·재홀드</text>
+<rect x="706.0" y="268.0" width="128.0" height="60.0" rx="6" fill="#fdf2ec"/>
+<text x="716.0" y="291.0" font-size="12.5" fill="#eb6834" font-weight="700">REQ-13</text>
+<text x="824.0" y="291.0" font-size="10.5" fill="#eb6834" text-anchor="end">부분</text>
+<text x="716.0" y="311.0" font-size="11" fill="#52514e">관리자 운영</text>
+<rect x="842.0" y="268.0" width="128.0" height="60.0" rx="6" fill="#fdf2ec"/>
+<text x="852.0" y="291.0" font-size="12.5" fill="#eb6834" font-weight="700">REQ-14</text>
+<text x="960.0" y="291.0" font-size="10.5" fill="#eb6834" text-anchor="end">부분</text>
+<text x="852.0" y="311.0" font-size="11" fill="#52514e">비회원 조회</text>
+<text x="26.0" y="354.0" font-size="11.5" fill="#8a8a84">* REQ-03·11 은 부하 측정에만 기대고 있다 — 60회 전부 V-3 0 이지만 전용 단위 경합 테스트가 없다.</text>
+<text x="26.0" y="382.0" font-size="13" fill="#52514e" font-weight="700">정량 검수 기준 여섯 — 이 프로젝트가 숫자로 답한 자리</text>
+<rect x="26.0" y="398.0" width="928.0" height="40.0" rx="6" fill="#eef8f4"/>
+<text x="40.0" y="423.0" font-size="12.5" fill="#0b0b0b" font-weight="700">REQ-01  초과 예약 0건</text>
+<text x="370.0" y="423.0" font-size="11.5" fill="#8a8a84">부하 60회 · DB 검증 V-1</text>
+<text x="940.0" y="423.0" font-size="12.5" fill="#1baf7a" font-weight="700" text-anchor="end">0건 — none 제외 넷, 각 9회 전부</text>
+<rect x="26.0" y="444.0" width="928.0" height="40.0" rx="6" fill="#eef8f4"/>
+<text x="40.0" y="469.0" font-size="12.5" fill="#0b0b0b" font-weight="700">REQ-05  중복 발송 0건</text>
+<text x="370.0" y="469.0" font-size="11.5" fill="#8a8a84">OutboxConcurrencyTest · 워커 8개</text>
+<text x="940.0" y="469.0" font-size="12.5" fill="#1baf7a" font-weight="700" text-anchor="end">알림 200건이 정확히 한 번씩</text>
+<rect x="26.0" y="490.0" width="928.0" height="40.0" rx="6" fill="#eef8f4"/>
+<text x="40.0" y="515.0" font-size="12.5" fill="#0b0b0b" font-weight="700">REQ-06  티켓 중복 사용 0건</text>
+<text x="370.0" y="515.0" font-size="11.5" fill="#8a8a84">U-11 부분 유니크 인덱스</text>
+<text x="940.0" y="515.0" font-size="12.5" fill="#1baf7a" font-weight="700" text-anchor="end">티켓당 ADMITTED 1건</text>
+<rect x="26.0" y="536.0" width="928.0" height="40.0" rx="6" fill="#eef8f4"/>
+<text x="40.0" y="561.0" font-size="12.5" fill="#0b0b0b" font-weight="700">REQ-10  응답시간 p95 3초 이내</text>
+<text x="370.0" y="561.0" font-size="11.5" fill="#8a8a84">k6 · 화면 13개 별도 측정</text>
+<text x="940.0" y="561.0" font-size="12.5" fill="#1baf7a" font-weight="700" text-anchor="end">API 18~41ms · 화면 최대 45.9ms</text>
+<rect x="26.0" y="582.0" width="928.0" height="40.0" rx="6" fill="#eef8f4"/>
+<text x="40.0" y="607.0" font-size="12.5" fill="#0b0b0b" font-weight="700">REQ-11  매수 상한 초과 승인 0건</text>
+<text x="370.0" y="607.0" font-size="11.5" fill="#8a8a84">부하 60회 · DB 검증 V-3</text>
+<text x="940.0" y="607.0" font-size="12.5" fill="#1baf7a" font-weight="700" text-anchor="end">0건 — 60회 전부</text>
+<rect x="26.0" y="628.0" width="928.0" height="40.0" rx="6" fill="#eef8f4"/>
+<text x="40.0" y="653.0" font-size="12.5" fill="#0b0b0b" font-weight="700">REQ-12  제약 위반 0건 (unique 제외)</text>
+<text x="370.0" y="653.0" font-size="11.5" fill="#8a8a84">부하 측정 제약 위반 카운터</text>
+<text x="940.0" y="653.0" font-size="12.5" fill="#1baf7a" font-weight="700" text-anchor="end">0건 — 3개 전략</text>
+<text x="26.0" y="692.0" font-size="12.5" fill="#0b0b0b" font-weight="700">«부분» 넷은 서로 다른 이유다 — 둘은 측정을 안 한 것이고, 둘은 인증을 안 만들기로 한 판정의 그림자다.</text>
+<text x="26.0" y="713.0" font-size="12.5" fill="#52514e">REQ-02  폴링 부하를 측정에 넣지 않았다        ·  REQ-12  만료·재홀드 단위 재현이 optimistic 에만 있다</text>
+<text x="26.0" y="732.0" font-size="12.5" fill="#52514e">REQ-13  권한 관리·수정 이력이 없다              ·  REQ-14  예약자 번호를 추측할 수 있다</text>
+<text x="26.0" y="758.0" font-size="11.5" fill="#8a8a84">정본: requirements.md 2절 추적표 · 3절(REQ-11~14 를 따로 세운 기준) · 4절(한때 «통합 테스트»로 적었던 것의 회수)</text>
+</svg>
