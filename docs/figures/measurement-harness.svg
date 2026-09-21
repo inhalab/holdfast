@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="500" viewBox="0 0 980 500" font-family="'Malgun Gothic','Apple SD Gothic Neo',system-ui,-apple-system,'Segoe UI',sans-serif">
+<rect width="980" height="500" fill="#fcfcfb"/>
+<text x="26" y="40" font-size="20" font-weight="700" fill="#0b0b0b">측정 하네스 — 앱 2대가 이 프로젝트의 전제다</text>
+<text x="26" y="66" font-size="13" fill="#52514e">1대면 JVM 안의 락으로도 초과 확정이 0이 되어 다섯을 가를 수 없다</text>
+<rect x="26.0" y="110.0" width="166.0" height="58.0" rx="6" fill="#eef4fc" stroke="#2a78d6" stroke-width="1.5"/>
+<text x="38.0" y="135.0" font-size="13" fill="#0b0b0b" font-weight="700">k6</text>
+<text x="38.0" y="154.0" font-size="10.5" fill="#8a8a84">부하 생성</text>
+<rect x="222.0" y="110.0" width="150.0" height="58.0" rx="6" fill="#f2f2f0" stroke="#7a7973" stroke-width="1.5"/>
+<text x="234.0" y="135.0" font-size="13" fill="#0b0b0b" font-weight="700">nginx</text>
+<text x="234.0" y="154.0" font-size="10.5" fill="#8a8a84">worker_connections 8192</text>
+<rect x="402.0" y="78.0" width="190.0" height="58.0" rx="6" fill="#fbf1f1" stroke="#e34948" stroke-width="1.5"/>
+<text x="414.0" y="103.0" font-size="13" fill="#0b0b0b" font-weight="700">app1</text>
+<text x="414.0" y="122.0" font-size="10.5" fill="#8a8a84">Spring Boot · 같은 이미지</text>
+<rect x="402.0" y="158.0" width="190.0" height="58.0" rx="6" fill="#fbf1f1" stroke="#e34948" stroke-width="1.5"/>
+<text x="414.0" y="183.0" font-size="13" fill="#0b0b0b" font-weight="700">app2</text>
+<text x="414.0" y="202.0" font-size="10.5" fill="#8a8a84">Spring Boot · 같은 이미지</text>
+<rect x="622.0" y="78.0" width="152.0" height="58.0" rx="6" fill="#f2f2f0" stroke="#7a7973" stroke-width="1.5"/>
+<text x="634.0" y="103.0" font-size="13" fill="#0b0b0b" font-weight="700">PostgreSQL 18</text>
+<text x="634.0" y="122.0" font-size="10.5" fill="#8a8a84">READ COMMITTED</text>
+<rect x="622.0" y="158.0" width="152.0" height="58.0" rx="6" fill="#f2f2f0" stroke="#7a7973" stroke-width="1.5"/>
+<text x="634.0" y="183.0" font-size="13" fill="#0b0b0b" font-weight="700">Redis 7</text>
+<text x="634.0" y="202.0" font-size="10.5" fill="#8a8a84">redis 전략만</text>
+<defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 z" fill="#8a8a84"/></marker></defs>
+<line x1="192" y1="139" x2="222" y2="139" stroke="#8a8a84" stroke-width="1.5" marker-end="url(#a)"/>
+<line x1="372" y1="139" x2="402" y2="109" stroke="#8a8a84" stroke-width="1.5" marker-end="url(#a)"/>
+<line x1="372" y1="139" x2="402" y2="187" stroke="#8a8a84" stroke-width="1.5" marker-end="url(#a)"/>
+<line x1="592" y1="107" x2="622" y2="107" stroke="#8a8a84" stroke-width="1.5" marker-end="url(#a)"/>
+<line x1="592" y1="187" x2="622" y2="187" stroke="#8a8a84" stroke-width="1.5" marker-end="url(#a)"/>
+<line x1="592" y1="114" x2="622" y2="178" stroke="#8a8a84" stroke-width="1.5" marker-end="url(#a)"/>
+<line x1="592" y1="180" x2="622" y2="116" stroke="#8a8a84" stroke-width="1.5" marker-end="url(#a)"/>
+<text x="790.0" y="112.0" font-size="11" fill="#8a8a84">앱 2대가 같은 DB 를 본다 —</text>
+<text x="790.0" y="130.0" font-size="11" fill="#8a8a84">그래서 락이 프로세스를</text>
+<text x="790.0" y="148.0" font-size="11" fill="#8a8a84">넘어야 한다</text>
+<rect x="26.0" y="250.0" width="928.0" height="58.0" rx="6" fill="#eef4fc"/>
+<text x="40.0" y="275.0" font-size="13" fill="#0b0b0b" font-weight="700">전략은 환경변수 하나로 갈린다 — 같은 이미지가 다섯 중 하나로 뜨고, 전략 밖 코드에는 분기가 없다.</text>
+<text x="40.0" y="296.0" font-size="11.5" fill="#8a8a84">@ConditionalOnProperty(holdfast.strategy) · none | pessimistic | optimistic | unique | redis</text>
+<text x="26.0" y="338.0" font-size="12.5" fill="#52514e">고정 변수 — 풀 30 · 스레드 200 · lock_timeout 1초 · waitTime 1초 / leaseTime 10초 · 홀드 TTL 10초 · 가상 스레드 끔</text>
+<text x="26.0" y="358.0" font-size="12.5" fill="#52514e">경합 3단계 — 저경합 1000석·100VU·사용자 400  /  고경합 10석·500VU·500  /  극단 1석·200VU·200</text>
+<rect x="26.0" y="378.0" width="928.0" height="82.0" rx="6" fill="#fdf2ec"/>
+<text x="40.0" y="403.0" font-size="13" fill="#eb6834" font-weight="700">적어 둔 한계 셋 — 재측정으로 해소하지 않는다</text>
+<text x="40.0" y="424.0" font-size="11.5" fill="#52514e">k6 가 앱과 같은 호스트에서 돈다 (요구는 「분리된 호스트」이고 미충족이다)</text>
+<text x="40.0" y="443.0" font-size="11.5" fill="#52514e">nginx 가 업스트림 커넥션을 재사용하지 않는다  ·  사용자 수를 VU 에 맞춘 것이 #191 과 #209 를 가렸다</text>
+<text x="26.0" y="486.0" font-size="11.5" fill="#8a8a84">정본: concurrency-spec.md 7.3 고정 변수 — 한계 셋과 그 ⚠ 각주가 모두 그 절에 있다</text>
+</svg>

@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="700" viewBox="0 0 980 700" font-family="'Malgun Gothic','Apple SD Gothic Neo',system-ui,-apple-system,'Segoe UI',sans-serif">
+<rect width="980" height="700" fill="#fcfcfb"/>
+<text x="26" y="40" font-size="20" font-weight="700" fill="#0b0b0b">검수 기준 PER-002 — 화면 13개, 기준은 3000ms</text>
+<text x="26" y="66" font-size="13" fill="#52514e">가장 느린 화면이 45.9ms다. 이 그림의 가로축 전체가 50ms이고, 기준선은 그 60배 바깥에 있다</text>
+<text x="26.0" y="120.0" font-size="11.5" fill="#2a78d6" font-weight="700">무부하</text>
+<rect x="72.0" y="110.0" width="26.0" height="9.0" rx="6" fill="#2a78d6"/>
+<text x="112.0" y="120.0" font-size="11.5" fill="#7a7973" font-weight="700">부하 중 (저경합 1000석 · 100VU 배경)</text>
+<rect x="330.0" y="110.0" width="26.0" height="9.0" rx="6" fill="#7a7973"/>
+<text x="954.0" y="120.0" font-size="11.5" fill="#8a8a84" text-anchor="end">3회 중앙값의 p95</text>
+<line x1="260.0" y1="140" x2="260.0" y2="560" stroke="#e8e7e3" stroke-width="1"/>
+<text x="260.0" y="134.0" font-size="10" fill="#8a8a84" text-anchor="middle">0ms</text>
+<line x1="372.0" y1="140" x2="372.0" y2="560" stroke="#e8e7e3" stroke-width="1"/>
+<text x="372.0" y="134.0" font-size="10" fill="#8a8a84" text-anchor="middle">10ms</text>
+<line x1="484.0" y1="140" x2="484.0" y2="560" stroke="#e8e7e3" stroke-width="1"/>
+<text x="484.0" y="134.0" font-size="10" fill="#8a8a84" text-anchor="middle">20ms</text>
+<line x1="596.0" y1="140" x2="596.0" y2="560" stroke="#e8e7e3" stroke-width="1"/>
+<text x="596.0" y="134.0" font-size="10" fill="#8a8a84" text-anchor="middle">30ms</text>
+<line x1="708.0" y1="140" x2="708.0" y2="560" stroke="#e8e7e3" stroke-width="1"/>
+<text x="708.0" y="134.0" font-size="10" fill="#8a8a84" text-anchor="middle">40ms</text>
+<line x1="820.0" y1="140" x2="820.0" y2="560" stroke="#e8e7e3" stroke-width="1"/>
+<text x="820.0" y="134.0" font-size="10" fill="#8a8a84" text-anchor="middle">50ms</text>
+<text x="26.0" y="165.0" font-size="11.5" fill="#52514e">프로그램 목록</text>
+<rect x="260.0" y="153.0" width="117.6" height="10.0" rx="3" fill="#2a78d6"/>
+<rect x="260.0" y="166.0" width="43.7" height="10.0" rx="3" fill="#7a7973"/>
+<text x="387.6" y="169.0" font-size="10.5" fill="#8a8a84">10.5 / 3.9</text>
+<text x="26.0" y="197.0" font-size="11.5" fill="#52514e">회차 목록</text>
+<rect x="260.0" y="185.0" width="77.3" height="10.0" rx="3" fill="#2a78d6"/>
+<rect x="260.0" y="198.0" width="61.6" height="10.0" rx="3" fill="#7a7973"/>
+<text x="347.3" y="201.0" font-size="10.5" fill="#8a8a84">6.9 / 5.5</text>
+<text x="26.0" y="229.0" font-size="11.5" fill="#52514e">좌석맵</text>
+<rect x="260.0" y="217.0" width="256.5" height="10.0" rx="3" fill="#2a78d6"/>
+<rect x="260.0" y="230.0" width="218.4" height="10.0" rx="3" fill="#7a7973"/>
+<text x="526.5" y="233.0" font-size="10.5" fill="#8a8a84">22.9 / 19.5</text>
+<text x="26.0" y="261.0" font-size="11.5" fill="#52514e">예약 상세</text>
+<rect x="260.0" y="249.0" width="78.4" height="10.0" rx="3" fill="#2a78d6"/>
+<rect x="260.0" y="262.0" width="76.2" height="10.0" rx="3" fill="#7a7973"/>
+<text x="348.4" y="265.0" font-size="10.5" fill="#8a8a84">7.0 / 6.8</text>
+<text x="26.0" y="293.0" font-size="11.5" fill="#52514e">비회원 조회 폼</text>
+<rect x="260.0" y="281.0" width="34.7" height="10.0" rx="3" fill="#2a78d6"/>
+<rect x="260.0" y="294.0" width="44.8" height="10.0" rx="3" fill="#7a7973"/>
+<text x="314.8" y="297.0" font-size="10.5" fill="#8a8a84">3.1 / 4.0</text>
+<text x="26.0" y="325.0" font-size="11.5" fill="#52514e">비회원 조회 결과</text>
+<rect x="260.0" y="313.0" width="66.1" height="10.0" rx="3" fill="#2a78d6"/>
+<rect x="260.0" y="326.0" width="62.7" height="10.0" rx="3" fill="#7a7973"/>
+<text x="336.1" y="329.0" font-size="10.5" fill="#8a8a84">5.9 / 5.6</text>
+<text x="26.0" y="357.0" font-size="11.5" fill="#52514e">마이페이지</text>
+<rect x="260.0" y="345.0" width="68.3" height="10.0" rx="3" fill="#2a78d6"/>
+<rect x="260.0" y="358.0" width="41.4" height="10.0" rx="3" fill="#7a7973"/>
+<text x="338.3" y="361.0" font-size="10.5" fill="#8a8a84">6.1 / 3.7</text>
+<text x="26.0" y="389.0" font-size="11.5" fill="#0b0b0b" font-weight="700">관리자 예약 현황</text>
+<rect x="260.0" y="377.0" width="514.1" height="10.0" rx="3" fill="#2a78d6"/>
+<rect x="260.0" y="390.0" width="486.1" height="10.0" rx="3" fill="#7a7973"/>
+<text x="784.1" y="393.0" font-size="10.5" fill="#8a8a84">45.9 / 43.4</text>
+<text x="26.0" y="421.0" font-size="11.5" fill="#52514e">관리자 프로그램 등록</text>
+<rect x="260.0" y="409.0" width="48.2" height="10.0" rx="3" fill="#2a78d6"/>
+<rect x="260.0" y="422.0" width="42.6" height="10.0" rx="3" fill="#7a7973"/>
+<text x="318.2" y="425.0" font-size="10.5" fill="#8a8a84">4.3 / 3.8</text>
+<text x="26.0" y="453.0" font-size="11.5" fill="#52514e">관리자 회차관리</text>
+<rect x="260.0" y="441.0" width="69.4" height="10.0" rx="3" fill="#2a78d6"/>
+<rect x="260.0" y="454.0" width="61.6" height="10.0" rx="3" fill="#7a7973"/>
+<text x="339.4" y="457.0" font-size="10.5" fill="#8a8a84">6.2 / 5.5</text>
+<text x="26.0" y="485.0" font-size="11.5" fill="#52514e">좌석배치도 목록</text>
+<rect x="260.0" y="473.0" width="48.2" height="10.0" rx="3" fill="#2a78d6"/>
+<rect x="260.0" y="486.0" width="45.9" height="10.0" rx="3" fill="#7a7973"/>
+<text x="318.2" y="489.0" font-size="10.5" fill="#8a8a84">4.3 / 4.1</text>
+<text x="26.0" y="517.0" font-size="11.5" fill="#52514e">좌석배치도 상세</text>
+<rect x="260.0" y="505.0" width="183.7" height="10.0" rx="3" fill="#2a78d6"/>
+<rect x="260.0" y="518.0" width="179.2" height="10.0" rx="3" fill="#7a7973"/>
+<text x="453.7" y="521.0" font-size="10.5" fill="#8a8a84">16.4 / 16.0</text>
+<text x="26.0" y="549.0" font-size="11.5" fill="#52514e">검표 단말</text>
+<rect x="260.0" y="537.0" width="15.7" height="10.0" rx="3" fill="#2a78d6"/>
+<rect x="260.0" y="550.0" width="17.9" height="10.0" rx="3" fill="#7a7973"/>
+<text x="287.9" y="553.0" font-size="10.5" fill="#8a8a84">1.4 / 1.6</text>
+<rect x="26.0" y="582.0" width="928.0" height="58.0" rx="6" fill="#eef8f4"/>
+<text x="40.0" y="606.0" font-size="12.5" fill="#0b0b0b" font-weight="700">26개 값이 전부 기준 아래다. 가장 좁은 여백도 65배이고, 관측된 회차 간 폭(최대 5.18배)을</text>
+<text x="40.0" y="626.0" font-size="12.5" fill="#0b0b0b" font-weight="700">가장 느린 화면에 통째로 실어도 238ms — 기준의 8%다. 잡음을 실어도 뒤집히지 않는다.</text>
+<text x="26.0" y="674.0" font-size="12.5" fill="#eb6834" font-weight="700">그래도 「PER-002 충족」이라고 쓰지 않는다 — 원문이 지정한 화면 중 둘(정산확인 · 검색결과 조회)이 아예 없다.</text>
+<text x="26.0" y="694.0" font-size="11.5" fill="#8a8a84">정본: per-002-page-timing.md 3.2 무부하 · 3.3 부하 중 · 4.1 판정 · 4.2 그래도 「충족」이라 쓰지 않는 이유</text>
+</svg>
