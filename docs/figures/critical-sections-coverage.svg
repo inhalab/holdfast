@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="488" viewBox="0 0 980 488" font-family="'Malgun Gothic','Apple SD Gothic Neo',system-ui,-apple-system,'Segoe UI',sans-serif">
+<rect width="980" height="488" fill="#fcfcfb"/>
+<text x="26" y="40" font-size="20" font-weight="700" fill="#0b0b0b">임계 구역 여섯 — 무엇이 덮고 있나</text>
+<text x="26" y="66" font-size="13" fill="#52514e">«무엇을 만들었나»가 아니라 «무엇이 그것을 지키는가». 빈칸도 함께 적는다</text>
+<rect x="26" y="104" width="934" height="40" fill="#f4f3f0"/>
+<text x="38" y="129" font-size="12.5" font-weight="700" fill="#52514e"></text>
+<text x="112" y="129" font-size="12.5" font-weight="700" fill="#52514e">임계 구역</text>
+<text x="348" y="129" font-size="12.5" font-weight="700" fill="#52514e">무엇이 덮나</text>
+<text x="778" y="129" font-size="12.5" font-weight="700" fill="#52514e">상태</text>
+<rect x="26" y="144" width="934" height="50" fill="#eef8f4"/>
+<line x1="26" y1="144" x2="960" y2="144" stroke="#e8e7e3" stroke-width="1"/>
+<text x="38" y="173.5" font-size="13" fill="#0b0b0b" font-weight="700">CS-1</text>
+<text x="112" y="163.0" font-size="12.5" fill="#52514e">좌석 홀드 획득</text>
+<text x="112" y="184.0" font-size="11.5" fill="#8a8a84">seat_inventory 행</text>
+<text x="348" y="163.0" font-size="12.5" fill="#52514e">단위 경합 테스트 5전략 · 부하 60회</text>
+<text x="348" y="184.0" font-size="11.5" fill="#8a8a84">V-1 초과 확정 · V-2 초과 홀드</text>
+<text x="778" y="163.0" font-size="13" fill="#1baf7a" font-weight="700">덮였다</text>
+<text x="778" y="184.0" font-size="11.5" fill="#8a8a84">1차 측정의 본체</text>
+<rect x="26" y="194" width="934" height="50" fill="#fdf2ec"/>
+<line x1="26" y1="194" x2="960" y2="194" stroke="#cfcec9" stroke-width="1"/>
+<text x="38" y="213.0" font-size="13" fill="#0b0b0b" font-weight="700">CS-2</text>
+<text x="38" y="234.0" font-size="13" fill="#0b0b0b" font-weight="700">CS-3</text>
+<text x="112" y="213.0" font-size="12.5" fill="#52514e">확정 × TTL 만료</text>
+<text x="112" y="234.0" font-size="11.5" fill="#8a8a84">2절: «가장 자주 터진다»</text>
+<text x="348" y="213.0" font-size="12.5" fill="#52514e">확정 쿼리의 lazy 검증뿐</text>
+<text x="348" y="234.0" font-size="11.5" fill="#8a8a84">부하로 한 번도 안 밀어봤다</text>
+<text x="778" y="213.0" font-size="13" fill="#eb6834" font-weight="700">열려 있다</text>
+<text x="778" y="234.0" font-size="11.5" fill="#8a8a84">#199 — 보류로 판정</text>
+<rect x="26" y="244" width="934" height="50" fill="#eef8f4"/>
+<line x1="26" y1="244" x2="960" y2="244" stroke="#cfcec9" stroke-width="1"/>
+<text x="38" y="273.5" font-size="13" fill="#0b0b0b" font-weight="700">CS-4</text>
+<text x="112" y="263.0" font-size="12.5" fill="#52514e">취소 시 좌석 반환</text>
+<text x="112" y="284.0" font-size="11.5" fill="#8a8a84">이중 반환</text>
+<text x="348" y="263.0" font-size="12.5" fill="#52514e">단위 경합 테스트 · 부하 취소 쌍 15만</text>
+<text x="348" y="284.0" font-size="11.5" fill="#8a8a84">C-1~C-4 + 검사의 자체 확인</text>
+<text x="778" y="263.0" font-size="13" fill="#1baf7a" font-weight="700">덮였다</text>
+<text x="778" y="284.0" font-size="11.5" fill="#8a8a84">4주차 — #200</text>
+<rect x="26" y="294" width="934" height="50" fill="#f2f2f0"/>
+<line x1="26" y1="294" x2="960" y2="294" stroke="#e8e7e3" stroke-width="1"/>
+<text x="38" y="323.5" font-size="13" fill="#0b0b0b" font-weight="700">CS-5</text>
+<text x="112" y="313.0" font-size="12.5" fill="#52514e">회차 잔여 수량</text>
+<text x="112" y="334.0" font-size="11.5" fill="#8a8a84">카운터 경합</text>
+<text x="348" y="313.0" font-size="12.5" fill="#52514e">만들지 않기로 했다</text>
+<text x="348" y="334.0" font-size="11.5" fill="#8a8a84">COUNT(*)로 유도 — 핫 로우를 안 만든다</text>
+<text x="778" y="313.0" font-size="13" fill="#7a7973" font-weight="700">해당 없음</text>
+<text x="778" y="334.0" font-size="11.5" fill="#8a8a84">1절 판정</text>
+<rect x="26" y="344" width="934" height="50" fill="#eef8f4"/>
+<line x1="26" y1="344" x2="960" y2="344" stroke="#e8e7e3" stroke-width="1"/>
+<text x="38" y="373.5" font-size="13" fill="#0b0b0b" font-weight="700">CS-6</text>
+<text x="112" y="363.0" font-size="12.5" fill="#52514e">1인 최대 매수 검사</text>
+<text x="112" y="384.0" font-size="11.5" fill="#8a8a84">좌석 락이 못 막는 유일한 축</text>
+<text x="348" y="363.0" font-size="12.5" fill="#52514e">부하 요청 147만 · 할당량 거절 70%</text>
+<text x="348" y="384.0" font-size="11.5" fill="#8a8a84">Q-1~Q-3</text>
+<text x="778" y="363.0" font-size="13" fill="#1baf7a" font-weight="700">덮였다</text>
+<text x="778" y="384.0" font-size="11.5" fill="#8a8a84">3주차 — #191</text>
+<line x1="26" y1="394" x2="960" y2="394" stroke="#cfcec9" stroke-width="1"/>
+<text x="26" y="428" font-size="12.5" fill="#0b0b0b">CS-2·CS-3 을 지우지 않고 남긴다 — 「가장 자주 터진다」고 지목해 놓고 안 잰 자리다.</text>
+<text x="26" y="447" font-size="12.5" fill="#0b0b0b">보류는 못 하는 것이 아니라 «홀드 TTL 을 바꾸면 60회와 같은 표에 못 올린다»를 지금 감수하지 않는 것이다.</text>
+</svg>

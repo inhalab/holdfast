@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="480" viewBox="0 0 980 480" font-family="'Malgun Gothic','Apple SD Gothic Neo',system-ui,-apple-system,'Segoe UI',sans-serif">
+<rect width="980" height="480" fill="#fcfcfb"/>
+<text x="26" y="40" font-size="20" font-weight="700" fill="#0b0b0b">전략 다섯 — 같은 사건이 서로 다른 자리에 나타난다</text>
+<text x="26" y="66" font-size="13" fill="#52514e">앱 락이 바꾼 것은 경합이 드러나는 방식이지 정합성이 아니다</text>
+<rect x="26" y="104" width="954" height="40" fill="#f4f3f0"/>
+<text x="38" y="129" font-size="12.5" font-weight="700" fill="#52514e">전략</text>
+<text x="188" y="129" font-size="12.5" font-weight="700" fill="#52514e">배타성을 보장하는 것</text>
+<text x="518" y="129" font-size="12.5" font-weight="700" fill="#52514e">그 사건이 나타나는 곳</text>
+<text x="788" y="129" font-size="12.5" font-weight="700" fill="#52514e">고경합 3회</text>
+<rect x="26" y="144" width="954" height="50" fill="#fbf1f1"/>
+<line x1="26" y1="144" x2="980" y2="144" stroke="#e8e7e3" stroke-width="1"/>
+<text x="38" y="163.0" font-size="13" fill="#e34948" font-weight="700">none</text>
+<text x="38" y="184.0" font-size="11.5" fill="#8a8a84">대조군</text>
+<text x="188" y="163.0" font-size="12.5" fill="#52514e">없다</text>
+<text x="188" y="184.0" font-size="11.5" fill="#8a8a84">U-2 도 제거한다 — 실패 증거를 얻으려고</text>
+<text x="518" y="173.5" font-size="12.5" fill="#52514e">아무것도 안 막는다</text>
+<text x="788" y="173.5" font-size="13" fill="#e34948" font-weight="700">초과 확정 5 · 4 · 3</text>
+<line x1="26" y1="194" x2="980" y2="194" stroke="#cfcec9" stroke-width="1"/>
+<text x="38" y="223.5" font-size="13" fill="#0b0b0b" font-weight="700">pessimistic</text>
+<text x="188" y="213.0" font-size="12.5" fill="#52514e">행 락</text>
+<text x="188" y="234.0" font-size="11.5" fill="#8a8a84">SELECT ... FOR UPDATE</text>
+<text x="518" y="223.5" font-size="12.5" fill="#52514e">행 락 대기 → 대부분 즉시 거절</text>
+<text x="788" y="223.5" font-size="12.5" fill="#52514e">락 포기 0</text>
+<line x1="26" y1="244" x2="980" y2="244" stroke="#e8e7e3" stroke-width="1"/>
+<text x="38" y="271.5" font-size="13" fill="#0b0b0b" font-weight="700">optimistic</text>
+<text x="188" y="271.5" font-size="12.5" fill="#52514e">version 조건부 UPDATE + 재시도</text>
+<text x="518" y="271.5" font-size="12.5" fill="#52514e">version 충돌 → 재시도</text>
+<text x="788" y="271.5" font-size="13" fill="#0b0b0b" font-weight="700">재시도 102 · 소진 34</text>
+<line x1="26" y1="290" x2="980" y2="290" stroke="#e8e7e3" stroke-width="1"/>
+<text x="38" y="319.5" font-size="13" fill="#0b0b0b" font-weight="700">unique</text>
+<text x="188" y="309.0" font-size="12.5" fill="#52514e">U-2 부분 유니크 인덱스</text>
+<text x="188" y="330.0" font-size="11.5" fill="#8a8a84">앱 레벨 락을 전혀 안 쓴다</text>
+<text x="518" y="319.5" font-size="12.5" fill="#52514e">INSERT 충돌 → 제약 위반</text>
+<text x="788" y="319.5" font-size="13" fill="#0b0b0b" font-weight="700">제약 위반 11</text>
+<line x1="26" y1="340" x2="980" y2="340" stroke="#e8e7e3" stroke-width="1"/>
+<text x="38" y="367.5" font-size="13" fill="#0b0b0b" font-weight="700">redis</text>
+<text x="188" y="367.5" font-size="12.5" fill="#52514e">분산락 + U-2 계층 방어</text>
+<text x="518" y="367.5" font-size="12.5" fill="#52514e">분산락 대기</text>
+<text x="788" y="367.5" font-size="12.5" fill="#52514e">락 포기 0</text>
+<line x1="26" y1="386" x2="980" y2="386" stroke="#cfcec9" stroke-width="1"/>
+<text x="26" y="420" font-size="12.5" fill="#0b0b0b">넷은 초과 확정 0 — 36회 전부. unique 가 결정적이다: 앱 락을 안 쓰는데도 9회 전부 0이다.</text>
+<text x="26" y="439" font-size="12.5" fill="#0b0b0b">정합성의 최종 책임은 전략이 아니라 DB 제약(U-2)과 조건부 UPDATE 가 진다.</text>
+</svg>
