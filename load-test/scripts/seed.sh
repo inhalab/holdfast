@@ -115,4 +115,23 @@ else
   psql_run -f - < "$SQL_DIR/u2-create.sql"
 fi
 
-echo "[seed] 완료"
+# **만든 것을 세고 끝낸다**(#222).
+#
+# 여기까지 오는 동안 psql 이 오류를 안 냈다는 것과 **행이 실제로 생겼다는 것은
+# 다르다** — 조건이 안 맞아 `INSERT … SELECT` 가 0행을 넣어도 psql 은 성공이다.
+# 그러면 시드가 «완료» 를 찍고, 뒤따르는 측정과 검증이 **전부 0을 통과로**
+# 읽는다. 검증 쪽(verify.sh)에서도 막지만, **만든 쪽이 먼저 알아야** 어디가
+# 틀렸는지 가릴 수 있다.
+made="$(psql_run -tAc "SELECT COUNT(*) FROM seat_inventory WHERE session_id = $SESSION_ID" | tr -d '[:space:]')"
+if [ "${made:-0}" -eq 0 ]; then
+  echo "[seed] !! 회차 $SESSION_ID 에 좌석 재고가 0건이다 — **시드가 아무것도 안 만들었다.**" >&2
+  echo "[seed]    psql 은 오류를 안 냈다. 0행을 넣는 것은 오류가 아니기 때문이다(#222)." >&2
+  exit 5
+fi
+if [ "$made" -ne "$SEATS" ]; then
+  echo "[seed] !! 좌석 재고가 ${made}건인데 시나리오는 ${SEATS}건을 기대한다." >&2
+  echo "[seed]    이전 회차가 남았거나 재초기화가 덜 됐다. 그대로 재면 경합도가 달라진다." >&2
+  exit 5
+fi
+
+echo "[seed] 완료 — 회차 $SESSION_ID · 좌석 재고 ${made}건"
