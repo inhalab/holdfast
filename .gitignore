@@ -76,3 +76,12 @@ infra/tunnel/credentials.json
 infra/tunnel/*.json
 !infra/tunnel/credentials.example.json
 .env
+
+# --- 발표 자료 생성기의 산출물 (tools/deck) ---
+# **정본은 스크립트다**(#217). 아래는 전부 그 스크립트가 만드는 것이라
+# 커밋하지 않는다 — 넣으면 「무엇이 정본인가」가 다시 둘이 된다.
+tools/deck/build/
+tools/deck/preview/
+tools/deck/*.pptx
+__pycache__/
+*.pyc
