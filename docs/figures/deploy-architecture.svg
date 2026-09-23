@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'Malgun Gothic','Apple SD Gothic Neo',system-ui,-apple-system,'Segoe UI',sans-serif">
+<title>holdfast 배포 아키텍처</title>
+<desc>브라우저에서 Cloudflare 엣지를 거쳐 AWS 서울 리전의 ALB, Fargate 태스크 두 개, RDS로 이어지는 요청 경로. 브라우저와 엣지 사이, 엣지와 오리진 사이가 모두 HTTPS다. Cloudflare는 최건 계정, AWS는 박태준 계정으로 계정 경계가 갈린다. NAT 게이트웨이가 없고 ALB는 Cloudflare 대역만 받는다.</desc>
+<style>
+  .d-band { fill: #f2f2f0; stroke: #e8e7e3; stroke-width: 1; }
+  .d-zone { fill: none; stroke: #8a8a84; stroke-width: 1.25; stroke-dasharray: 6 5; }
+  .d-box { fill: #ffffff; stroke: #b9b8b3; stroke-width: 1.5; }
+  .d-box-accent { fill: #ffffff; stroke: #2a78d6; stroke-width: 2; }
+  .d-flow { stroke: #2a78d6; stroke-width: 2; fill: none; }
+  .d-aux { stroke: #8a8a84; stroke-width: 1.5; fill: none; stroke-dasharray: 5 5; }
+
+  text { fill: #0b0b0b; }
+  .t-zone { font-size: 17px; font-weight: 700; fill: #8a8a84; letter-spacing: .04em; }
+  .t-name { font-size: 20px; font-weight: 700; }
+  .t-big  { font-size: 22px; font-weight: 700; }
+  .t-sub  { font-size: 16px; fill: #52514e; }
+  .t-edge { font-size: 16px; fill: #2a78d6; font-weight: 600; }
+  .t-edge-aux { font-size: 15px; fill: #8a8a84; }
+  .t-meta { font-size: 15px; fill: #8a8a84; }
+  .t-flag { font-size: 16px; fill: #e34948; font-weight: 600; }
+  .t-ok   { font-size: 16px; fill: #1baf7a; font-weight: 600; }
+</style>
+
+<rect width="1600" height="900" fill="#fcfcfb"/>
+
+<!-- ══ 왼쪽: 클라이언트와 Cloudflare ══ -->
+<rect class="d-box" x="180" y="180" width="320" height="76" rx="8"/>
+<text class="t-big" x="340" y="226" text-anchor="middle">브라우저</text>
+
+<line class="d-flow" x1="340" y1="256" x2="340" y2="330" marker-end="url(#ah)"/>
+<text class="t-edge" x="354" y="300">HTTPS :443</text>
+
+<rect class="d-zone" x="20" y="336" width="640" height="336" rx="12"/>
+<text class="t-zone" x="44" y="372">CLOUDFLARE — 최건 계정</text>
+<text class="t-meta" x="636" y="372" text-anchor="end">inhalab.cloud</text>
+
+<rect class="d-box" x="48" y="392" width="276" height="116" rx="8"/>
+<text class="t-name" x="186" y="426" text-anchor="middle">app.inhalab.cloud</text>
+<text class="t-ok" x="186" y="454" text-anchor="middle">공개 — 사용자 화면</text>
+<text class="t-sub" x="186" y="480" text-anchor="middle">좌석맵 · 예약 · 검표</text>
+
+<rect class="d-box-accent" x="336" y="392" width="276" height="116" rx="8"/>
+<text class="t-name" x="474" y="426" text-anchor="middle">admin.inhalab.cloud</text>
+<text class="t-flag" x="474" y="454" text-anchor="middle">Cloudflare Access</text>
+<text class="t-sub" x="474" y="480" text-anchor="middle">이메일 인증 — 앱은 모른다</text>
+
+<text class="t-meta" x="340" y="552" text-anchor="middle">SSL/TLS = Full (strict)</text>
+<text class="t-ok" x="340" y="582" text-anchor="middle">브라우저↔엣지와 엣지↔오리진이 둘 다 암호화된다</text>
+<text class="t-sub" x="340" y="610" text-anchor="middle">이번 주에 Full 에서 Full (strict) 로 고정했다</text>
+
+<line class="d-flow" x1="660" y1="470" x2="700" y2="470" marker-end="url(#ah)"/>
+
+<!-- 왼쪽 아래: 그림이 혼자 못 하는 말 -->
+<text class="t-name" x="24" y="726">계정 경계가 갈린다</text>
+<text class="t-sub" x="24" y="756">도메인은 최건 계정, 리소스는 박태준 계정이다.</text>
+<text class="t-sub" x="24" y="782">그래서 «사람이 CNAME 을 넣는 자리»를 코드로 옮겼다.</text>
+<text class="t-name" x="24" y="830">TLS 는 두 번 끝난다</text>
+<text class="t-sub" x="24" y="858">엣지에서 한 번, ALB 에서 한 번.</text>
+<text class="t-sub" x="24" y="882">그 사이는 이번에 처음 생겼고, 처음부터 암호화됐다.</text>
+
+<!-- ══ 오른쪽: AWS ══ -->
+<rect class="d-zone" x="700" y="60" width="880" height="800" rx="12"/>
+<text class="t-zone" x="724" y="96">AWS — 박태준 계정</text>
+<text class="t-meta" x="1556" y="96" text-anchor="end">ap-northeast-2 (서울)</text>
+
+<rect class="d-box" x="728" y="116" width="824" height="68" rx="8"/>
+<text class="t-name" x="1140" y="146" text-anchor="middle" xml:space="preserve">ACM 인증서   *.inhalab.cloud</text>
+<text class="t-sub" x="1140" y="172" text-anchor="middle">와일드카드 하나 · 무료 · 검증 CNAME 도 Terraform 이 Cloudflare 에 넣는다</text>
+
+<rect class="d-band" x="728" y="204" width="824" height="500" rx="10"/>
+<text class="t-zone" x="752" y="238">VPC 10.42.0.0/16 · 퍼블릭 서브넷 2AZ</text>
+<text class="t-flag" x="1528" y="238" text-anchor="end">NAT Gateway 없음</text>
+
+<line class="d-aux" x1="1200" y1="184" x2="1200" y2="252" marker-end="url(#ah-aux)"/>
+<text class="t-edge-aux" x="1214" y="226">리스너에 붙는다</text>
+
+<rect class="d-box-accent" x="768" y="252" width="744" height="96" rx="8"/>
+<text class="t-big" x="1140" y="284" text-anchor="middle">Application Load Balancer :443</text>
+<text class="t-flag" x="1140" y="310" text-anchor="middle">보안그룹: Cloudflare 대역 15개만 허용</text>
+<text class="t-sub" x="1140" y="334" text-anchor="middle">:80 은 301 로 :443 에 넘긴다 · 직행하면 502 가 아니라 무응답이다</text>
+
+<path class="d-flow" d="M 1000 348 L 1000 378 L 900 378 L 900 404" marker-end="url(#ah)"/>
+<path class="d-flow" d="M 1280 348 L 1280 378 L 1380 378 L 1380 404" marker-end="url(#ah)"/>
+<text class="t-edge" x="1140" y="374" text-anchor="middle">:8080</text>
+<text class="t-edge-aux" x="1140" y="398" text-anchor="middle">헬스체크 /api/health — actuator 가 아니다</text>
+
+<rect class="d-box" x="760" y="404" width="280" height="112" rx="8"/>
+<text class="t-name" x="900" y="438" text-anchor="middle">Fargate 태스크 A</text>
+<text class="t-sub" x="900" y="464" text-anchor="middle">1 vCPU / 2 GB · 퍼블릭 IP</text>
+<text class="t-meta" x="900" y="494" text-anchor="middle">배지 04d65c9a</text>
+
+<rect class="d-box" x="1240" y="404" width="280" height="112" rx="8"/>
+<text class="t-name" x="1380" y="438" text-anchor="middle">Fargate 태스크 B</text>
+<text class="t-sub" x="1380" y="464" text-anchor="middle">1 vCPU / 2 GB · 퍼블릭 IP</text>
+<text class="t-meta" x="1380" y="494" text-anchor="middle">배지 a320016f</text>
+
+<text class="t-sub" x="1140" y="438" text-anchor="middle">태스크 정의 하나를</text>
+<text class="t-sub" x="1140" y="464" text-anchor="middle">desired_count 2 로</text>
+<text class="t-meta" x="1140" y="494" text-anchor="middle">배지는 메타데이터에서</text>
+
+<path class="d-flow" d="M 900 516 L 900 550 L 1050 550 L 1050 578" marker-end="url(#ah)"/>
+<path class="d-flow" d="M 1380 516 L 1380 550 L 1230 550 L 1230 578" marker-end="url(#ah)"/>
+<text class="t-edge" x="1140" y="544" text-anchor="middle">:5432</text>
+<text class="t-edge-aux" x="1140" y="572" text-anchor="middle">FOR UPDATE</text>
+
+<rect class="d-box-accent" x="960" y="578" width="360" height="112" rx="8"/>
+<text class="t-big" x="1140" y="610" text-anchor="middle">RDS PostgreSQL 18</text>
+<text class="t-sub" x="1140" y="636" text-anchor="middle">db.t3.micro · Single-AZ · 앱에서만 받는다</text>
+<text class="t-ok" x="1140" y="662" text-anchor="middle">두 태스크가 이 좌석 행에서 만난다</text>
+<text class="t-meta" x="1140" y="684" text-anchor="middle">좌석 재고 · U-2 유니크 인덱스</text>
+
+<line class="d-aux" x1="860" y1="704" x2="860" y2="744" marker-end="url(#ah-aux)"/>
+<line class="d-aux" x1="1140" y1="704" x2="1140" y2="744" marker-end="url(#ah-aux)"/>
+<line class="d-aux" x1="1420" y1="704" x2="1420" y2="744" marker-end="url(#ah-aux)"/>
+
+<rect class="d-box" x="728" y="744" width="264" height="80" rx="8"/>
+<text class="t-name" x="860" y="778" text-anchor="middle">ECR</text>
+<text class="t-sub" x="860" y="802" text-anchor="middle">앱 이미지 · 최근 10개</text>
+
+<rect class="d-box" x="1008" y="744" width="264" height="80" rx="8"/>
+<text class="t-name" x="1140" y="778" text-anchor="middle">SSM Parameter Store</text>
+<text class="t-sub" x="1140" y="802" text-anchor="middle">DB 비밀번호 · SecureString</text>
+
+<rect class="d-box" x="1288" y="744" width="264" height="80" rx="8"/>
+<text class="t-name" x="1420" y="778" text-anchor="middle">CloudWatch Logs</text>
+<text class="t-sub" x="1420" y="802" text-anchor="middle">보존 1일</text>
+
+<text class="t-meta" x="1140" y="850" text-anchor="middle">전략은 환경변수 하나로 갈린다 — 같은 이미지가 다섯 중 하나로 뜬다</text>
+
+<defs>
+  <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M 0 1 L 10 5 L 0 9 z" fill="#2a78d6"/>
+  </marker>
+  <marker id="ah-aux" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M 0 1 L 10 5 L 0 9 z" fill="#8a8a84"/>
+  </marker>
+</defs>
+</svg>
