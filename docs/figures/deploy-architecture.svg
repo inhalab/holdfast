@@ -46,7 +46,7 @@
 
 <text class="t-meta" x="340" y="552" text-anchor="middle">SSL/TLS = Full (strict)</text>
 <text class="t-ok" x="340" y="582" text-anchor="middle">브라우저↔엣지와 엣지↔오리진이 둘 다 암호화된다</text>
-<text class="t-sub" x="340" y="610" text-anchor="middle">이번 주에 Full 에서 Full (strict) 로 고정했다</text>
+<text class="t-sub" x="340" y="610" text-anchor="middle">자동 모드를 끔다 — 엣지가 오리진 인증서를 검증한다</text>
 
 <line class="d-flow" x1="660" y1="470" x2="700" y2="470" marker-end="url(#ah)"/>
 
@@ -56,7 +56,7 @@
 <text class="t-sub" x="24" y="782">그래서 «사람이 CNAME 을 넣는 자리»를 코드로 옮겼다.</text>
 <text class="t-name" x="24" y="830">TLS 는 두 번 끝난다</text>
 <text class="t-sub" x="24" y="858">엣지에서 한 번, ALB 에서 한 번.</text>
-<text class="t-sub" x="24" y="882">그 사이는 이번에 처음 생겼고, 처음부터 암호화됐다.</text>
+<text class="t-sub" x="24" y="882">그 사이 구간도 처음부터 암호화돼 있다.</text>
 
 <!-- ══ 오른쪽: AWS ══ -->
 <rect class="d-zone" x="700" y="60" width="880" height="800" rx="12"/>
@@ -76,7 +76,7 @@
 
 <rect class="d-box-accent" x="768" y="252" width="744" height="96" rx="8"/>
 <text class="t-big" x="1140" y="284" text-anchor="middle">Application Load Balancer :443</text>
-<text class="t-flag" x="1140" y="310" text-anchor="middle">보안그룹: Cloudflare 대역 15개만 허용</text>
+<text class="t-flag" x="1140" y="310" text-anchor="middle">보안그룹: Cloudflare 게시 대역만 허용</text>
 <text class="t-sub" x="1140" y="334" text-anchor="middle">:80 은 301 로 :443 에 넘긴다 · 직행하면 502 가 아니라 무응답이다</text>
 
 <path class="d-flow" d="M 1000 348 L 1000 378 L 900 378 L 900 404" marker-end="url(#ah)"/>
@@ -87,12 +87,12 @@
 <rect class="d-box" x="760" y="404" width="280" height="112" rx="8"/>
 <text class="t-name" x="900" y="438" text-anchor="middle">Fargate 태스크 A</text>
 <text class="t-sub" x="900" y="464" text-anchor="middle">1 vCPU / 2 GB · 퍼블릭 IP</text>
-<text class="t-meta" x="900" y="494" text-anchor="middle">배지 04d65c9a</text>
+<text class="t-meta" x="900" y="494" text-anchor="middle">배지 — 태스크마다 다르다</text>
 
 <rect class="d-box" x="1240" y="404" width="280" height="112" rx="8"/>
 <text class="t-name" x="1380" y="438" text-anchor="middle">Fargate 태스크 B</text>
 <text class="t-sub" x="1380" y="464" text-anchor="middle">1 vCPU / 2 GB · 퍼블릭 IP</text>
-<text class="t-meta" x="1380" y="494" text-anchor="middle">배지 a320016f</text>
+<text class="t-meta" x="1380" y="494" text-anchor="middle">배지 — 화면이 이걸 보인다</text>
 
 <text class="t-sub" x="1140" y="438" text-anchor="middle">태스크 정의 하나를</text>
 <text class="t-sub" x="1140" y="464" text-anchor="middle">desired_count 2 로</text>
