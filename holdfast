@@ -613,9 +613,19 @@ TUNNEL_PROBES="${TUNNEL_PROBES:-demo-none.inhalab.cloud/ demo-pess.inhalab.cloud
 # 세션이 없다. 그쪽은 리허설에서 브라우저로 확인한다 — 이 함수가 지키는 것은
 # **"밖에서 아무나 들어오느냐"** 한 겹이다.
 tunnel_verify() {
-  local probe host path code redirect body failed=0
+  local probe host path code redirect body failed=0 checked=0
+  # **볼 것이 없으면 실패다**(#222). TUNNEL_PROBES 를 비우면 루프가 0바퀴 돌고
+  # 아래 «확인 통과» 가 그대로 찍힌다 — **아무것도 안 보고 초록이다.**
+  # #186 이 이 함수를 fail-by-default 로 고쳤는데, 그때 «목록이 비는 경우»는
+  # 범위 밖이었다.
+  if [ -z "${TUNNEL_PROBES// /}" ]; then
+    echo "[holdfast] !! TUNNEL_PROBES 가 비어 있다 — **확인할 것이 없다.**" >&2
+    echo "[holdfast]    통과로 찍지 않는다. 볼 대상이 없는 것은 통과가 아니다(#222)." >&2
+    return 1
+  fi
   echo "[holdfast] 밖에서 확인한다 — 인증 없이 앱이 나오면 실패다."
   for probe in $TUNNEL_PROBES; do
+    checked=$((checked + 1))
     host="${probe%%/*}"; path="/${probe#*/}"; [ "$host" = "$probe" ] && path=/
     # **`|| echo 000` 을 쓰지 않는다.** curl은 실패해도 `%{http_code}` 로 `000` 을
     # 이미 찍으므로, 거기에 또 붙이면 `000000` 이 되어 분기를 빠져나간다.
@@ -651,16 +661,35 @@ tunnel_verify() {
         echo "[holdfast]   $host$path  $code — 정상 (앱에 못 닿는다)" ;;
     esac
   done
-  [ "$failed" = "0" ] && { echo "[holdfast] 확인 통과."; return 0; }
+  # **몇 개를 봤는지 같이 찍는다.** 「통과」만 찍으면 0건 통과와 구분이 안 된다.
+  if [ "$failed" = "0" ]; then
+    echo "[holdfast] 확인 통과 — ${checked}곳을 봤다."
+    return 0
+  fi
   return 1
 }
 
 # 떠 있는 시연 스택 이름들. **서브셸이라 use_stack의 export가 새지 않는다.**
+# **이 함수는 «떠 있나»를 판정하지 않는다. «떠 있는 것의 이름»을 찍는다.**
+#
+# 그래서 **아무것도 안 떠 있는 것은 실패가 아니다** — 빈 문자열이 답이다.
+# 한때 루프 마지막 문장이 `[ -n … ] && printf` 여서 **아무것도 없으면 함수가
+# 1을 반환**했고, 부르는 쪽의 `up="$(demo_stacks_up)"` 가 그 1을 물려받아
+# `set -e` 가 **거기서 조용히 죽였다**(#222).
+#
+# **증상이 고약한 방향이었다** — 가드가 「통과시켜야 할 때」 정확히 죽는다.
+# `./holdfast deadlock pessimistic` 이 **출력 한 줄 없이 exit 1** 이었고,
+# `tunnel up` 은 «시연 스택이 안 떠 있다»를 말해야 할 자리에서 말없이 끝났다.
+# #184·#186 과 같은 부류다 — **검증 도구가 조용히 아무 일도 안 한다.**
+#
+# `if` 로 쓰는 것이 고침이다. 조건이 거짓이어도 `if` 문 자체는 0이다.
 demo_stacks_up() {
   (
     for st in $DEMO_STACKS; do
       use_stack "$st" || continue
-      [ -n "$(docker compose ps -q 2>/dev/null)" ] && printf '%s ' "$COMPOSE_PROJECT_NAME"
+      if [ -n "$(docker compose ps -q 2>/dev/null)" ]; then
+        printf '%s ' "$COMPOSE_PROJECT_NAME"
+      fi
     done
   )
 }
@@ -687,7 +716,9 @@ refuse_if_measure_up() {
 refuse_if_demo_up() {
   local up
   up="$(demo_stacks_up)"
-  [ -z "$up" ] && return 0
+  # **`[ … ] && return 0` 으로 쓰지 않는다.** 그 꼴은 조건이 거짓일 때 문장
+  # 전체가 1이 되어, 자리가 조금만 바뀌면 `set -e` 에 걸린다(#222).
+  if [ -z "$up" ]; then return 0; fi
   echo "[holdfast] !! 시연 스택이 떠 있다: $up" >&2
   echo "[holdfast]    측정은 한 스택에서만 한다. 포트가 갈려도 CPU·메모리를" >&2
   echo "[holdfast]    나눠 쓰면 7.3의 고정 변수가 통제되지 않는다." >&2
