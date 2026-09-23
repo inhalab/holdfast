@@ -276,6 +276,67 @@ aws_test_cidr_guard() {  # $1 = plan 파일
   echo "[holdfast]    계속한다 — 확인이 끝나면 비우고 다시 apply 한다." >&2
 }
 
+# **전체 단계는 apply 앞에서 한 번 묻는다**(#212).
+#
+# 사고는 이랬다 — `./holdfast aws up` 을 «단계 목록이나 보자»로 불렀다. **기본값이
+# app(전체)** 이고 up 은 plan 을 파일로 뽑아 곧장 apply 하므로 확인을 받는 자리가
+# 없다. 전체 스택이 서기 시작했고 중간에 terraform 을 죽이자 **state 에 기록되기
+# 전에 만들어진 RDS 가 남았다.** destroy 는 모르는 것을 못 지운다.
+#
+# **#212 는 «인자 없는 up 만» 으로 적었는데 그보다 넓게 잡았다.** 위험한 것은
+# «인자를 안 쳤다»가 아니라 **«전체 스택이 선다»** 다. `up app` 이라고 또박또박
+# 쳐도 같은 돈이 나가고 같은 사고가 난다. 좁게 잡으면 **게이트를 지나지 않는
+# 철자가 하나 생기고**, 그것이 하필 문서에 적힌 형태다.
+#
+# **칠 말은 단계 이름이다.** 인자를 안 쳐서 여기 온 것이므로 그 인자를 치게 한다.
+# 아무 글자나 받으면 손가락이 먼저 움직이고, 그때 게이트는 없는 것과 같다.
+aws_up_confirm() {  # $1 = 단계, $2 = plan 파일, $3 = -target 개수
+  local stage="$1" plan="$2" ntargets="$3" body add answer addr label r
+
+  # **«app 이냐»가 아니라 «targets 가 비었냐»로 판정한다.** 빈 targets 가 곧
+  # 전체 apply 이고, 그것이 실제로 돈이 나가는 조건이다. 단계 이름으로 물으면
+  # 이름이 하나 늘 때마다 게이트를 같이 고쳐야 하고, 안 고치면 조용히 새 구멍이
+  # 생긴다 — **조건을 이름이 아니라 결과에 묶는다.**
+  [ "$ntargets" -eq 0 ] || return 0
+  if [ "${AWS_UP_YES:-}" = "1" ]; then
+    echo "[holdfast]    --yes 가 있다 — 확인을 건너뛴다(#212)." >&2
+    return 0
+  fi
+
+  body="$(tf show -no-color "$plan" 2>/dev/null || true)"
+  add="$(printf '%s\n' "$body" | grep -cE '# .* will be created' || true)"
+
+  echo >&2
+  echo "[holdfast] ── 전체 단계다. apply 앞에서 한 번 묻는다(#212). ──" >&2
+  echo "[holdfast]    만들 리소스 ${add}개. 그중 과금되는 것:" >&2
+  # **이름을 읽어서 세지 않고 아는 것만 짚는다.** plan 전체를 훑어 «과금될
+  # 법한 것»을 추리면 새 리소스가 들어올 때마다 조용히 틀린다. 셋만 짚고
+  # 위의 «리소스 N개»가 나머지를 대신 말하게 둔다.
+  for r in "aws_lb.main|ALB" \
+           "aws_ecs_service.app|Fargate 태스크 2대" \
+           "aws_db_instance.main|RDS db.t3.micro"; do
+    addr="${r%%|*}"; label="${r##*|}"
+    if printf '%s\n' "$body" | grep -q "# ${addr} will be created"; then
+      echo "[holdfast]      · $label" >&2
+    fi
+  done
+  echo "[holdfast]    시간당 약 \$$AWS_HOURLY — 3시간 약 \$$(aws_cost_so_far 3) · 24시간 약 \$$(aws_cost_so_far 24)." >&2
+  echo "[holdfast]    Budgets 경보는 8~12시간 늦게 온다. 방어는 down 뿐이다." >&2
+  echo "[holdfast]    **apply 를 중간에 죽이지 않는다.** 죽이면 state 밖에 리소스가" >&2
+  echo "[holdfast]    남을 수 있고 destroy 가 그것을 못 본다 — 그때는 aws status 로" >&2
+  echo "[holdfast]    «돈이 나가나»를 직접 확인한다(#212)." >&2
+  echo >&2
+
+  if [ ! -t 0 ]; then
+    echo "[holdfast] !! 대화형이 아니라 여기서 멈춘다. 자동화라면 --yes 를 준다." >&2
+    exit 1
+  fi
+  printf '[holdfast]    계속하려면 «%s» 를 친다: ' "$stage" >&2
+  answer=""
+  read -r answer || answer=""
+  [ "$answer" = "$stage" ] || { echo "[holdfast]    멈춘다 — 아무것도 서지 않았다." >&2; exit 1; }
+}
+
 # **destroy 가 tfvars 를 지우지 않는다**(#218 (b)).
 #
 # 리소스를 내려도 값은 남고 **다음 apply 가 그것을 그대로 쓴다.** 내린 뒤에
@@ -475,9 +536,11 @@ holdfast — 실행 진입점
 
 AWS 배포 (#42)
   aws push             이미지를 빌드해 ECR 에 민다
-  aws up [단계]        apply. 단계는 net|data|edge|app 이고 기본은 app(전체)
+  aws up [단계] [--yes]  apply. 단계는 net|data|edge|app 이고 기본은 app(전체)
                        edge 는 ALB · 인증서 · DNS 만 — TLS 확인용, 앱도 DB도 안 선다
                        **비싼 것이 뒤다** — net 은 과금이 없고 data 부터 돈이 든다
+                       **전체(app)는 apply 앞에서 한 번 묻는다**(#212). 단계를
+                       지정한 net|data|edge 는 그대로 간다. --yes 로 건너뛴다
   aws status           떠 있나 · 몇 시간째 · 지금까지 얼마
   aws down             destroy 하고 **태그로** 남은 것을 확인한다
   aws url              화면 주소
@@ -973,8 +1036,34 @@ EOF
 
       up)
         aws_profile_guard
-        stage="${1:-app}"
-        mapfile -t targets < <(aws_stage_targets "$stage")
+        # **단계와 --yes 를 따로 받는다.** 순서를 안 가린다 — `up --yes`,
+        # `up app --yes`, `up --yes app` 이 같은 뜻이다. 모르는 옵션은 거부한다:
+        # `--force` 같은 것을 조용히 단계 이름으로 먹으면 «모르는 단계» 라는
+        # 엉뚱한 자리에서 죽는다.
+        stage=""
+        AWS_UP_YES="${AWS_UP_YES:-}"
+        for a in "$@"; do
+          case "$a" in
+            --yes) AWS_UP_YES=1 ;;
+            -*) echo "[holdfast] !! 모르는 옵션: $a" >&2; exit 2 ;;
+            *)
+              if [ -n "$stage" ]; then
+                echo "[holdfast] !! 단계는 하나만 준다 — $stage 와 $a 가 같이 왔다." >&2
+                exit 2
+              fi
+              stage="$a" ;;
+          esac
+        done
+        stage="${stage:-app}"
+
+        # **프로세스 치환으로 받으면 안 된다.** `mapfile -t x < <(f)` 는 f 가
+        # `exit 2` 로 죽어도 **mapfile 이 성공**한다 — 서브셸만 죽기 때문이다.
+        # 그러면 «알 수 없는 단계» 를 찍어 놓고 **targets 가 빈 채로 계속 가고,
+        # 빈 targets 는 곧 전체 apply 다.** 오타 하나가 전체 스택을 세운다.
+        # #212 가 말한 구멍의 다른 입구라 여기서 같이 막는다.
+        if ! targets_raw="$(aws_stage_targets "$stage")"; then exit 2; fi
+        targets=()
+        if [ -n "$targets_raw" ]; then mapfile -t targets <<< "$targets_raw"; fi
 
         # **plan 을 파일로 뽑아 그것을 apply 한다.** plan 과 apply 사이에 구성이
         # 바뀌면 확인한 것과 다른 것이 서는데, NAT 검사가 그 사이에 있으므로
@@ -983,6 +1072,9 @@ EOF
         tf plan -no-color -out=".tfplan" "${targets[@]}"
         aws_nat_guard ".tfplan"
         aws_test_cidr_guard ".tfplan"
+        # **확인은 시계보다 앞이다.** 여기서 멈추면 아무것도 안 섰으므로 시계를
+        # 켤 이유가 없다. 뒤에 두면 «거절했는데 status 가 떠 있다고 답하는» 상태가 된다.
+        aws_up_confirm "$stage" ".tfplan" "${#targets[@]}"
 
         # **시계를 apply 앞에서 켠다.** 한때 뒤에서 켰는데, apply 가 중간에 죽으면
         # **과금되는 리소스는 서 있고 시계는 안 켜진 상태**가 된다 — 실제로 한 번
