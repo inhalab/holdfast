@@ -46,14 +46,14 @@
 
 <text class="t-meta" x="340" y="552" text-anchor="middle">SSL/TLS = Full (strict)</text>
 <text class="t-ok" x="340" y="582" text-anchor="middle">브라우저↔엣지와 엣지↔오리진이 둘 다 암호화된다</text>
-<text class="t-sub" x="340" y="610" text-anchor="middle">자동 모드를 끔다 — 엣지가 오리진 인증서를 검증한다</text>
+<text class="t-sub" x="340" y="610" text-anchor="middle">자동 모드를 끈다 — 엣지가 오리진 인증서를 검증한다</text>
 
 <line class="d-flow" x1="660" y1="470" x2="700" y2="470" marker-end="url(#ah)"/>
 
 <!-- 왼쪽 아래: 그림이 혼자 못 하는 말 -->
 <text class="t-name" x="24" y="726">계정 경계가 갈린다</text>
 <text class="t-sub" x="24" y="756">도메인은 최건 계정, 리소스는 박태준 계정이다.</text>
-<text class="t-sub" x="24" y="782">그래서 «사람이 CNAME 을 넣는 자리»를 코드로 옮겼다.</text>
+<text class="t-sub" x="24" y="782">그래서 '사람이 CNAME 을 넣는 자리'를 코드로 옮겼다.</text>
 <text class="t-name" x="24" y="830">TLS 는 두 번 끝난다</text>
 <text class="t-sub" x="24" y="858">엣지에서 한 번, ALB 에서 한 번.</text>
 <text class="t-sub" x="24" y="882">그 사이 구간도 처음부터 암호화돼 있다.</text>
