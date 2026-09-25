@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'Malgun Gothic','Apple SD Gothic Neo',system-ui,-apple-system,'Segoe UI',sans-serif">
+<title>전 구간 기동 — 확인 다섯이 각각 어디까지 닿았나</title>
+<desc>요청 다섯이 Cloudflare 엣지, ALB, Fargate 태스크 두 대 중 어디까지 닿고 어디서 멈췄는지. app 은 200 으로 태스크까지 닿고 24회가 12 대 12 로 갈렸다. admin 은 엣지의 Access 에서 302, http 는 앱에 닿기 전에 301, ALB 직행은 보안그룹에서 무응답 000.</desc>
+<rect width="1600" height="900" fill="#fcfcfb"/>
+<defs>
+<marker id="aB" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0,0 L9,4 L0,8 z" fill="#2a78d6"/></marker>
+<marker id="aG" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0,0 L9,4 L0,8 z" fill="#1baf7a"/></marker>
+<marker id="aR" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0,0 L9,4 L0,8 z" fill="#e34948"/></marker>
+<marker id="aN" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0,0 L9,4 L0,8 z" fill="#7a7973"/></marker>
+</defs>
+<text x="48" y="70" font-size="34" fill="#0b0b0b" font-weight="700">전 구간 기동 — 확인 다섯이 각각 어디까지 닿았나</text>
+<text x="48" y="110" font-size="19" fill="#52514e">2026-09-23, 엣지와 오리진을 같은 순간에 세우고 쟀다. 그 전에는 둘을 따로 봐서 app 의 성공 신호가 503 이었다</text>
+<rect x="470" y="146" width="290" height="590" rx="12" fill="#f2f2f0"/>
+<text x="488" y="180" font-size="21" fill="#0b0b0b" font-weight="700">Cloudflare 엣지</text>
+<text x="488" y="206" font-size="15" fill="#8a8a84">최건 계정</text>
+<rect x="800" y="146" width="270" height="590" rx="12" fill="#f2f2f0"/>
+<text x="818" y="180" font-size="21" fill="#0b0b0b" font-weight="700">ALB</text>
+<text x="818" y="206" font-size="15" fill="#8a8a84">박태준 계정 · AWS 서울</text>
+<rect x="1110" y="146" width="442" height="590" rx="12" fill="#f2f2f0"/>
+<text x="1128" y="180" font-size="21" fill="#0b0b0b" font-weight="700">Fargate 태스크 2대</text>
+<text x="1128" y="206" font-size="15" fill="#8a8a84">태스크 정의 하나 · desired_count 2</text>
+<text x="48" y="180" font-size="21" fill="#0b0b0b" font-weight="700">요청</text>
+<text x="48" y="266" font-size="20" fill="#0b0b0b" font-weight="700">https://app.inhalab.cloud</text>
+<text x="48" y="292" font-size="15" fill="#8a8a84">좌석 화면</text>
+<path d="M330 270 H1150" fill="none" stroke="#2a78d6" stroke-width="3" marker-end="url(#aB)"/>
+<rect x="1168" y="244" width="88" height="48" rx="24" fill="#eef8f4" stroke="#1baf7a" stroke-width="2"/>
+<text x="1212" y="279" font-size="28" fill="#1baf7a" font-weight="700" text-anchor="middle">200</text>
+<text x="1270" y="268" font-size="17" fill="#0b0b0b" font-weight="700">좌석 화면이 렌더됐다</text>
+<text x="1270" y="292" font-size="15" fill="#8a8a84">/api/health: db up · redis down</text>
+<text x="48" y="358" font-size="20" fill="#0b0b0b" font-weight="700">같은 주소 24회</text>
+<text x="48" y="384" font-size="15" fill="#8a8a84">어느 태스크가 받았나 — 화면의 배지</text>
+<path d="M330 362 H1000" fill="none" stroke="#2a78d6" stroke-width="3"/>
+<path d="M1000 362 C 1060 362, 1100 336, 1150 336" fill="none" stroke="#2a78d6" stroke-width="3" marker-end="url(#aB)"/>
+<path d="M1000 362 C 1060 362, 1100 388, 1150 388" fill="none" stroke="#2a78d6" stroke-width="3" marker-end="url(#aB)"/>
+<text x="1162" y="342" font-size="17" fill="#0b0b0b" font-weight="700">A  1be8c479</text>
+<text x="1162" y="395" font-size="17" fill="#0b0b0b" font-weight="700">B  51730cc8</text>
+<rect x="1318" y="340" width="153" height="48" rx="24" fill="#eef8f4" stroke="#1baf7a" stroke-width="2"/>
+<text x="1394" y="375" font-size="28" fill="#1baf7a" font-weight="700" text-anchor="middle">12 : 12</text>
+<text x="1318" y="418" font-size="15" fill="#8a8a84">앱이 정말 두 대다</text>
+<text x="48" y="466" font-size="20" fill="#0b0b0b" font-weight="700">https://admin.inhalab.cloud</text>
+<text x="48" y="492" font-size="15" fill="#8a8a84">관리자 화면</text>
+<path d="M330 470 H578" fill="none" stroke="#7a7973" stroke-width="3" marker-end="url(#aN)"/>
+<rect x="588" y="444" width="88" height="48" rx="24" fill="#eef4fc" stroke="#2a78d6" stroke-width="2"/>
+<text x="632" y="479" font-size="28" fill="#2a78d6" font-weight="700" text-anchor="middle">302</text>
+<line x1="690" y1="436" x2="690" y2="504" stroke="#e34948" stroke-width="6" stroke-linecap="round"/>
+<text x="698" y="430" font-size="15" fill="#e34948" font-weight="700">Access</text>
+<text x="330" y="504" font-size="15" fill="#8a8a84">→ Access 로그인으로 — 앱은 모른다</text>
+<text x="48" y="558" font-size="20" fill="#0b0b0b" font-weight="700">http://app.inhalab.cloud</text>
+<text x="48" y="584" font-size="15" fill="#8a8a84">평문으로 들어온 요청</text>
+<path d="M330 562 H650" fill="none" stroke="#7a7973" stroke-width="3" marker-end="url(#aN)"/>
+<rect x="660" y="536" width="88" height="48" rx="24" fill="#eef4fc" stroke="#2a78d6" stroke-width="2"/>
+<text x="704" y="571" font-size="28" fill="#2a78d6" font-weight="700" text-anchor="middle">301</text>
+<path d="M758 528 h26 v68 h-26" fill="none" stroke="#e34948" stroke-width="3"/>
+<text x="330" y="596" font-size="15" fill="#8a8a84">→ https 로 — 앱에 닿기 전에 되돌린다</text>
+<text x="48" y="650" font-size="20" fill="#0b0b0b" font-weight="700">ALB 주소로 직행</text>
+<text x="48" y="676" font-size="15" fill="#8a8a84">엣지를 거치지 않는 요청</text>
+<path d="M330 654 H778" fill="none" stroke="#e34948" stroke-width="3" stroke-dasharray="8 7" marker-end="url(#aR)"/>
+<text x="480" y="642" font-size="15" fill="#e34948">엣지를 거치지 않는다</text>
+<line x1="792" y1="620" x2="792" y2="688" stroke="#e34948" stroke-width="6" stroke-linecap="round"/>
+<text x="810" y="614" font-size="15" fill="#e34948" font-weight="700">보안그룹</text>
+<rect x="830" y="628" width="88" height="48" rx="24" fill="#fbf1f1" stroke="#e34948" stroke-width="2"/>
+<text x="874" y="663" font-size="28" fill="#e34948" font-weight="700" text-anchor="middle">000</text>
+<text x="932" y="652" font-size="17" fill="#0b0b0b" font-weight="700">무응답 — 502 도 아니다</text>
+<text x="932" y="676" font-size="15" fill="#8a8a84">보안그룹이 Cloudflare 대역만 받는다</text>
+<rect x="48" y="764" width="1504" height="62" rx="10" fill="#eef8f4"/>
+<text x="70" y="794" font-size="20" fill="#0b0b0b" font-weight="700">내린 뒤 — 66 destroyed · 과금되는 리소스 0</text>
+<text x="70" y="816" font-size="15" fill="#52514e">태그 목록이 아니라 AWS 에 직접 물어 확인했다. 태그 목록은 지운 뒤에도 서비스·태스크 정의가 있다고 답했다</text>
+<text x="48" y="862" font-size="15" fill="#8a8a84">정본: infra/terraform/README.md 「전 구간 확인 — 2026-09-23」 (#231 · #42)  ·  301 을 돌려준 층이 엣지인지 ALB :80 인지는 기록에 없다</text>
+</svg>

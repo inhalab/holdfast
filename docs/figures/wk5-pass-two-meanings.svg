@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'Malgun Gothic','Apple SD Gothic Neo',system-ui,-apple-system,'Segoe UI',sans-serif">
+<title>「통과」가 두 뜻이었다 — 같은 출력이 정반대 두 상황에서 나왔다</title>
+<desc>검증 스크립트 verify.sh 에 재고가 있는 회차와 없는 회차를 주었을 때. 전에는 둘 다 전부 0 · exit 0 이라 구분이 안 됐다. #235 뒤에는 있는 회차는 무엇을 몇 건 봤는지 찍고 exit 0, 없는 회차는 검증이 성립하지 않는다며 exit 4.</desc>
+<rect width="1600" height="900" fill="#fcfcfb"/>
+<defs>
+<marker id="aB" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0,0 L9,4 L0,8 z" fill="#2a78d6"/></marker>
+<marker id="aG" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0,0 L9,4 L0,8 z" fill="#1baf7a"/></marker>
+<marker id="aR" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0,0 L9,4 L0,8 z" fill="#e34948"/></marker>
+<marker id="aN" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0,0 L9,4 L0,8 z" fill="#7a7973"/></marker>
+</defs>
+<text x="48" y="70" font-size="34" fill="#0b0b0b" font-weight="700">「통과」가 두 뜻이었다 — 같은 출력이 정반대 두 상황에서 나왔다</text>
+<text x="48" y="110" font-size="19" fill="#52514e">«봤는데 위반이 없다» 와 «볼 것이 없었다». 구분하지 않으면 고장 난 도구가 가장 좋은 성적을 낸다 — 규칙 10</text>
+<rect x="48" y="146" width="728" height="454" rx="12" fill="#f2f2f0"/>
+<text x="70" y="184" font-size="24" fill="#0b0b0b" font-weight="700">전</text>
+<text x="754" y="184" font-size="17" fill="#e34948" font-weight="700" text-anchor="end">같은 출력 — 구분이 안 된다</text>
+<rect x="824" y="146" width="728" height="454" rx="12" fill="#f2f2f0"/>
+<text x="846" y="184" font-size="24" fill="#0b0b0b" font-weight="700">후 — #235</text>
+<text x="1530" y="184" font-size="17" fill="#1baf7a" font-weight="700" text-anchor="end">두 출력 — 무엇을 봤는지 찍는다</text>
+<rect x="70" y="230" width="270" height="86" rx="10" fill="#ffffff" stroke="#b9b8b3" stroke-width="1.5"/>
+<text x="88" y="266" font-size="20" fill="#0b0b0b" font-weight="700">verify.sh 1</text>
+<text x="88" y="294" font-size="15" fill="#8a8a84">재고가 있다 — 봤고 위반 없음</text>
+<rect x="70" y="440" width="270" height="86" rx="10" fill="#ffffff" stroke="#b9b8b3" stroke-width="1.5"/>
+<text x="88" y="476" font-size="20" fill="#0b0b0b" font-weight="700">verify.sh 9999</text>
+<text x="88" y="504" font-size="15" fill="#8a8a84">없는 회차 — 볼 재고 0건</text>
+<path d="M340 273 C 420 273, 440 373, 500 360" fill="none" stroke="#7a7973" stroke-width="3" marker-end="url(#aN)"/>
+<path d="M340 483 C 420 483, 440 373, 500 386" fill="none" stroke="#7a7973" stroke-width="3" marker-end="url(#aN)"/>
+<rect x="510" y="330" width="244" height="86" rx="10" fill="#eef8f4" stroke="#1baf7a" stroke-width="2"/>
+<text x="530" y="366" font-size="20" fill="#1baf7a" font-weight="700">검증 쿼리 전부 0</text>
+<text x="530" y="394" font-size="17" fill="#0b0b0b">초록 · exit 0</text>
+<text x="70" y="572" font-size="16" fill="#e34948" font-weight="700">시드를 안 돌렸거나 회차를 잘못 줘도 «위반 없음» 으로 읽혔다</text>
+<rect x="846" y="230" width="270" height="86" rx="10" fill="#ffffff" stroke="#b9b8b3" stroke-width="1.5"/>
+<text x="864" y="266" font-size="20" fill="#0b0b0b" font-weight="700">verify.sh 1</text>
+<text x="864" y="294" font-size="15" fill="#8a8a84">재고가 있다</text>
+<rect x="846" y="440" width="270" height="86" rx="10" fill="#ffffff" stroke="#b9b8b3" stroke-width="1.5"/>
+<text x="864" y="476" font-size="20" fill="#0b0b0b" font-weight="700">verify.sh 9999</text>
+<text x="864" y="504" font-size="15" fill="#8a8a84">없는 회차</text>
+<path d="M1116 273 H1150" fill="none" stroke="#1baf7a" stroke-width="3" marker-end="url(#aG)"/>
+<rect x="1160" y="230" width="370" height="86" rx="10" fill="#eef8f4" stroke="#1baf7a" stroke-width="2"/>
+<text x="1178" y="264" font-size="16" fill="#0b0b0b" font-weight="700">[verify] 회차 1 · 좌석 재고 1건을</text>
+<text x="1178" y="288" font-size="16" fill="#0b0b0b" font-weight="700">대상으로 본다.</text>
+<text x="1512" y="310" font-size="15" fill="#1baf7a" font-weight="700" text-anchor="end">exit 0</text>
+<path d="M1116 483 H1150" fill="none" stroke="#e34948" stroke-width="3" marker-end="url(#aR)"/>
+<rect x="1160" y="440" width="370" height="86" rx="10" fill="#fbf1f1" stroke="#e34948" stroke-width="2"/>
+<text x="1178" y="474" font-size="16" fill="#0b0b0b" font-weight="700">[verify] !! 회차 9999 에 좌석 재고가</text>
+<text x="1178" y="498" font-size="16" fill="#0b0b0b" font-weight="700">0건이다 — 검증이 성립하지 않는다.</text>
+<text x="1512" y="520" font-size="15" fill="#e34948" font-weight="700" text-anchor="end">exit 4</text>
+<text x="846" y="572" font-size="16" fill="#1baf7a" font-weight="700">통과할 때도 무엇을 몇 건 봤는지 찍는다 — 「통과」만 찍으면 0건 통과와 같다</text>
+<text x="48" y="648" font-size="20" fill="#0b0b0b" font-weight="700">같은 부류가 둘 더 걸렸다 — 그리고 반대 방향이 하나</text>
+<text x="70" y="684" font-size="17" fill="#0b0b0b" font-weight="700">tunnel_verify</text>
+<text x="290" y="684" font-size="17" fill="#52514e">확인 목록이 비면 0바퀴 돌고 «확인 통과»</text>
+<text x="1552" y="684" font-size="17" fill="#1baf7a" font-weight="700" text-anchor="end">→ exit 1</text>
+<text x="70" y="720" font-size="17" fill="#0b0b0b" font-weight="700">seed.sh</text>
+<text x="290" y="720" font-size="17" fill="#52514e">INSERT 가 0행을 넣어도 «완료»</text>
+<text x="1552" y="720" font-size="17" fill="#1baf7a" font-weight="700" text-anchor="end">→ 만든 행을 세고 기대 좌석 수와 대조</text>
+<text x="70" y="756" font-size="17" fill="#0b0b0b" font-weight="700">가드 (반대 방향)</text>
+<text x="290" y="756" font-size="17" fill="#52514e">«막을 것이 없다» 를 실패로 반환 — 통과시켜야 할 때 조용히 죽었다</text>
+<text x="1552" y="756" font-size="17" fill="#1baf7a" font-weight="700" text-anchor="end">→ if 로 고쳤다</text>
+<text x="48" y="818" font-size="18" fill="#0b0b0b" font-weight="700">0건을 실패로 찍는 것은 「검사가 돌았나」를 막고, 위반을 일부러 심는 자가검증은 「검사가 옳은가」를 막는다.</text>
+<text x="48" y="862" font-size="15" fill="#8a8a84">정본: docs/workflow.md 규칙 10  ·  #222  ·  #235 「확인 방법」 — 막아야 할 때와 통과시켜야 할 때를 둘 다 돌렸다</text>
+</svg>
