@@ -85,3 +85,6 @@ tools/deck/preview/
 tools/deck/*.pptx
 __pycache__/
 *.pyc
+
+# 클로드 
+CLAUDE.md
