@@ -1,14 +1,22 @@
 # -*- coding: utf-8 -*-
-"""5주차 주간 발표 — **박태준 몫만** 만든다.
+"""5주차 주간 발표 — **박태준 몫 다섯 장의 바탕**을 만든다.
 
-**합치는 자리는 PowerPoint 가 아니라 이 스크립트다**(#217). 최건 몫은 같은
-`engine.py` 를 써서 자기 장을 PR 로 올리고, 머지된 뒤 발표자가 한 번 돌려
-`.pptx` 하나를 만든다. 표지·목차·마무리는 공동 장이라 여기 없다.
+**발표본은 이 스크립트의 출력이 아니다 — 손으로 마감했다.** 이 출력을 받은 뒤
+PowerPoint 에서 글꼴(Noto Sans KR Medium), 상자 위치, 문안 몇 곳, 표지·마무리,
+발표자 노트를 직접 고쳤다. 고친 양이 많아 이번 주에는 스크립트로 되돌리지 않고,
+**4주차와 같이 발표에 쓴 판을 보관본으로 둔다**(#217 결정 3).
+
+**그래서 출력 이름을 발표본과 갈라 놓았다.** 한때 같은 이름이었는데, 그러면
+누가 이 파일을 한 번 돌리는 순간 손으로 마감한 발표본이 통째로 덮인다.
+
+**다음 회차부터는 되풀이하지 않는다.** 글꼴을 바꾸려면 engine.py 의 FONT 를,
+배치를 바꾸려면 여기 좌표를 고친다 — 손으로 마감할 일이 생기면 그 차이가 곧
+«원본이 둘»이다(#217).
 
 **어두운 띠와 꼬리 한 줄을 안 쓴다.** 3·4주차가 장마다 «내용 + 아래 요약 상자»
 한 틀이었는데, 그 상자가 세로의 40%를 먹으면서 정작 **내용을 좁은 위쪽에
 욱여넣게** 했다. 띠가 하던 말은 **제목으로 올린다** — 제목이 결론이고 아래가
-근거면 한눈에 읽힌다. 요약을 따로 둘 이유가 없다.
+근거면 한눈에 읽힌다.
 """
 import sys, shutil
 from pathlib import Path
@@ -18,9 +26,10 @@ from engine import (Deck, W, H, M, CW, PAD, INK, NAVY, MUTED, ICE, PANEL,
 sys.stdout.reconfigure(encoding="utf-8")
 HERE = Path(__file__).parent
 ROOT = HERE.parent.parent
-OUT = ROOT / "docs" / "submissions" / "5주차_발표_박태준.pptx"
+# 발표본(5주차_발표_박태준.pptx)과 이름을 가른다 — 위 머리말
+OUT = ROOT / "docs" / "submissions" / "5주차_생성본.pptx"
 NOTES = ROOT / "docs" / "submissions" / "5주차-노트.md"
-PREV = HERE / "preview-w5"
+PREV = HERE / "preview-wk5"
 FIG = HERE / "build"   # docs/figures 의 SVG 에서 뽑은 PNG. 빌드 산출물이라 커밋 안 한다
 
 BOT = 748   # 맨 아래 한 줄이 앉는 자리. 띠를 안 쓰므로 여기까지 내용이 쓴다
@@ -186,7 +195,7 @@ for op in (o for sl in d.slides for o in sl.ops if o[0] == "image"):
     shutil.copy(op[5], PREV / Path(op[5]).name)
 print(f"미리보기: {PREV} ({len(d.slides)}장)")
 
-tmp = HERE / "w5-out.pptx"
+tmp = HERE / "wk5-out.pptx"
 d.save_pptx(tmp)
 try:
     shutil.copy(tmp, OUT)
