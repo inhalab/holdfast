@@ -94,7 +94,7 @@
 | p95 × 경합도 | 같은 표의 p95 열 + [`m3-conclusion.md`](../results/m3-conclusion.md) 2.5(대조군 다섯 세션) |
 | 2차 측정 | [`concurrency-spec.md`](../concurrency-spec.md) 7.2.3(CS-6) · 7.2.4(CS-4) |
 | 경합도 정의 (좌석 · VU) | [`concurrency-spec.md`](../concurrency-spec.md) 7.2 |
-| 전 구간 기동 (5주차) | [`infra/terraform/README.md`](../../infra/terraform/README.md) 「전 구간 확인 — 2026-09-23」 표(`#231` · `#42`). **301 을 돌려준 층이 엣지인지 ALB `:80` 인지는 기록에 없다** — 그래서 경계에 걸쳐 그렸다 |
+| 전 구간 기동 (5주차) | [`infra/terraform/README.md`](../../infra/terraform/README.md) 「전 구간 확인 — 2026-09-23」 표(`#231` · `#42`). **301 은 엣지다** — [`infra-decision.md`](../infra-decision.md) 2.1 의 `Always Use HTTPS` 관측과 오리진 없이 돌린 확인(`#237`) |
 | 「통과」의 두 뜻 (5주차) | [`workflow.md`](../workflow.md) 규칙 10, `#235` 본문 2절(`verify.sh` 출력 원문) · 3절 · 「확인 방법」 표, `#222` |
 | 배포 아키텍처 | [`infra-decision.md`](../infra-decision.md) 2.1(도메인 · TLS) · 3절(AWS 형태 · 판단 넷), `infra/terraform/*.tf` 의 주석 — 리소스 값은 거기가 정본이다 |
 

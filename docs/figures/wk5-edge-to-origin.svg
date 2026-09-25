@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="'Malgun Gothic','Apple SD Gothic Neo',system-ui,-apple-system,'Segoe UI',sans-serif">
 <title>전 구간 기동 — 확인 다섯이 각각 어디까지 닿았나</title>
-<desc>요청 다섯이 Cloudflare 엣지, ALB, Fargate 태스크 두 대 중 어디까지 닿고 어디서 멈췄는지. app 은 200 으로 태스크까지 닿고 24회가 12 대 12 로 갈렸다. admin 은 엣지의 Access 에서 302, http 는 앱에 닿기 전에 301, ALB 직행은 보안그룹에서 무응답 000.</desc>
+<desc>요청 다섯이 Cloudflare 엣지, ALB, Fargate 태스크 두 대 중 어디까지 닿고 어디서 멈췄는지. app 은 200 으로 태스크까지 닿고 24회가 12 대 12 로 갈렸다. admin 은 엣지의 Access 에서 302, http 는 엣지의 Always Use HTTPS 가 301 로 돌려보내고, ALB 직행은 보안그룹에서 무응답 000.</desc>
 <rect width="1600" height="900" fill="#fcfcfb"/>
 <defs>
 <marker id="aB" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto"><path d="M0,0 L9,4 L0,8 z" fill="#2a78d6"/></marker>
@@ -47,11 +47,12 @@
 <text x="330" y="504" font-size="15" fill="#8a8a84">→ Access 로그인으로 — 앱은 모른다</text>
 <text x="48" y="558" font-size="20" fill="#0b0b0b" font-weight="700">http://app.inhalab.cloud</text>
 <text x="48" y="584" font-size="15" fill="#8a8a84">평문으로 들어온 요청</text>
-<path d="M330 562 H650" fill="none" stroke="#7a7973" stroke-width="3" marker-end="url(#aN)"/>
-<rect x="660" y="536" width="88" height="48" rx="24" fill="#eef4fc" stroke="#2a78d6" stroke-width="2"/>
-<text x="704" y="571" font-size="28" fill="#2a78d6" font-weight="700" text-anchor="middle">301</text>
-<path d="M758 528 h26 v68 h-26" fill="none" stroke="#e34948" stroke-width="3"/>
-<text x="330" y="596" font-size="15" fill="#8a8a84">→ https 로 — 앱에 닿기 전에 되돌린다</text>
+<path d="M330 562 H578" fill="none" stroke="#7a7973" stroke-width="3" marker-end="url(#aN)"/>
+<rect x="588" y="536" width="88" height="48" rx="24" fill="#eef4fc" stroke="#2a78d6" stroke-width="2"/>
+<text x="632" y="571" font-size="28" fill="#2a78d6" font-weight="700" text-anchor="middle">301</text>
+<line x1="690" y1="528" x2="690" y2="596" stroke="#e34948" stroke-width="6" stroke-linecap="round"/>
+<text x="698" y="522" font-size="15" fill="#e34948" font-weight="700">HTTPS 강제</text>
+<text x="330" y="596" font-size="15" fill="#8a8a84">→ https 로 — 오리진에 보내지 않는다</text>
 <text x="48" y="650" font-size="20" fill="#0b0b0b" font-weight="700">ALB 주소로 직행</text>
 <text x="48" y="676" font-size="15" fill="#8a8a84">엣지를 거치지 않는 요청</text>
 <path d="M330 654 H778" fill="none" stroke="#e34948" stroke-width="3" stroke-dasharray="8 7" marker-end="url(#aR)"/>
@@ -65,5 +66,5 @@
 <rect x="48" y="764" width="1504" height="62" rx="10" fill="#eef8f4"/>
 <text x="70" y="794" font-size="20" fill="#0b0b0b" font-weight="700">내린 뒤 — 66 destroyed · 과금되는 리소스 0</text>
 <text x="70" y="816" font-size="15" fill="#52514e">태그 목록이 아니라 AWS 에 직접 물어 확인했다. 태그 목록은 지운 뒤에도 서비스·태스크 정의가 있다고 답했다</text>
-<text x="48" y="862" font-size="15" fill="#8a8a84">정본: infra/terraform/README.md 「전 구간 확인 — 2026-09-23」 (#231 · #42)  ·  301 을 돌려준 층이 엣지인지 ALB :80 인지는 기록에 없다</text>
+<text x="48" y="862" font-size="15" fill="#8a8a84">정본: infra/terraform/README.md 「전 구간 확인 — 2026-09-23」 (#231 · #42)  ·  301 이 엣지인 근거: infra-decision.md 2.1 (Always Use HTTPS)</text>
 </svg>
