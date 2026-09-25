@@ -182,8 +182,15 @@ class AdminCatalogFlowTest {
     /**
      * 정상 회차를 기준으로 두고 테스트마다 <b>한 값만</b> 어긋나게 한다.
      * 다섯 개를 매번 나열하면 무엇이 다른지 읽히지 않는다.
+     *
+     * <p><b>지금 기준으로 잡는다 — 날짜로 박지 않는다.</b> 한때
+     * {@code 2026-10-01T00:00Z} 였고, S-3 이 {@code now + 7일} 을 예약 오픈으로
+     * 넣으면서 <b>2026-09-24 05:00Z 부터 매일 깨졌다</b> — 그 값이 입장 종료
+     * ({@code BASE + 5시간})를 넘어 T-3 이 먼저 거절했다. 서비스가 {@code now()}
+     * 와 비교하는 규칙(S-3)이 있으니 기준도 {@code now()} 를 따라가야 한다.
      */
-    private static final Instant BASE = Instant.parse("2026-10-01T00:00:00Z");
+    private static final Instant BASE =
+            Instant.now().plus(30, ChronoUnit.DAYS).truncatedTo(ChronoUnit.HOURS);
 
     private void createSessionWith(Instant starts, Instant ends,
                                    Instant entryOpens, Instant entryCloses,
